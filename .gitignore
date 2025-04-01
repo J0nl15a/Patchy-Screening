@@ -1,0 +1,15 @@
+#Ignore Thumbs.db file
+Thumbs.db
+
+#Ignore data directory
+L1000N1800/
+
+#Ignore plotting directory
+Plots/	
+
+#Ignore batch files directory
+batch_files/
+
+#Ignore SLURM output scripts
+*.out
+*.err

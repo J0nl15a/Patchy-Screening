@@ -1,0 +1,1 @@
+This is the analysis script and all other relevant code for the patchy screening analysis of the FLAMINGO simulations.

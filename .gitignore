@@ -10,6 +10,9 @@ Plots/
 #Ignore batch files directory
 batch_files/
 
+#Ignore bash scripts
+*.sh	
+
 #Ignore SLURM output scripts
 *.out
 *.err

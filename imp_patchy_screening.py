@@ -183,7 +183,7 @@ class patchyScreening:
             hp.graticule()
             plt.savefig(f'./Plots/T_ps_map_small_scale_{plot[1]}_{self.survey[plot[2]]}_{self.mstar_bins_name[plot[3]]}_new.png', dpi=1200)
             plt.clf()
-        self.mean_mod_T_large_scale = np.mean(np.abs(self.large_scale_map.copy()))
+        self.mean_mod_T_large_scale = np.mean(np.abs(self.large_scale_map))
         print(self.mean_mod_T_large_scale)
         print(f'Generating, rotating and filtering alms: {time.time() - self.job_start_time}s')
         return
@@ -205,12 +205,12 @@ class patchyScreening:
             return np.sin(((l - 2350) * np.pi) / 300)
 
     def tau_prof(self, i, source_vector, theta, phi, plot=(False)):
+        
         halo_pixels = hp.query_disc(self.nside, source_vector[i,:], radius=(0.25*u.deg).to_value(u.radian))
         theta_pix, phi_pix = hp.pix2ang(self.nside, halo_pixels, lonlat=True)
         rtheta = hp.rotator.angdist([theta[i], phi[i]], [theta_pix, phi_pix], lonlat=True)*60.0*180.0/np.pi
         large_scale_fluxes=self.large_scale_map[halo_pixels]
         small_scale_fluxes=self.small_scale_map[halo_pixels]
-        
         tau_1D = np.zeros(len(self.theta_d))
         for j in range(len(self.theta_d)):
             idx_in = np.where((rtheta > theta_d[j]-0.25) & (rtheta <= theta_d[j]+0.25))
@@ -219,25 +219,20 @@ class patchyScreening:
 
     def run_tau_profiles(self, source_vector, theta, phi, nhalo, plot):
         batch_size=max(1, nhalo // (self.ncpu*2))
-        randint = np.random.randint(nhalo)
-        print(nhalo, type(nhalo))
-        print(source_vector, type(source_vector))
-        print(theta, type(theta))
-        print(phi, type(phi))
-        
+        randint = np.random.randint(nhalo)        
         print(f'Starting profile loop: {time.time() - self.job_start_time}s')
-        results = Parallel(n_jobs=self.ncpu, backend="loky", batch_size=batch_size)(delayed(self.tau_prof)(i, source_vector, theta, phi) for i in range(nhalo))
+        results = Parallel(n_jobs=self.ncpu, backend="loky", batch_size=batch_size)(delayed(self.tau_prof)(i, source_vector, theta, phi, (plot[0],randint,plot[1],plot[2],plot[3])) for i in range(nhalo))
         print('tau_1D')
         print(tau_1D[randint,:])
         print(f'Ending profile loop: {time.time() - self.job_start_time}s')
         #data_1D = zip(*results)
-        self.data_1D = np.asarray(results)
-        return
+        data_1D = np.asarray(results)
+        return data_1D
 
-    def stack_and_save(self, nhalo, iz, simname, im, method, fits_file):
+    def stack_and_save(self, data_1D, nhalo, iz, simname, im, method, fits_file):
         tau_1D_stack = np.zeros(len(self.theta_d))
         for i in range(nhalo):
-            tau_1D = self.data_1D[i,:]
+            tau_1D = data_1D[i,:]
             tau_1D_stack += tau_1D
         tau_1D_stack /= nhalo
         print(simname,tau_1D_stack)
@@ -306,8 +301,8 @@ class patchyScreening:
             plt.savefig(f'./Plots/T_ps_map_small_scale_{simname2}_{self.survey[iz]}_{mstar_bins_name[im]}_new.png', dpi=1200)
             plt.clf()
         source_vector, theta, phi = self.get_halo_coordinates(nhalo)
-        self.run_tau_profiles(source_vec tor, theta, phi, nhalo, False)
-        self.stack_and_save(nhalo, iz, simname, im, method, fits_file)
+        data_1D = self.run_tau_profiles(source_vector, theta, phi, nhalo, (plot,self.T_cmb_ps,simname2,iz))
+        self.stack_and_save(data_1D, nhalo, iz, simname, im, method, fits_file)
         return merge, source_vector, theta, phi
 
     def get_halo_coordinates(self, nhalo):

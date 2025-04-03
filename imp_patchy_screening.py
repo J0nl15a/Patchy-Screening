@@ -40,11 +40,11 @@ class patchyScreening:
         elif method.upper() == 'FITS':
             lensed_dir = '/cosma8/data/dp004/dc-yang3/maps/L1000N1800/HYDRO_FIDUCIAL/lightcone0_shells/patchy_screening_folder'
             if fits_file == 'unlensed':
-                self.mock_CMB_primary = hp.read_map(f'{lensed_dir}/CMB_T_map_unl.fits', dtype=None, verbose=False)
+                self.mock_CMB_primary = hp.read_map(f'{lensed_dir}/CMB_T_map_unl.fits', dtype=np.float64, verbose=False)
             elif fits_file == 'lensed_z2':
-                self.mock_CMB_primary = hp.read_map(f'{lensed_dir}/CMB_T_map_l_kappa_z2.fits', dtype=None, verbose=False)
+                self.mock_CMB_primary = hp.read_map(f'{lensed_dir}/CMB_T_map_l_kappa_z2.fits', dtype=np.float64, verbose=False)
             elif fits_file == 'lensed_z3':
-                self.mock_CMB_primary = hp.read_map(f'{lensed_dir}/CMB_T_map_l_kappa_z3.fits', dtype=None, verbose=False)
+                self.mock_CMB_primary = hp.read_map(f'{lensed_dir}/CMB_T_map_l_kappa_z3.fits', dtype=np.float64, verbose=False)
         else:
             raise ValueError("Unknown CMB map generation method")
         print(f'Generating mock primary CMB: {time.time() - self.job_start_time}s')
@@ -183,7 +183,7 @@ class patchyScreening:
             hp.graticule()
             plt.savefig(f'./Plots/T_ps_map_small_scale_{plot[1]}_{self.survey[plot[2]]}_{self.mstar_bins_name[plot[3]]}_new.png', dpi=1200)
             plt.clf()
-        self.mean_mod_T_large_scale = np.mean(np.abs(self.large_scale_map))
+        self.mean_mod_T_large_scale = np.mean(np.abs(self.large_scale_map.copy()))
         print(self.mean_mod_T_large_scale)
         print(f'Generating, rotating and filtering alms: {time.time() - self.job_start_time}s')
         return
@@ -204,26 +204,99 @@ class patchyScreening:
         else:
             return np.sin(((l - 2350) * np.pi) / 300)
 
-    def tau_prof(self, i, source_vector, theta, phi, plot=(False)):
+    def tau_prof(self, i, source_vector, theta, phi):
         
         halo_pixels = hp.query_disc(self.nside, source_vector[i,:], radius=(0.25*u.deg).to_value(u.radian))
         theta_pix, phi_pix = hp.pix2ang(self.nside, halo_pixels, lonlat=True)
         rtheta = hp.rotator.angdist([theta[i], phi[i]], [theta_pix, phi_pix], lonlat=True)*60.0*180.0/np.pi
-        large_scale_fluxes=self.large_scale_map[halo_pixels]
-        small_scale_fluxes=self.small_scale_map[halo_pixels]
+        large_scale_fluxes=np.array(self.large_scale_map[halo_pixels].copy())
+        small_scale_fluxes=np.array(self.small_scale_map[halo_pixels].copy())
         tau_1D = np.zeros(len(self.theta_d))
         for j in range(len(self.theta_d)):
-            idx_in = np.where((rtheta > theta_d[j]-0.25) & (rtheta <= theta_d[j]+0.25))
+            idx_in = np.where((rtheta > self.theta_d[j]-0.25) & (rtheta <= self.theta_d[j]+0.25))
             tau_1D[j] = (-1*np.mean(np.sign(large_scale_fluxes[idx_in])*small_scale_fluxes[idx_in]))/self.mean_mod_T_large_scale
         return tau_1D
 
-    def run_tau_profiles(self, source_vector, theta, phi, nhalo, plot):
+    def run_tau_profiles(self, source_vector, theta, phi, nhalo):
         batch_size=max(1, nhalo // (self.ncpu*2))
         randint = np.random.randint(nhalo)        
         print(f'Starting profile loop: {time.time() - self.job_start_time}s')
-        results = Parallel(n_jobs=self.ncpu, backend="loky", batch_size=batch_size)(delayed(self.tau_prof)(i, source_vector, theta, phi, (plot[0],randint,plot[1],plot[2],plot[3])) for i in range(nhalo))
-        print('tau_1D')
-        print(tau_1D[randint,:])
+        if isinstance(self.large_scale_map, np.memmap):
+            print("self.large_scale_map is a memmap!")
+        else:
+            print("self.large_scale_map is not a memmap!")
+        if isinstance(self.small_scale_map, np.memmap):
+            print("self.small_scale_map is a memmap!")
+        else:
+            print("self.small_scale_map is not a memmap!")
+        if isinstance(source_vector[randint,:], np.memmap):
+            print("source_vector[randint,:] is a memmap!")
+        else:
+            print("source_vector[randint,:] is not a memmap!")
+        if isinstance(theta, np.memmap):
+            print("theta is a memmap!")
+        else:
+            print("theta is not a memmap!")
+        if isinstance(phi, np.memmap):
+            print("phi is a memmap!")
+        else:
+            print("phi is not a memmap!")
+        if isinstance(self.mean_mod_T_large_scale, np.memmap):
+            print("self.mean_mod_T_large_scale is a memmap!")
+        else:
+            print("self.mean_mod_T_large_scale is not a memmap!")
+        if isinstance(self.theta_d, np.memmap):
+            print("theta_d is a memmap!")
+        else:
+            print("theta_d is not a memmap!")
+
+        import pickle
+
+        def check_pickleable(obj, name):
+            try:
+                pickle.dumps(obj)
+                print(f"{name} is pickleable.")
+            except Exception as e:
+                print(f"{name} is NOT pickleable: {e}")
+
+        # Example for several objects:
+        check_pickleable(self.large_scale_map, "self.large_scale_map")
+        check_pickleable(self.small_scale_map, "self.small_scale_map")
+        check_pickleable(source_vector[randint,:], "source_vector")
+        check_pickleable(theta, "theta")
+        check_pickleable(phi, "phi")
+        check_pickleable(self.theta_d, "self.theta_d")
+        check_pickleable(self.mean_mod_T_large_scale, "self.mean_mod_T_large_scale")
+
+        if hasattr(self.large_scale_map, 'filename'):
+            print("self.large_scale_map filename:", self.large_scale_map.filename)
+        else:
+            print("self.large_scale_map has no filename attribute.")
+        if hasattr(self.small_scale_map, 'filename'):
+            print("self.small_scale_map filename:", self.small_scale_map.filename)
+        else:
+            print("self.small_scale_map has no filename attribute.")
+        if hasattr(self.mean_mod_T_large_scale, 'filename'):
+            print("self.mean_mod filename:", self.mean_mod_T_large_scale.filename)
+        else:
+            print("self.mean_mod has no filename attribute.")
+        if hasattr(theta, 'filename'):
+            print("theta filename:", theta.filename)
+        else:
+            print("theta has no filename attribute.")
+        if hasattr(phi, 'filename'):
+            print("phi filename:", phi.filename)
+        else:
+            print("phi has no filename attribute.")
+        if hasattr(source_vector, 'filename'):
+            print("source_vector[randint,:] filename:", source_vector.filename)
+        else:
+            print("source_vector[randint,:] has no filename attribute.")
+        if hasattr(self.theta_d, 'filename'):
+            print("theta_d filename:", self.theta_d.filename)
+        else:
+            print("theta_d has no filename attribute.")
+        results = Parallel(n_jobs=self.ncpu, backend="loky", batch_size=batch_size)(delayed(self.tau_prof)(i, source_vector, theta, phi) for i in range(nhalo))
         print(f'Ending profile loop: {time.time() - self.job_start_time}s')
         #data_1D = zip(*results)
         data_1D = np.asarray(results)
@@ -301,7 +374,7 @@ class patchyScreening:
             plt.savefig(f'./Plots/T_ps_map_small_scale_{simname2}_{self.survey[iz]}_{mstar_bins_name[im]}_new.png', dpi=1200)
             plt.clf()
         source_vector, theta, phi = self.get_halo_coordinates(nhalo)
-        data_1D = self.run_tau_profiles(source_vector, theta, phi, nhalo, (plot,self.T_cmb_ps,simname2,iz))
+        data_1D = self.run_tau_profiles(source_vector, theta, phi, nhalo)
         self.stack_and_save(data_1D, nhalo, iz, simname, im, method, fits_file)
         return merge, source_vector, theta, phi
 

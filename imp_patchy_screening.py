@@ -154,9 +154,13 @@ class patchyScreening:
         print(f'Identifying stackable objects: {time.time() - self.job_start_time}s')
         return
 
-    def compute_alm_maps(self, plot=(False,False,False,False)):
+    def compute_alm_maps(self, rotate, plot=(False,False,False,False)):
         alm = hp.map2alm(self.T_cmb_ps, lmax=3*self.nside-1)
         ell, m = hp.Alm.getlm(lmax=3*self.nside-1)
+        if rotate == True:
+            np.random.seed(int(sys.argv[5]))
+            rotated_alm = hp.Rotator(deg=True, rot=(np.random.uniform(0, 180), np.random.uniform(0, 360))).rotate_alm(alm, lmax=3*self.nside-1)
+            alm = rotated_alm
         lowpass_values = np.array([self.f_lowpass(l) for l in ell])
         highpass_values = np.array([self.f_highpass(l) for l in ell])
         lowpass_alm = hp.almxfl(alm.copy(), lowpass_values)
@@ -294,7 +298,7 @@ class patchyScreening:
         print(f'Writing out data: {time.time() - self.job_start_time}s')
         return
 
-    def run_analysis(self, isim, iz, im, method='FITS', fits_file='unlensed', signal=True, plot=False):
+    def run_analysis(self, isim, iz, im, method='FITS', fits_file='unlensed', signal=True, rotate=False, plot=False):
         #for isim in range(self.isel, self.isel+1):
         simname = self.sim_list[isim]
         simname2 = self.sim_list2[isim]
@@ -327,7 +331,7 @@ class patchyScreening:
         halo_lc_data, df_halo = self.load_halo_data(simname, simname2, i)
         #for im in range(len(self.mstar_bins)):
         self.filter_stellar_mass(df_halo, halo_lc_data, im)
-        self.compute_alm_maps((plot,simname,iz,im))
+        self.compute_alm_maps(rotate, (plot,simname,iz,im))
         if plot == True:
             hp.mollview(self.large_scale_map, title=f"Large scale CMB temperature map (sim={simname2})", cmap="jet")#, min=-1.5e-4, max=1.5e-4)
             hp.graticule()

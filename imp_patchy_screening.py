@@ -353,8 +353,8 @@ class patchyScreening:
         vec[:,0]=self.x
         vec[:,1]=self.y
         vec[:,2]=self.z
-        self.theta, self.phi = hp.pixelfunc.vec2ang(vec,lonlat=True)
-        self.source_vector = hp.ang2vec(theta, phi,lonlat=True)
+        self.theta, self.phi = hp.pixelfunc.vec2ang(vec, lonlat=True)
+        self.source_vector = hp.ang2vec(self.theta, self.phi, lonlat=True)
         return 
 
 if __name__ == '__main__':
@@ -371,7 +371,7 @@ if __name__ == '__main__':
     im = int(sys.argv[4])
     
     ps = patchyScreening(theta_d, isam, survey, mstar_bins, mstar_bins_name, ncpu, isel, rect_size=20)
-    ps.run_analysis(isel, iz, im, plot=False, fits_file='unlensed', signal=False)
+    ps.run_analysis(isel, iz, im, plot=False, fits_file='unlensed', signal=True)
 
     if iz==0 and im==0:
         ##on unit sphere---might not be necessary, but a standard way
@@ -386,8 +386,9 @@ if __name__ == '__main__':
         # Increment the map values at the halo positions
         # If you have weights for each halo (e.g., halo mass), you could use np.bincount with weights, or other functions to compute
         #other statistics such as mean blablabla
-        mstar = np.asarray(ps.lc_data.mstar)
-        mass_weights = np.bincount(pixels, weights=mstar, minlength=npix)
+        mstar = np.asarray(ps.merge.mstar)
+        mvir = np.asarray(ps.merge.m_vir)
+        mass_weights = np.bincount(pixels, weights=mvir, minlength=npix)
         healpix_map = mass_weights
         print(healpix_map.shape)
         print(pixels.shape)
@@ -395,10 +396,29 @@ if __name__ == '__main__':
     
         #np.add.at(healpix_map, pixels, mstar) #—---this gives you the summed value per pixel.
     
-        hp.mollview(healpix_map, title=f"Halo Density Map", unit="Count", cmap="viridis")
+        hp.mollview(healpix_map, title=f"Halo Map", unit=r"$M_{vir}$", cmap="viridis")
         hp.graticule()
-        plt.savefig(f'./Plots/halo_density_map.png', dpi=1200)
+        plt.savefig(f'./Plots/halo_map.png', dpi=1200)
         plt.clf()
+
+        # Compute the power spectrum from your halo map
+        cl = hp.anafast(healpix_map)
+
+        # Create an array of multipole moments l (the length of cl is usually lmax+1)
+        l = np.arange(len(cl))
+
+        # Plot the power spectrum
+        plt.figure(figsize=(8,6))
+        plt.plot(l, cl, label='C_l')
+        plt.xlabel(r'Multipole moment $\ell$')
+        plt.ylabel(r'$C_\ell$')
+        plt.title("Power Spectrum of the Halo Map")
+        plt.yscale("log")  # Using a log scale can help if the spectrum spans several orders of magnitude
+        plt.xlim(0, l[-1])
+        plt.legend()
+        plt.savefig('./Plots/halo_map_power_spectrum.png', dpi=1200)
+        plt.clf()
+
     
 
 '''if i==plot[1]:

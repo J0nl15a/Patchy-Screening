@@ -50,18 +50,18 @@ for i,f in enumerate(infile):
     ax1.plot(data[0], data[1], label=f'{direc_parts[2]}', color=colours[direc_parts[2]])
     #ax1.plot(data[0], data[1], label=f'{stellar_bins[components[4]][1]}', color=colour_shade)
 
-    '''blue_noise_data = pd.read_pickle('./L1000N1800/Blue/noise_files/blue_noise_data.pickle')
-    green_noise_data = pd.read_pickle('./L1000N1800/Green/noise_files/green_noise_data.pickle')
-    red_noise_data = pd.read_pickle('./L1000N1800/Red/noise_files/red_noise_data.pickle')
-    if direc_parts[2]=='Blue':
-        ax1.plot(data[0], blue_noise_data['mean'], color=colours[direc_parts[2]], linestyle='dashed')
-        ax1.fill_between(data[0], blue_noise_data['mean']-blue_noise_data['std'], blue_noise_data['mean']+blue_noise_data['std'], color=colours[direc_parts[2]], alpha=.3, linewidth=0)
-    elif direc_parts[2]=='Green':
-        ax1.plot(data[0], green_noise_data['mean'], color=colours[direc_parts[2]], linestyle='dashed')
-        ax1.fill_between(data[0], green_noise_data['mean']-green_noise_data['std'], green_noise_data['mean']+green_noise_data['std'], color=colours[direc_parts[2]], alpha=.3, linewidth=0)
-    elif direc_parts[2]=='Red':
-        ax1.plot(data[0], red_noise_data['mean'], label='Noise data', color=colours[direc_parts[2]], linestyle='dashed')
-        ax1.fill_between(data[0], red_noise_data['mean']-red_noise_data['std'], red_noise_data['mean']+red_noise_data['std'], color=colours[direc_parts[2]], alpha=.3, linewidth=0)'''
+'''blue_noise_data = pd.read_pickle('./L1000N1800/Blue/noise_files/blue_noise_data.pickle')
+green_noise_data = pd.read_pickle('./L1000N1800/Green/noise_files/green_noise_data.pickle')
+red_noise_data = pd.read_pickle('./L1000N1800/Red/noise_files/red_noise_data.pickle')
+if direc_parts[2]=='Blue':
+ax1.plot(data[0], blue_noise_data['mean'], color=colours[direc_parts[2]], linestyle='dashed')
+ax1.fill_between(data[0], blue_noise_data['mean']-blue_noise_data['std'], blue_noise_data['mean']+blue_noise_data['std'], color=colours[direc_parts[2]], alpha=.3, linewidth=0)
+elif direc_parts[2]=='Green':
+ax1.plot(data[0], green_noise_data['mean'], color=colours[direc_parts[2]], linestyle='dashed')
+ax1.fill_between(data[0], green_noise_data['mean']-green_noise_data['std'], green_noise_data['mean']+green_noise_data['std'], color=colours[direc_parts[2]], alpha=.3, linewidth=0)
+elif direc_parts[2]=='Red':
+ax1.plot(data[0], red_noise_data['mean'], label='Noise data', color=colours[direc_parts[2]], linestyle='dashed')
+ax1.fill_between(data[0], red_noise_data['mean']-red_noise_data['std'], red_noise_data['mean']+red_noise_data['std'], color=colours[direc_parts[2]], alpha=.3, linewidth=0)'''
 
 formatter = ScalarFormatter(useMathText=True)
 formatter.set_powerlimits((-4, -4))

@@ -9,7 +9,7 @@ from camb import model, initialpower
 import time
 
 class patchyScreening:
-    def __init__(self, theta_d, isam, survey, mstar_bins, mstar_bins_name, ncpu, isel, rect_size=20, nside=8192):
+    def __init__(self, theta_d, isam, survey, im_name, ncpu, isel, rect_size=20, nside=8192):
 
         self.job_start_time = time.time()
         self.sim_list = ['HYDRO_FIDUCIAL','HYDRO_PLANCK','HYDRO_PLANCK_LARGE_NU_FIXED','HYDRO_PLANCK_LARGE_NU_VARY','HYDRO_STRONG_AGN','HYDRO_WEAK_AGN','HYDRO_LOW_SIGMA8','HYDRO_STRONGER_AGN','HYDRO_JETS','HYDRO_STRONGEST_AGN','HYDRO_STRONG_SUPERNOVA','HYDRO_STRONGER_AGN_STRONG_SUPERNOVA','HYDRO_STRONG_JETS']
@@ -18,8 +18,7 @@ class patchyScreening:
         self.theta_d = theta_d
         self.isam = isam
         self.survey = survey
-        self.mstar_bins = mstar_bins
-        self.mstar_bins_name = mstar_bins_name
+        self.im_name = im_name
         self.nside = nside
         self.ncpu = ncpu
         self.isel = isel
@@ -142,7 +141,7 @@ class patchyScreening:
         #if df_halo == None or halo_lc_data == None:
         #    self.load_halo_data(self, simname, simname2, i)
         df_mass = df_halo
-        df_mass = df_mass.loc[df_mass.mstar > self.mstar_bins[mstar_bin]]
+        df_mass = df_mass.loc[df_mass.mstar > mstar_bin]
         df_mass.sort_values(by='ID', inplace=True)
         df_mass.reset_index(inplace=True, drop=True)
         self.merge = pd.merge_ordered(df_mass, halo_lc_data, on=['ID'], how='inner')
@@ -156,7 +155,7 @@ class patchyScreening:
         print(f'Identifying stackable objects: {time.time() - self.job_start_time}s')
         return
 
-    def compute_alm_maps(self, rotate, plot=(False,False,False,False)):
+    def compute_alm_maps(self, rotate, plot=(False,False,False)):
         alm = hp.map2alm(self.T_cmb_ps, lmax=3*self.nside-1)
         ell, m = hp.Alm.getlm(lmax=3*self.nside-1)
         if rotate == True:
@@ -182,11 +181,11 @@ class patchyScreening:
         if plot[0] == True:
             hp.mollview(self.large_scale_map.copy(), title=f"Large scale CMB temperature map (sim={plot[1]})", cmap="jet")#, min=-1.5e-4, max=1.5e-4)
             hp.graticule()
-            plt.savefig(f'./Plots/T_ps_map_large_scale_{plot[1]}_{self.survey[plot[2]]}_{self.mstar_bins_name[plot[3]]}_new.png', dpi=1200)
+            plt.savefig(f'./Plots/T_ps_map_large_scale_{plot[1]}_{self.survey[plot[2]]}_{self.im_name}.png', dpi=1200)
             plt.clf()
             hp.mollview(self.small_scale_map.copy(), title=f"Small scale CMB temperature map (sim={plot[1]})", cmap="jet")#, min=-1e-6, max=1e-6)
             hp.graticule()
-            plt.savefig(f'./Plots/T_ps_map_small_scale_{plot[1]}_{self.survey[plot[2]]}_{self.mstar_bins_name[plot[3]]}_new.png', dpi=1200)
+            plt.savefig(f'./Plots/T_ps_map_small_scale_{plot[1]}_{self.survey[plot[2]]}_{self.im_name}.png', dpi=1200)
             plt.clf()
         self.mean_mod_T_large_scale = np.mean(np.abs(self.large_scale_map.copy()))
         print(self.mean_mod_T_large_scale)
@@ -228,7 +227,7 @@ class patchyScreening:
             plt.xlabel('X (arcmin)')
             plt.ylabel('Y (arcmin)')
             plt.title(f'Rectangular Cutout Around Halo = {i}', wrap=True)
-            plt.savefig(f'./Plots/random_cutout_T_ps_map_{plot[2]}_{self.survey[plot[3]]}_new.png', dpi=1200)
+            plt.savefig(f'./Plots/random_cutout_T_ps_map_{plot[2]}_{self.survey[plot[3]]}.png', dpi=1200)
             plt.clf()
             plt.close('all')
             grid_values_tau = np.histogram2d(theta_pix.copy()*60.0, phi_pix.copy()*60.0, bins=[grid_x, grid_y], weights=tau_2D)
@@ -238,7 +237,7 @@ class patchyScreening:
             plt.xlabel('X (arcmin)')
             plt.ylabel('Y (arcmin)')
             plt.title(f'Rectangular Cutout Around Halo = {i} w/ Patchy Screening', wrap=True)
-            plt.savefig(f'./Plots/random_cutout_T_filtered_map_{plot[2]}_{self.survey[plot[3]]}_new.png', dpi=1200)
+            plt.savefig(f'./Plots/random_cutout_T_filtered_map_{plot[2]}_{self.survey[plot[3]]}.png', dpi=1200)
             plt.clf()
             plt.close('all')
         tau_1D = np.zeros(len(self.theta_d))
@@ -253,11 +252,10 @@ class patchyScreening:
         print(f'Starting profile loop: {time.time() - self.job_start_time}s')
         results = Parallel(n_jobs=self.ncpu, backend="loky", batch_size=batch_size)(delayed(self.tau_prof)(i, (plot[0],randint,plot[1],plot[2])) for i in range(self.nhalo))
         print(f'Ending profile loop: {time.time() - self.job_start_time}s')
-        #data_1D = zip(*results)
         self.data_1D = np.asarray(results)
         return
 
-    def stack_and_save(self, iz, simname, im, method, fits_file, signal):
+    def stack_and_save(self, iz, simname, method, fits_file, signal):
         tau_1D_stack = np.zeros(len(self.theta_d))
         for i in range(self.nhalo):
             tau_1D = self.data_1D[i,:]
@@ -273,24 +271,24 @@ class patchyScreening:
         data[3] = self.nhalo
         if signal != True:
             if method == 'CAMB':
-                outfile = os.path.join('./L1000N1800', self.survey[iz], f'{simname}_tau_Mstar_bin{self.mstar_bins_name[im]}_nside{self.nside}_{method}_no_ps.pickle')
+                outfile = os.path.join('./L1000N1800', self.survey[iz], f'{simname}_tau_Mstar_bin{self.im_name}_nside{self.nside}_{method}_no_ps.pickle')
             elif method == 'FITS' and fits_file == 'unlensed':
-                outfile = os.path.join('./L1000N1800', self.survey[iz], f'{simname}_tau_Mstar_bin{self.mstar_bins_name[im]}_nside{self.nside}_{method}_{fits_file}_no_ps.pickle')
+                outfile = os.path.join('./L1000N1800', self.survey[iz], f'{simname}_tau_Mstar_bin{self.im_name}_nside{self.nside}_{method}_{fits_file}_no_ps.pickle')
             elif method == 'FITS' and fits_file == 'lensed_z2':
-                outfile = os.path.join('./L1000N1800', self.survey[iz], f'{simname}_tau_Mstar_bin{self.mstar_bins_name[im]}_nside{self.nside}_{method}_{fits_file}_no_ps.pickle')
+                outfile = os.path.join('./L1000N1800', self.survey[iz], f'{simname}_tau_Mstar_bin{self.im_name}_nside{self.nside}_{method}_{fits_file}_no_ps.pickle')
             elif method == 'FITS' and fits_file == 'lensed_z3':
-                outfile = os.path.join('./L1000N1800', self.survey[iz], f'{simname}_tau_Mstar_bin{self.mstar_bins_name[im]}_nside{self.nside}_{method}_{fits_file}_no_ps.pickle')
+                outfile = os.path.join('./L1000N1800', self.survey[iz], f'{simname}_tau_Mstar_bin{self.im_name}_nside{self.nside}_{method}_{fits_file}_no_ps.pickle')
             else:
                 raise ValueError("Unknown parameter configuration")
         elif signal == True:
             if method == 'CAMB':
-                outfile = os.path.join('./L1000N1800', self.survey[iz], f'{simname}_tau_Mstar_bin{self.mstar_bins_name[im]}_nside{self.nside}_{method}.pickle')
+                outfile = os.path.join('./L1000N1800', self.survey[iz], f'{simname}_tau_Mstar_bin{self.im_name}_nside{self.nside}_{method}.pickle')
             elif method == 'FITS' and fits_file == 'unlensed':
-                outfile = os.path.join('./L1000N1800', self.survey[iz], f'{simname}_tau_Mstar_bin{self.mstar_bins_name[im]}_nside{self.nside}_{method}_{fits_file}.pickle')
+                outfile = os.path.join('./L1000N1800', self.survey[iz], f'{simname}_tau_Mstar_bin{self.im_name}_nside{self.nside}_{method}_{fits_file}.pickle')
             elif method == 'FITS' and fits_file == 'lensed_z2':
-                outfile = os.path.join('./L1000N1800', self.survey[iz], f'{simname}_tau_Mstar_bin{self.mstar_bins_name[im]}_nside{self.nside}_{method}_{fits_file}.pickle')
+                outfile = os.path.join('./L1000N1800', self.survey[iz], f'{simname}_tau_Mstar_bin{self.im_name}_nside{self.nside}_{method}_{fits_file}.pickle')
             elif method == 'FITS' and fits_file == 'lensed_z3':
-                outfile = os.path.join('./L1000N1800', self.survey[iz], f'{simname}_tau_Mstar_bin{self.mstar_bins_name[im]}_nside{self.nside}_{method}_{fits_file}.pickle')
+                outfile = os.path.join('./L1000N1800', self.survey[iz], f'{simname}_tau_Mstar_bin{self.im_name}_nside{self.nside}_{method}_{fits_file}.pickle')
             else:
                 raise ValueError("Unknown parameter configuration")
         os.makedirs(os.path.dirname(outfile), exist_ok=True)
@@ -307,14 +305,14 @@ class patchyScreening:
         if plot == True:
             hp.mollview(self.mock_CMB_primary, title=f"Mock Primary CMB temperature map (sim={simname})", cmap="jet")#, min=-1.5e-4, max=1.5e-4)
             hp.graticule()
-            plt.savefig(f'./Plots/primary_CMB_map_{simname}_new.png', dpi=1200)
+            plt.savefig(f'./Plots/primary_CMB_map_{simname}.png', dpi=1200)
             plt.clf()
         i = self.isam[iz]
         self.load_lightcones(simname2, i, (plot,iz))
         if plot == True:
             hp.mollview(self.DM_map, title=f"DM map (sim={simname2}, lightcone shell={i-1}+{i}+{i+1})", cmap="jet")#, min=2e-5, max=2e-3)
             hp.graticule()
-            plt.savefig(f'./Plots/DM_map_{simname2}_{self.survey[iz]}_shell_{i-1}-{i+1}_new.png', dpi=1200)
+            plt.savefig(f'./Plots/DM_map_{simname2}_{self.survey[iz]}_shell_{i-1}-{i+1}.png', dpi=1200)
             plt.clf()
         if signal == True:
             self.T_cmb_ps = -1 * self.DM_map.copy() * self.mock_CMB_primary.copy()
@@ -326,23 +324,23 @@ class patchyScreening:
         if plot == True:
             hp.mollview(self.T_cmb_ps, title="CMB temperature map w/ Patchy Screening", cmap="jet")#, min=-1.5e-4, max=1.5e-4)
             hp.graticule()
-            plt.savefig(f'./Plots/T_ps_map_{simname2}_{self.survey[iz]}_new.png', dpi=1200)
+            plt.savefig(f'./Plots/T_ps_map_{simname2}_{self.survey[iz]}.png', dpi=1200)
             plt.clf()
         halo_lc_data, df_halo = self.load_halo_data(simname, simname2, i)
         self.filter_stellar_mass(im, df_halo, halo_lc_data)
-        self.compute_alm_maps(rotate, (plot,simname,iz,im))
+        self.compute_alm_maps(rotate, (plot,simname,iz))
         if plot == True:
             hp.mollview(self.large_scale_map, title=f"Large scale CMB temperature map (sim={simname2})", cmap="jet")#, min=-1.5e-4, max=1.5e-4)
             hp.graticule()
-            plt.savefig(f'./Plots/T_ps_map_large_scale_{simname2}_{self.survey[iz]}_{self.mstar_bins_name[im]}_new.png', dpi=1200)
+            plt.savefig(f'./Plots/T_ps_map_large_scale_{simname2}_{self.survey[iz]}_{self.im_name}.png', dpi=1200)
             plt.clf()
             hp.mollview(self.small_scale_map, title=f"Small scale CMB temperature map (sim={simname2})", cmap="jet")#, min=-1e-6, max=1e-6)
             hp.graticule()
-            plt.savefig(f'./Plots/T_ps_map_small_scale_{simname2}_{self.survey[iz]}_{self.mstar_bins_name[im]}_new.png', dpi=1200)
+            plt.savefig(f'./Plots/T_ps_map_small_scale_{simname2}_{self.survey[iz]}_{self.im_name}.png', dpi=1200)
             plt.clf()
         self.get_halo_coordinates()
         self.run_tau_profiles((plot, simname2, iz))
-        self.stack_and_save(iz, simname, im, method, fits_file, signal)
+        self.stack_and_save(iz, simname, method, fits_file, signal)
         return
 
     def get_halo_coordinates(self):
@@ -362,20 +360,17 @@ if __name__ == '__main__':
     theta_d = np.arange(0.5, 11, 0.5)
     isam = np.array([11, 21, 29])
     survey = ['Blue', 'Green', 'Red']
-    mstar_bins = 10**np.array([10.9, 11.0, 11.1, 11.2, 11.3, 11.4, 11.5, 11.6, 9.5])
-    mstar_bins_name = ['10p9', '11p0', '11p1', '11p2', '11p3', '11p4', '11p5', '11p6', '9p5']
-    fits_types = ['unlensed', 'lensed_z2', 'lensed_z3']
     ncpu = int(sys.argv[1])
     isel = int(sys.argv[2])
     iz = int(sys.argv[3])
-    im = int(sys.argv[4]) #10**np.array(sys.argv[4])
-    #im_name = f"{sys.argv[4]:.1f}".replace('.', 'p')
-    fits = int(sys.argv[5])
+    im = 10**np.array(float(sys.argv[4]))
+    im_name = f"{float(sys.argv[4]):.1f}".replace('.', 'p')
+    fits = str(sys.argv[5])
     sig = sys.argv[6]
     
-    ps = patchyScreening(theta_d, isam, survey, mstar_bins, mstar_bins_name, ncpu, isel, rect_size=20)
-    ps.run_analysis(isel, iz, im, plot=False, fits_file=fits_types[fits], signal=sig)
-
+    ps = patchyScreening(theta_d, isam, survey, im_name, ncpu, isel, rect_size=20)
+    ps.run_analysis(isel, iz, im, plot=False, fits_file=fits, signal=sig)
+    
     ##on unit sphere---might not be necessary, but a standard way
     # Create an empty HEALPix map
     # This creates a map with all pixels initialized to zero
@@ -404,9 +399,9 @@ if __name__ == '__main__':
     print(galaxy_overdensity.shape)
     #np.add.at(healpix_map, pixels, galaxy_overdensity) #—---this gives you the summed value per pixel.
     
-    hp.mollview(galaxy_overdensity, title=f"Galaxy Overdensity Map\n(sim={ps.sim_list2[isel]}, {ps.survey[iz]} sample, log$M_*$={ps.mstar_bins_name[im]}, primary CMB={fits_types[fits]})", unit=r"$\delta_g$", cmap="viridis")
+    hp.mollview(galaxy_overdensity, title=f"Galaxy Overdensity Map\n(sim={ps.sim_list2[isel]}, {ps.survey[iz]} sample, log$M_*$={ps.im}, primary CMB={fits})", unit=r"$\delta_g$", cmap="viridis")
     hp.graticule()
-    plt.savefig(f'./Plots/halo_galaxy_overdensity_{ps.sim_list[isel]}_{ps.survey[iz]}_{ps.mstar_bins_name[im]}_{fits_types[fits]}.png', dpi=1200)
+    plt.savefig(f'./Plots/halo_galaxy_overdensity_{ps.sim_list[isel]}_{ps.survey[iz]}_{ps.im_name}_{fits}.png', dpi=1200)
     plt.clf()
 
     '''# Compute the power spectrum from your halo map

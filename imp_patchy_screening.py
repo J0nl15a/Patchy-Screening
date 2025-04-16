@@ -137,8 +137,10 @@ class patchyScreening:
             print(f'Loading halo lightcone data: {time.time() - self.job_start_time}s')
             return halo_lc_data, df_VR
 
-    def filter_stellar_mass(self, df_halo, halo_lc_data, mstar_bin):
+    def filter_stellar_mass(self, mstar_bin, df_halo=None, halo_lc_data=None):
         # Merge and filter the DataFrames based on mstar_bin
+        #if df_halo == None or halo_lc_data == None:
+        #    self.load_halo_data(self, simname, simname2, i)
         df_mass = df_halo
         df_mass = df_mass.loc[df_mass.mstar > self.mstar_bins[mstar_bin]]
         df_mass.sort_values(by='ID', inplace=True)
@@ -158,7 +160,7 @@ class patchyScreening:
         alm = hp.map2alm(self.T_cmb_ps, lmax=3*self.nside-1)
         ell, m = hp.Alm.getlm(lmax=3*self.nside-1)
         if rotate == True:
-            np.random.seed(int(sys.argv[5]))
+            np.random.seed(int(sys.argv[-1]))
             rotated_alm = hp.Rotator(deg=True, rot=(np.random.uniform(0, 180), np.random.uniform(0, 360))).rotate_alm(alm, lmax=3*self.nside-1)
             alm = rotated_alm
         lowpass_values = np.array([self.f_lowpass(l) for l in ell])
@@ -271,24 +273,24 @@ class patchyScreening:
         data[3] = self.nhalo
         if signal != True:
             if method == 'CAMB':
-                outfile = os.path.join('./L1000N1800', self.survey[iz], f'{simname}_tau_Mstar_bin{im}_nside{self.nside}_{method}_no_ps.pickle')
+                outfile = os.path.join('./L1000N1800', self.survey[iz], f'{simname}_tau_Mstar_bin{self.mstar_bins_name[im]}_nside{self.nside}_{method}_no_ps.pickle')
             elif method == 'FITS' and fits_file == 'unlensed':
-                outfile = os.path.join('./L1000N1800', self.survey[iz], f'{simname}_tau_Mstar_bin{im}_nside{self.nside}_{method}_{fits_file}_no_ps.pickle')
+                outfile = os.path.join('./L1000N1800', self.survey[iz], f'{simname}_tau_Mstar_bin{self.mstar_bins_name[im]}_nside{self.nside}_{method}_{fits_file}_no_ps.pickle')
             elif method == 'FITS' and fits_file == 'lensed_z2':
-                outfile = os.path.join('./L1000N1800', self.survey[iz], f'{simname}_tau_Mstar_bin{im}_nside{self.nside}_{method}_{fits_file}_no_ps.pickle')
+                outfile = os.path.join('./L1000N1800', self.survey[iz], f'{simname}_tau_Mstar_bin{self.mstar_bins_name[im]}_nside{self.nside}_{method}_{fits_file}_no_ps.pickle')
             elif method == 'FITS' and fits_file == 'lensed_z3':
-                outfile = os.path.join('./L1000N1800', self.survey[iz], f'{simname}_tau_Mstar_bin{im}_nside{self.nside}_{method}_{fits_file}_no_ps.pickle')
+                outfile = os.path.join('./L1000N1800', self.survey[iz], f'{simname}_tau_Mstar_bin{self.mstar_bins_name[im]}_nside{self.nside}_{method}_{fits_file}_no_ps.pickle')
             else:
                 raise ValueError("Unknown parameter configuration")
         elif signal == True:
             if method == 'CAMB':
-                outfile = os.path.join('./L1000N1800', self.survey[iz], f'{simname}_tau_Mstar_bin{im}_nside{self.nside}_{method}.pickle')
+                outfile = os.path.join('./L1000N1800', self.survey[iz], f'{simname}_tau_Mstar_bin{self.mstar_bins_name[im]}_nside{self.nside}_{method}.pickle')
             elif method == 'FITS' and fits_file == 'unlensed':
-                outfile = os.path.join('./L1000N1800', self.survey[iz], f'{simname}_tau_Mstar_bin{im}_nside{self.nside}_{method}_{fits_file}.pickle')
+                outfile = os.path.join('./L1000N1800', self.survey[iz], f'{simname}_tau_Mstar_bin{self.mstar_bins_name[im]}_nside{self.nside}_{method}_{fits_file}.pickle')
             elif method == 'FITS' and fits_file == 'lensed_z2':
-                outfile = os.path.join('./L1000N1800', self.survey[iz], f'{simname}_tau_Mstar_bin{im}_nside{self.nside}_{method}_{fits_file}.pickle')
+                outfile = os.path.join('./L1000N1800', self.survey[iz], f'{simname}_tau_Mstar_bin{self.mstar_bins_name[im]}_nside{self.nside}_{method}_{fits_file}.pickle')
             elif method == 'FITS' and fits_file == 'lensed_z3':
-                outfile = os.path.join('./L1000N1800', self.survey[iz], f'{simname}_tau_Mstar_bin{im}_nside{self.nside}_{method}_{fits_file}.pickle')
+                outfile = os.path.join('./L1000N1800', self.survey[iz], f'{simname}_tau_Mstar_bin{self.mstar_bins_name[im]}_nside{self.nside}_{method}_{fits_file}.pickle')
             else:
                 raise ValueError("Unknown parameter configuration")
         os.makedirs(os.path.dirname(outfile), exist_ok=True)
@@ -299,7 +301,6 @@ class patchyScreening:
         return
 
     def run_analysis(self, isim, iz, im, method='FITS', fits_file='unlensed', signal=True, rotate=False, plot=False):
-        #for isim in range(self.isel, self.isel+1):
         simname = self.sim_list[isim]
         simname2 = self.sim_list2[isim]
         self.generate_cmb_map(method=method, fits_file=fits_file)
@@ -308,7 +309,6 @@ class patchyScreening:
             hp.graticule()
             plt.savefig(f'./Plots/primary_CMB_map_{simname}_new.png', dpi=1200)
             plt.clf()
-        #for iz in range(len(self.survey)):
         i = self.isam[iz]
         self.load_lightcones(simname2, i, (plot,iz))
         if plot == True:
@@ -329,17 +329,16 @@ class patchyScreening:
             plt.savefig(f'./Plots/T_ps_map_{simname2}_{self.survey[iz]}_new.png', dpi=1200)
             plt.clf()
         halo_lc_data, df_halo = self.load_halo_data(simname, simname2, i)
-        #for im in range(len(self.mstar_bins)):
-        self.filter_stellar_mass(df_halo, halo_lc_data, im)
+        self.filter_stellar_mass(im, df_halo, halo_lc_data)
         self.compute_alm_maps(rotate, (plot,simname,iz,im))
         if plot == True:
             hp.mollview(self.large_scale_map, title=f"Large scale CMB temperature map (sim={simname2})", cmap="jet")#, min=-1.5e-4, max=1.5e-4)
             hp.graticule()
-            plt.savefig(f'./Plots/T_ps_map_large_scale_{simname2}_{self.survey[iz]}_{mstar_bins_name[im]}_new.png', dpi=1200)
+            plt.savefig(f'./Plots/T_ps_map_large_scale_{simname2}_{self.survey[iz]}_{self.mstar_bins_name[im]}_new.png', dpi=1200)
             plt.clf()
             hp.mollview(self.small_scale_map, title=f"Small scale CMB temperature map (sim={simname2})", cmap="jet")#, min=-1e-6, max=1e-6)
             hp.graticule()
-            plt.savefig(f'./Plots/T_ps_map_small_scale_{simname2}_{self.survey[iz]}_{mstar_bins_name[im]}_new.png', dpi=1200)
+            plt.savefig(f'./Plots/T_ps_map_small_scale_{simname2}_{self.survey[iz]}_{self.mstar_bins_name[im]}_new.png', dpi=1200)
             plt.clf()
         self.get_halo_coordinates()
         self.run_tau_profiles((plot, simname2, iz))
@@ -363,61 +362,70 @@ if __name__ == '__main__':
     theta_d = np.arange(0.5, 11, 0.5)
     isam = np.array([11, 21, 29])
     survey = ['Blue', 'Green', 'Red']
-    mstar_bins = 10**np.array([10.9, 11.0, 11.1, 11.2, 11.3, 11.4, 11.5, 11.6])
-    mstar_bins_name = ['10p9', '11p0', '11p1', '11p2', '11p3', '11p4', '11p5', '11p6']
+    mstar_bins = 10**np.array([10.9, 11.0, 11.1, 11.2, 11.3, 11.4, 11.5, 11.6, 9.5])
+    mstar_bins_name = ['10p9', '11p0', '11p1', '11p2', '11p3', '11p4', '11p5', '11p6', '9p5']
+    fits_types = ['unlensed', 'lensed_z2', 'lensed_z3']
     ncpu = int(sys.argv[1])
     isel = int(sys.argv[2])
     iz = int(sys.argv[3])
-    im = int(sys.argv[4])
+    im = int(sys.argv[4]) #10**np.array(sys.argv[4])
+    #im_name = f"{sys.argv[4]:.1f}".replace('.', 'p')
+    fits = int(sys.argv[5])
+    sig = sys.argv[6]
     
     ps = patchyScreening(theta_d, isam, survey, mstar_bins, mstar_bins_name, ncpu, isel, rect_size=20)
-    ps.run_analysis(isel, iz, im, plot=False, fits_file='unlensed', signal=True)
+    ps.run_analysis(isel, iz, im, plot=False, fits_file=fits_types[fits], signal=sig)
 
-    if iz==0 and im==0:
-        ##on unit sphere---might not be necessary, but a standard way
-        # Create an empty HEALPix map
-        # This creates a map with all pixels initialized to zero
-        npix = hp.nside2npix(ps.nside)
-        healpix_map = np.zeros(npix)
-
-        # Convert vectors to HEALPix pixel indices
-        pixels = hp.pixelfunc.vec2pix(ps.nside, ps.source_vector[:,0], ps.source_vector[:,1], ps.source_vector[:,2])  ##in ring order by default
-
-        # Increment the map values at the halo positions
-        # If you have weights for each halo (e.g., halo mass), you could use np.bincount with weights, or other functions to compute
-        #other statistics such as mean blablabla
-        mstar = np.asarray(ps.merge.mstar)
-        mvir = np.asarray(ps.merge.m_vir)
-        mass_weights = np.bincount(pixels, weights=mvir, minlength=npix)
-        healpix_map = mass_weights
-        print(healpix_map.shape)
-        print(pixels.shape)
-        print(mass_weights.shape)
+    ##on unit sphere---might not be necessary, but a standard way
+    # Create an empty HEALPix map
+    # This creates a map with all pixels initialized to zero
+    npix = hp.nside2npix(2048)
+    healpix_map = np.zeros(npix)
     
-        #np.add.at(healpix_map, pixels, mstar) #—---this gives you the summed value per pixel.
+    # Convert vectors to HEALPix pixel indices
+    pixels = hp.pixelfunc.vec2pix(2048, ps.source_vector[:,0], ps.source_vector[:,1], ps.source_vector[:,2])  ##in ring order by default
     
-        hp.mollview(healpix_map, title=f"Halo Map", unit=r"$M_{vir}$", cmap="viridis")
-        hp.graticule()
-        plt.savefig(f'./Plots/halo_map.png', dpi=1200)
-        plt.clf()
+    # Increment the map values at the halo positions
+    # If you have weights for each halo (e.g., halo mass), you could use np.bincount with weights, or other functions to compute
+    #other statistics such as mean blablabla
+    galaxy_number = ps.nhalo
+    number_density= galaxy_number/41253
+    print(number_density)
+    mstar = np.asarray(ps.merge.mstar)
+    mvir = np.asarray(ps.merge.m_vir)
+    #mass_weights = np.bincount(pixels, weights=mvir, minlength=npix)
+    density_map = np.bincount(pixels, minlength=npix).astype(np.float64)
+    mean_density = np.mean(density_map)
+    #healpix_map = mass_weights
+    print(healpix_map.shape)
+    print(pixels.shape)
+    #print(mass_weights.shape)
+    galaxy_overdensity = (density_map - mean_density) / mean_density
+    print(galaxy_overdensity.shape)
+    #np.add.at(healpix_map, pixels, galaxy_overdensity) #—---this gives you the summed value per pixel.
+    
+    hp.mollview(galaxy_overdensity, title=f"Galaxy Overdensity Map\n(sim={ps.sim_list2[isel]}, {ps.survey[iz]} sample, log$M_*$={ps.mstar_bins_name[im]}, primary CMB={fits_types[fits]})", unit=r"$\delta_g$", cmap="viridis")
+    hp.graticule()
+    plt.savefig(f'./Plots/halo_galaxy_overdensity_{ps.sim_list[isel]}_{ps.survey[iz]}_{ps.mstar_bins_name[im]}_{fits_types[fits]}.png', dpi=1200)
+    plt.clf()
 
-        # Compute the power spectrum from your halo map
-        cl = hp.anafast(healpix_map)
+    '''# Compute the power spectrum from your halo map
+    cl = hp.anafast(healpix_map)
 
-        # Create an array of multipole moments l (the length of cl is usually lmax+1)
-        l = np.arange(len(cl))
-
-        # Plot the power spectrum
-        plt.figure(figsize=(8,6))
-        plt.plot(l, cl, label='C_l')
-        plt.xlabel(r'Multipole moment $\ell$')
-        plt.ylabel(r'$C_\ell$')
-        plt.title("Power Spectrum of the Halo Map")
-        plt.yscale("log")  # Using a log scale can help if the spectrum spans several orders of magnitude
-        plt.xlim(0, l[-1])
-        plt.legend()
-        plt.savefig('./Plots/halo_map_power_spectrum.png', dpi=1200)
-        plt.clf()
+    # Create an array of multipole moments l (the length of cl is usually lmax+1)
+    l = np.arange(len(cl))
+    
+    # Plot the power spectrum
+    plt.figure(figsize=(8,6))
+    plt.plot(l, cl, label='C_l')
+    plt.xlabel(r'Multipole moment $\ell$')
+    plt.ylabel(r'$C_\ell$')
+    plt.title("Power Spectrum of the Halo Map")
+    plt.yscale("log")  # Using a log scale can help if the spectrum spans several orders of magnitude
+    plt.xlim(0, l[-1])
+    plt.legend()
+    plt.savefig('./Plots/halo_map_power_spectrum.png', dpi=1200)
+    plt.clf()'''
 
     
 

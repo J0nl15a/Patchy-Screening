@@ -277,28 +277,10 @@ class patchyScreening:
         data[1] = tau_1D_stack
         data[2] = (self.theta_d*np.pi/(180.0*60.0))*self.Dcom
         data[3] = self.nhalo
-        if self.signal != True:
-            if self.method == 'CAMB':
-                outfile = os.path.join('./L1000N1800', self.z_sample_name, f'{self.simname}_tau_Mstar_bin{self.im_name}_nside{self.nside}_{self.method}_no_ps.pickle')
-            elif self.method == 'FITS' and self.fits_file == 'unlensed':
-                outfile = os.path.join('./L1000N1800', self.z_sample_name, f'{self.simname}_tau_Mstar_bin{self.im_name}_nside{self.nside}_{self.method}_{self.fits_file}_no_ps.pickle')
-            elif self.method == 'FITS' and self.fits_file == 'lensed_z2':
-                outfile = os.path.join('./L1000N1800', self.z_sample_name, f'{self.simname}_tau_Mstar_bin{self.im_name}_nside{self.nside}_{self.method}_{self.fits_file}_no_ps.pickle')
-            elif self.method == 'FITS' and self.fits_file == 'lensed_z3':
-                outfile = os.path.join('./L1000N1800', self.z_sample_name, f'{self.simname}_tau_Mstar_bin{self.im_name}_nside{self.nside}_{self.method}_{self.fits_file}_no_ps.pickle')
-            else:
-                raise ValueError("Unknown parameter configuration")
-        elif self.signal == True:
-            if self.method == 'CAMB':
-                outfile = os.path.join('./L1000N1800', self.z_sample_name, f'{self.simname}_tau_Mstar_bin{self.im_name}_nside{self.nside}_{self.method}.pickle')
-            elif self.method == 'FITS' and self.fits_file == 'unlensed':
-                outfile = os.path.join('./L1000N1800', self.z_sample_name, f'{self.simname}_tau_Mstar_bin{self.im_name}_nside{self.nside}_{self.method}_{self.fits_file}.pickle')
-            elif self.method == 'FITS' and self.fits_file == 'lensed_z2':
-                outfile = os.path.join('./L1000N1800', self.z_sample_name, f'{self.simname}_tau_Mstar_bin{self.im_name}_nside{self.nside}_{self.method}_{self.fits_file}.pickle')
-            elif self.method == 'FITS' and self.fits_file == 'lensed_z3':
-                outfile = os.path.join('./L1000N1800', self.z_sample_name, f'{self.simname}_tau_Mstar_bin{self.im_name}_nside{self.nside}_{self.method}_{self.fits_file}.pickle')
-            else:
-                raise ValueError("Unknown parameter configuration")
+        fits_suffix = "" if self.method=='CAMB' else f"_{self.fits_file}"
+        signal_suffix = "" if self.signal==True else "_no_ps"
+        noise_suffix = "" if self.rotate==False else "_noise"
+        outfile = os.path.join('./L1000N1800', self.z_sample_name, f'{self.simname}_tau_Mstar_bin{self.im_name}_nside{self.nside}_{self.method}{fits_suffix}{signal_suffix}{noise_suffix}.pickle')
         os.makedirs(os.path.dirname(outfile), exist_ok=True)
         with open(outfile, 'wb') as f:
             pickle.dump(data, f)
@@ -369,7 +351,7 @@ if __name__ == '__main__':
     im = 10**np.array(float(sys.argv[4]))
     im_name = f"{float(sys.argv[4]):.1f}".replace('.', 'p')
     fits = str(sys.argv[5])
-    sig = sys.argv[6]
+    sig = bool(sys.argv[6])
         
     ps = patchyScreening(isim, iz, im, im_name, ncpu, theta_d, fits_file=fits, signal=sig, rect_size=20)
     ps.run_analysis(plot=False)
@@ -402,9 +384,9 @@ if __name__ == '__main__':
     print(galaxy_overdensity.shape)
     #np.add.at(healpix_map, pixels, galaxy_overdensity) #—---this gives you the summed value per pixel.
     
-    hp.mollview(galaxy_overdensity, title=f"Galaxy Overdensity Map\n(sim={ps.sim_list2[isel]}, {ps.survey[iz]} sample, log$M_*$={ps.im}, primary CMB={fits})", unit=r"$\delta_g$", cmap="viridis")
+    hp.mollview(galaxy_overdensity, title=f"Galaxy Overdensity Map\n(sim={ps.simname}, {ps.z_sample_name} sample, log$M_*$={np.log10(ps.im)}, primary CMB={fits})", unit=r"$\delta_g$", cmap="viridis")
     hp.graticule()
-    plt.savefig(f'./Plots/halo_galaxy_overdensity_{ps.sim_list[isel]}_{ps.survey[iz]}_{ps.im_name}_{fits}.png', dpi=1200)
+    plt.savefig(f'./Plots/halo_galaxy_overdensity_{ps.simname}_{ps.z_sample_name}_{ps.im_name}_{fits}.png', dpi=1200)
     plt.clf()
 
     '''# Compute the power spectrum from your halo map

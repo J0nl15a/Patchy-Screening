@@ -26,9 +26,10 @@ class TauPlotter:
         self.base_dir = base_dir
 
     def construct_filepath(self, sim, colour, mass_bin, nside=8192, primary_method='FITS', file_method='unlensed', has_signal=True):
-        suffix = "" if has_signal else "_no_ps"
-        self.stellar_bins = {10.9: ('10p9', 'bin0'), 11.0: ('11p0', 'bin1'), 11.1: ('11p1', 'bin2'), 11.2: ('11p2', 'bin3'), 11.3: ('11p3', 'bin4'), 11.4: ('11p4', 'bin5'), 11.5: ('11p5', 'bin6'), 11.6: ('11p6', 'bin7')}
-        filename = f"{sim}_tau_Mstar_{self.stellar_bins[mass_bin][1]}_nside{nside}_{primary_method}_{file_method}{suffix}.pickle"
+        signal_suffix = "" if has_signal else "_no_ps"
+        fits_suffix = "" if primary_method != 'FITS' else f"_{file_method}"
+        self.stellar_bins = f"{mass_bin:.1f}".replace('.', 'p')
+        filename = f"{sim}_tau_Mstar_bin{self.stellar_bins}_nside{nside}_{primary_method}{fits_suffix}{signal_suffix}.pickle"
         filepath = os.path.join(self.base_dir, colour, filename)
         return filepath
 
@@ -64,7 +65,7 @@ class TauPlotter:
 
         ax.set_xlabel("Annulus centre (arcmin)")
         ax.set_ylabel(r"Filtered $\tau$")
-        ax.set_title(f"$\\tau$ Profiles for $\log M_*$ = {mass_bin}\n(sim={sim}, nside={nside}, primary CMB={file_method})" if primary_method=='FITS' else f"\\tau Profiles for log stellar mass = {mass_bin}\n(sim={sim}, nside={nside}, primary CMB={primary_method})")
+        ax.set_title(f"$\\tau$ Profiles for log$M_*$ = {mass_bin}\n(sim={sim}, nside={nside}, primary CMB={file_method})" if primary_method=='FITS' else f"$\\tau$ Profiles for log$M_*$ = {mass_bin}\n(sim={sim}, nside={nside}, primary CMB={primary_method})")
         ax.set_xlim(left=0, right=11)
         ax.legend(fontsize=10)
 
@@ -75,7 +76,7 @@ class TauPlotter:
         file_suffix = "" if file_method==False else f"_{file_method}"
         signal_suffix = "" if signal_flag==True else "_no_ps"
         noise_suffix = "" if noise_data==None else "_noise"
-        plt.savefig(f"./Plots/{sim}_stellar_bin_{self.stellar_bins[mass_bin][0]}_nside{nside}{primary_suffix}{file_suffix}{signal_suffix}{noise_suffix}.png", dpi=1200)
+        plt.savefig(f"./Plots/{sim}_stellar_bin_{self.stellar_bins}_nside{nside}{primary_suffix}{file_suffix}{signal_suffix}{noise_suffix}.png", dpi=1200)
         plt.clf()
 
     def plot_by_colour(self, sim, colour, mass_bins, nside=8192, primary_method='FITS', file_method='unlensed', signal_flag=True, noise_data=None):
@@ -103,7 +104,7 @@ class TauPlotter:
                 
         ax.set_xlabel("Annulus centre (arcmin)")
         ax.set_ylabel(r"Filtered $\tau$")
-        ax.set_title(f"$\\tau$ Profiles for unWISE sample = {colour}\n(sim={sim}, nside={nside}, primary CMB={file_method})" if primary_method=='FITS' else f"\\tau Profiles for unWISE sample = {colour}\n(sim={sim}, nside={nside}, primary CMB={primary_method})")
+        ax.set_title(f"$\\tau$ Profiles for unWISE sample = {colour}\n(sim={sim}, nside={nside}, primary CMB={file_method})" if primary_method=='FITS' else f"$\\tau$ Profiles for unWISE sample = {colour}\n(sim={sim}, nside={nside}, primary CMB={primary_method})")
         ax.set_xlim(left=0, right=11)
         ax.legend(fontsize=10)
 
@@ -151,8 +152,8 @@ class TauPlotter:
         ax.ticklabel_format(axis='y', style='sci', scilimits=(-4, -4))
         
         ax.set_xlabel("Annulus centre (arcmin)")
-        ax.set_ylabel(r"$\tau$")
-        ax.set_title(f"$\\tau$ Profiles for {colour} sample, {mass_bin} for different lensing methods\n(sim={sim}, nside={nside})")
+        ax.set_ylabel(r"Filtered $\tau$")
+        ax.set_title(f"$\\tau$ Profiles for {colour} sample, log$M_*$={mass_bin} for different lensing methods\n(sim={sim}, nside={nside})")
         ax.set_xlim(left=0, right=11)
         ax.legend(fontsize=10)
 
@@ -162,26 +163,37 @@ class TauPlotter:
         primary_suffix = "_CAMB" if primary_method=='CAMB' else "_FITS"
         signal_suffix = "" if signal_flag==True else "_no_ps"
         noise_suffix = "" if noise_data==None else "_noise"
-        plt.savefig(f"./Plots/{sim}_method_comp_{colour}_{self.stellar_bins[mass_bin][0]}_nside{nside}{primary_suffix}{signal_suffix}{noise_suffix}.png", dpi=1200)
+        plt.savefig(f"./Plots/{sim}_method_comp_{colour}_{self.stellar_bins}_nside{nside}{primary_suffix}{signal_suffix}{noise_suffix}.png", dpi=1200)
         plt.clf()
 
-    def generic_plot(self, file_list, labels, plot_title, xlabel="Angular Bin (arcmin)", ylabel="Tau", noise_data=None):
+    def generic_plot(self, file_list, labels, line_styles, colours, alpha, plot_title, outname, noise_data=None):
         # file_list: list of file paths to load
         # labels: list of labels corresponding to each file
-        plt.figure(figsize=(8,6))
-        for fp, lab in zip(file_list, labels):
+        fig, ax = plt.subplots(figsize=(8,6), constrained_layout=True, dpi=1200)
+        ax2 = ax.twiny()
+        ax.hlines(y=0, xmin=-1, xmax=12, linestyles='-', color='k', label=None)
+        for fp, lab, style, colour, alpha in zip(file_list, labels, line_styles, colours, alpha):
             with open(fp, 'rb') as f:
                 data = pickle.load(f)
             theta_d = data[0]
             tau_profile = data[1]
-            plt.plot(theta_d, tau_profile, label=lab)
+            ax.plot(theta_d, tau_profile, style, label=lab, color=colour, alpha=alpha)
             if noise_data is not None and lab in noise_data:
-                plt.plot(theta_d, noise_data[lab], '--', label=f"{lab} noise")
-        plt.xlabel(xlabel)
-        plt.ylabel(ylabel)
-        plt.title(plot_title)
-        plt.legend()
-        outname = plot_title.replace(" ", "_") + ".png"
+                ax.plot(theta_d, noise_data[lab], '--', label=f"{lab} noise")
+        formatter = ScalarFormatter(useMathText=True)
+        formatter.set_powerlimits((-4, -4))
+        ax.yaxis.set_major_formatter(formatter)
+        ax.ticklabel_format(axis='y', style='sci', scilimits=(-4, -4))
+        
+        ax.set_xlabel("Annulus centre (arcmin)")
+        ax.set_ylabel(r"$\tau$")
+        ax.set_title(plot_title)
+        ax.set_xlim(left=0, right=11)
+        ax.legend(fontsize=10)
+
+        ax2.plot(data[2], data[1], alpha=0)
+        ax2.set_xlabel('r [Mpc/h]')
+
         plt.savefig(os.path.join("./Plots", outname), dpi=1200)
         plt.clf()
 
@@ -191,11 +203,39 @@ if __name__ == '__main__':
     tp = TauPlotter(base_dir="./L1000N1800")
     tp.plot_by_stellar_bin(sim="HYDRO_FIDUCIAL",
                            mass_bin=10.9,
-                           colours=["Blue", "Green", "Red"])
+                           colours=["Blue", "Green", "Red"],
+                           file_method="unlensed")
+    
+    tp.plot_by_colour(sim="HYDRO_FIDUCIAL",
+                      colour="Blue",
+                      mass_bins=[10.9, 11.0, 11.1, 11.2, 11.3, 11.4, 11.5, 11.6],
+                      file_method="unlensed")
+    
     tp.plot_by_file_method(sim="HYDRO_FIDUCIAL",
-                           colour="Green",
-                           mass_bin=11.0,
+                           colour="Blue",
+                           mass_bin=10.9,
                            primary_method="FITS",
-                           file_methods=["unlensed", "lensed_z2"], signal_flag=False)
-
-
+                           file_methods=["unlensed"],
+                           signal_flag=False)
+    
+    tp.generic_plot(file_list=['./L1000N1800/Blue/HYDRO_FIDUCIAL_tau_Mstar_bin11p6_nside8192_FITS_unlensed.pickle', './L1000N1800/Blue/HYDRO_FIDUCIAL_tau_Mstar_bin11p6_nside8192_FITS_unlensed_no_ps.pickle', './L1000N1800/Blue/HYDRO_FIDUCIAL_tau_Mstar_bin11p6_nside8192_FITS_lensed_z2.pickle', './L1000N1800/Blue/HYDRO_FIDUCIAL_tau_Mstar_bin11p6_nside8192_FITS_lensed_z2_no_ps.pickle', './L1000N1800/Blue/HYDRO_FIDUCIAL_tau_Mstar_bin11p6_nside8192_FITS_lensed_z3.pickle', './L1000N1800/Blue/HYDRO_FIDUCIAL_tau_Mstar_bin11p6_nside8192_FITS_lensed_z3_no_ps.pickle'],
+                    labels=["unlensed", "unlensed (no PS)", "lensed to z=2", "lensed to z=2 (no PS)", "lensed to z=3", "lensed to z=3 (no PS)"],
+                    line_styles=["-", ":", "--", "*", "-.", "+"],
+                    colours=["tab:blue" for _ in range(6)],
+                    alpha=[1. for _ in range(6)],
+                    plot_title=f'$\\tau$ Profiles for Blue sample, $\log M_*$=11.6 for different lensing methods\n(sim=HYDRO_FIDUCIAL, nside=8192)',
+                    outname='HYDRO_FIDUCIAL_method_comp_full_Blue_11p6_nside8192_FITS.png')
+    tp.generic_plot(file_list=['./L1000N1800/Green/HYDRO_FIDUCIAL_tau_Mstar_bin11p6_nside8192_FITS_unlensed.pickle', './L1000N1800/Green/HYDRO_FIDUCIAL_tau_Mstar_bin11p6_nside8192_FITS_unlensed_no_ps.pickle', './L1000N1800/Green/HYDRO_FIDUCIAL_tau_Mstar_bin11p6_nside8192_FITS_lensed_z2.pickle', './L1000N1800/Green/HYDRO_FIDUCIAL_tau_Mstar_bin11p6_nside8192_FITS_lensed_z2_no_ps.pickle', './L1000N1800/Green/HYDRO_FIDUCIAL_tau_Mstar_bin11p6_nside8192_FITS_lensed_z3.pickle', './L1000N1800/Green/HYDRO_FIDUCIAL_tau_Mstar_bin11p6_nside8192_FITS_lensed_z3_no_ps.pickle'],
+                    labels=["unlensed", "unlensed (no PS)", "lensed to z=2", "lensed to z=2 (no PS)", "lensed to z=3", "lensed to z=3 (no PS)"],
+                    line_styles=["-", ":", "--", "*", "-.", "+"],
+                    colours=["tab:green" for _ in range(6)],
+                    alpha=[1. for _ in range(6)],
+                    plot_title=f'$\\tau$ Profiles for Green sample, $\log M_*$=11.6 for different lensing methods\n(sim=HYDRO_FIDUCIAL, nside=8192)',
+                    outname='HYDRO_FIDUCIAL_method_comp_full_Green_11p6_nside8192_FITS.png')
+    tp.generic_plot(file_list=['./L1000N1800/Red/HYDRO_FIDUCIAL_tau_Mstar_bin11p6_nside8192_FITS_unlensed.pickle', './L1000N1800/Red/HYDRO_FIDUCIAL_tau_Mstar_bin11p6_nside8192_FITS_unlensed_no_ps.pickle', './L1000N1800/Red/HYDRO_FIDUCIAL_tau_Mstar_bin11p6_nside8192_FITS_lensed_z2.pickle', './L1000N1800/Red/HYDRO_FIDUCIAL_tau_Mstar_bin11p6_nside8192_FITS_lensed_z2_no_ps.pickle', './L1000N1800/Red/HYDRO_FIDUCIAL_tau_Mstar_bin11p6_nside8192_FITS_lensed_z3.pickle', './L1000N1800/Red/HYDRO_FIDUCIAL_tau_Mstar_bin11p6_nside8192_FITS_lensed_z3_no_ps.pickle'],
+                    labels=["unlensed", "unlensed (no PS)", "lensed to z=2", "lensed to z=2 (no PS)", "lensed to z=3", "lensed to z=3 (no PS)"],
+                    line_styles=["-", ":", "--", "*", "-.", "+"],
+                    colours=["tab:red" for _ in range(6)],
+                    alpha=[1. for _ in range(6)],
+                    plot_title=f'$\\tau$ Profiles for Red sample, $\log M_*$=11.6 for different lensing methods\n(sim=HYDRO_FIDUCIAL, nside=8192)',
+                    outname='HYDRO_FIDUCIAL_method_comp_full_Red_11p6_nside8192_FITS.png')

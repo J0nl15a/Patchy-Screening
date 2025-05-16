@@ -18,8 +18,14 @@ class patchyScreening:
         self.simname = sim_list[isim]
         self.simname2 = sim_list2[isim]
         survey = {'Blue':11, 'Green':22, 'Red':30}
-        self.z_sample = survey[iz]
-        self.z_sample_name = iz
+        obs_samples = {'Blue':8692981, 'Green':3645917}
+        if isinstance(iz, str):
+            self.z_sample = int(survey[iz])
+            self.z_sample_name = iz
+            self.nsamp = obs_samples[iz]
+        elif isinstance(iz,int) or isinstance(iz,float):
+            self.z_sample = int(iz)
+            self.z_sample_name = f'Custom_shell_{iz}'
         self.im = im
         self.im_name = im_name
         self.ncpu = ncpu
@@ -117,8 +123,7 @@ class patchyScreening:
         # Load halo lightcone and SOAP data into DataFrames
         halo_lc_data = pd.DataFrame()
         if lightcone_type == 'HBT':
-            if self.z_sample >= 10: halo_lightcone = f'/cosma8/data/dp004/jch/FLAMINGO/HBT/L1000N1800/{self.simname}/lightcone_halos/lightcone0/lightcone_halos_00{77-self.z_sample}.hdf5'
-            if self.z_sample < 10: halo_lightcone = f'/cosma8/data/dp004/jch/FLAMINGO/HBT/L1000N1800/{self.simname}/lightcone_halos/lightcone0/lightcone_halos_000{77-self.z_sample}.hdf5'
+            halo_lightcone = f'/cosma8/data/dp004/jch/FLAMINGO/HBT/L1000N1800/{self.simname}/lightcone_halos/lightcone0/lightcone_halos_{77-self.z_sample:04d}.hdf5'
             f = h5py.File(halo_lightcone, 'r')
             halo_lc_data['ID'] = f['InputHalos/HaloCatalogueIndex'][...]
             halo_lc_data['SnapNum'] = f['Lightcone/SnapshotNumber'][...]
@@ -128,8 +133,7 @@ class patchyScreening:
             halo_lc_data['yminpot'] = halo_centre[:,1]
             halo_lc_data['zminpot'] = halo_centre[:,2]
         elif lightcone_type == 'VR':
-            if self.z_sample >= 10: halo_lightcone = f'/cosma8/data/dp004/jch/FLAMINGO/lightcone_halos/{self.simname}/lightcone_halos/lightcone0/lightcone_halos_00{self.z_sample}.hdf5'
-            if self.z_sample < 10: halo_lightcone = f'/cosma8/data/dp004/jch/FLAMINGO/lightcone_halos/{self.simname}/lightcone_halos/lightcone0/lightcone_halos_000{self.z_sample}.hdf5'
+            halo_lightcone = f'/cosma8/data/dp004/jch/FLAMINGO/lightcone_halos/{self.simname}/lightcone_halos/lightcone0/lightcone_halos_{self.z_sample:04d}.hdf5'
             f = h5py.File(halo_lightcone, 'r')
             halo_lc_data['ID'] = f['Subhalo/ID'][...]
             halo_lc_data['SnapNum'] = f['Subhalo/SnapNum'][...]
@@ -147,7 +151,7 @@ class patchyScreening:
         print(f'D_com = {self.Dcom}, Snap number = {snap}')
 
         if lightcone_type == 'HBT':
-            HBT_file = f'/cosma8/data/dp004/flamingo/Runs/L1000N1800/{self.simname2}/SOAP-HBT/halo_properties_00'+str(snap)+'.hdf5'
+            HBT_file = f'/cosma8/data/dp004/flamingo/Runs/L1000N1800/{self.simname2}/SOAP-HBT/halo_properties_{snap:04d}.hdf5'
             f = h5py.File(HBT_file, 'r')
             df_HBT = pd.DataFrame()
             df_HBT['ID'] = f['InputHalos/HaloCatalogueIndex'][...]
@@ -160,7 +164,7 @@ class patchyScreening:
             print(f'Loading halo lightcone data: {time.time() - self.job_start_time}s')
             return halo_lc_data, df_HBT
         elif lightcone_type == 'VR':
-            VR_file = f'/cosma8/data/dp004/flamingo/Runs/L1000N1800/{self.simname2}/SOAP/halo_properties_00'+str(snap)+'.hdf5'
+            VR_file = f'/cosma8/data/dp004/flamingo/Runs/L1000N1800/{self.simname2}/SOAP/halo_properties_{snap:04d}.hdf5'
             f = h5py.File(HBT_file, 'r')
             df_VR = pd.DataFrame()
             df_VR['ID'] = f['VR/ID'][...]
@@ -180,14 +184,6 @@ class patchyScreening:
         df_mass.sort_values(by='ID', inplace=True)
         df_mass.reset_index(inplace=True, drop=True)
         self.merge = pd.merge_ordered(df_mass, halo_lc_data, on=['ID'], how='inner')
-        '''if self.nhalo > nsamp:
-                idx=np.random.randint(0,nhalo-1,size=nsamp)
-                x=x[idx]
-                y=y[idx]
-                z=z[idx]
-                mvir=mvir[idx]
-                mstar=mstar[idx]
-                nhalo=len(mvir)'''
         self.x=np.asarray(self.merge.xminpot)
         self.y=np.asarray(self.merge.yminpot)
         self.z=np.asarray(self.merge.zminpot)
@@ -404,9 +400,9 @@ if __name__ == '__main__':
 
     ps = patchyScreening(isim, iz, im, im_name, ncpu, theta_d, fits_file=fits, signal=sig, rect_size=20)
     #ps_camb = patchyScreening(isim, iz, im, im_name, ncpu, theta_d, cmb_method='CAMB', signal=sig, rect_size=20)
-    #ps.run_analysis(plot=True)
+    #ps.run_analysis(plot=False)
     ps.get_halo_coordinates()
-    
+    quit()
     '''cl_fits = hp.anafast(ps.mock_CMB_primary)
     cl_camb = hp.anafast(ps_camb.mock_CMB_primary)
 
@@ -491,7 +487,7 @@ if __name__ == '__main__':
 
     # Compute the power spectrum from your halo map
     #cl = hp.anafast(healpix_map)
-    cl = hp.anafast(galaxy_overdensity)#/(2*np.pi**2)
+    cl = hp.anafast(galaxy_overdensity)/(4*np.pi)#/(2*np.pi**2)
     cl_reduced = hp.anafast(galaxy_overdensity_reduced)#/(2*np.pi**2)
     
     # Create an array of multipole moments l (the length of cl is usually lmax+1)
@@ -514,7 +510,7 @@ if __name__ == '__main__':
     chi2 = np.sum(((interp_sim - obs_data_blue[:,1])/obs_data_blue_std)**2)
     #chi2, pvalue = chisquare(f_obs=obs_data_blue[:,1], f_exp=interp_sim)
     print(chi2)
-    quit()
+    #quit()
     '''textstr = (
         rf"$\chi^2 = {chi2:.2f}$" "\n"
         rf"$p = {p_value:.2g}$"
@@ -522,7 +518,7 @@ if __name__ == '__main__':
     
     # Plot the power spectrum
     plt.figure(figsize=(8,6))
-    plt.plot(l, cl*1e5, color='tab:blue', label=r'FLAMINGO')# (x$\frac{1}{2\pi^2}$)')
+    plt.plot(l, cl*1e5, color='tab:blue', label=r'FLAMINGO (x$\frac{1}{4\pi}$)')# (x$\frac{1}{2\pi^2}$)')
     plt.plot(obs_data_blue[:,0], interp_sim*1e5, color='r', marker='.', markersize=5, label='Farren et al. (2023) (interpolated)')
     #plt.plot(l_reduced, cl_reduced*1e5, color='tab:red', label='FLAMINGO (reduced)')
     plt.plot(obs_data_blue[:,0], obs_data_blue[:,1]*1e5, color='b', marker='.', markersize=5, label='Farren et al. (2023)')

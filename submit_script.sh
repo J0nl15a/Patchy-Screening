@@ -10,7 +10,7 @@
 #SBATCH --exclusive
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=ARIJCONL@ljmu.ac.uk 
-#SBATCH -t 1:00:00
+#SBATCH -t 1:30:00
 
 # Queue the job to be restarted
 output=$(sbatch --dependency=afternotok:$SLURM_JOBID $0)

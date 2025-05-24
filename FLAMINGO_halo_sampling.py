@@ -19,48 +19,6 @@ green_sample = np.loadtxt('/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening
 im = float(sys.argv[2])
 im_name = f"{float(sys.argv[2]):.1f}".replace('.', 'p')
 
-'''sampled_dfs_blue = []
-sampled_dfs_green = []
-for i in halo_z_bins['i']:
-    if halo_z_bins['z1'][i] <= 3.0:
-        ps = patchyScreening(0, i, 10**np.array(10.9), 0, 1, 0, lightcone_method=('FULL', 'shell'))
-        try:
-            ps.filter_stellar_mass()
-        except OSError:
-            print(f"File /cosma8/data/dp004/flamingo/Runs/L1000N1800/HYDRO_FIDUCIAL/hbt_lightcone_halos/lightcone0/lightcone_halos_{77-i:04d}.hdf5 doesn't work.")
-            continue
-        print(ps.nhalo)
-
-        print(blue_sample[i][2], type(blue_sample[i][2]))
-        subdf_blue = ps.merge.sample(n=int(blue_sample[i][2]), random_state=1000).copy()
-        mvir_blue=np.asarray(subdf_blue.m_vir)
-        nhalo_blue=len(mvir_blue)
-        print(nhalo_blue)
-
-        print(green_sample[i][2], type(green_sample[i][2]))
-        subdf_green = ps.merge.sample(n=int(green_sample[i][2]), random_state=1000).copy()
-        mvir_green=np.asarray(subdf_green.m_vir)
-        nhalo_green=len(mvir_green)
-        print(nhalo_green)
-
-        sampled_dfs_blue.append(subdf_blue)
-        sampled_dfs_green.append(subdf_green)
-    
-sampled_halo_data_blue = pd.concat(sampled_dfs_blue, ignore_index=True)
-sampled_halo_data_green = pd.concat(sampled_dfs_green, ignore_index=True)
-mvir_blue=np.asarray(sampled_halo_data_blue.m_vir)
-nhalo_blue=len(mvir_blue)
-print(nhalo_blue)
-mvir_green=np.asarray(sampled_halo_data_green.m_vir)
-nhalo_green=len(mvir_green)
-print(nhalo_green)
-
-sampled_halo_data_blue.to_parquet('sampled_halo_data_Blue.parquet', compression='snappy', index=False)
-sampled_halo_data_green.to_parquet('sampled_halo_data_Green.parquet', compression='snappy', index=False)'''
-
-
-################################################################################################################################################################################################################
-
 def process_snapshot(i):
     """Process a single redshift‐bin index i.  
        Returns (subdf_blue, subdf_green) or None on failure/skip."""

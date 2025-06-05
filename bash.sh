@@ -10,7 +10,7 @@
 #SBATCH --exclusive
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=ARIJCONL@ljmu.ac.uk 
-#SBATCH -t 6:00:00
+#SBATCH -t 2:00:00
 
 # Queue the job to be restarted
 #output=$(sbatch --dependency=afternotok:$SLURM_JOBID $0)
@@ -24,7 +24,8 @@ module purge
 # Activate conda environment
 conda activate patchy_screening
 # Run the copied Python script
-python3 FLAMINGO_halo_sampling.py 128 "$@"
+python3 FLAMINGO_halo_lightcones.py "$@"
+#python3 FLAMINGO_halo_sampling.py 128 "$@"
 
 # ---- CLEANUP AFTER JOB COMPLETION ----
 echo "Job completed. Cleaning up temporary files..."

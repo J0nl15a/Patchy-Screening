@@ -3,8 +3,8 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=128
 #SBATCH -J patchy_screening
-#SBATCH -o ./batch_files/job.%J.dump
-#SBATCH -e ./batch_files/job.%J.err
+#SBATCH -o ./batch_files/job.patchy_screening.%J.dump
+#SBATCH -e ./batch_files/job.patchy_screening.%J.err
 #SBATCH -p cosma8
 #SBATCH -A dp004
 #SBATCH --exclusive

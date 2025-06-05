@@ -15,16 +15,12 @@ class patchyScreening:
 
         self.job_start_time = time.time()
         sim_list = ['HYDRO_FIDUCIAL','HYDRO_PLANCK','HYDRO_PLANCK_LARGE_NU_FIXED','HYDRO_PLANCK_LARGE_NU_VARY','HYDRO_STRONG_AGN','HYDRO_WEAK_AGN','HYDRO_LOW_SIGMA8','HYDRO_STRONGER_AGN','HYDRO_JETS_published','HYDRO_STRONGEST_AGN','HYDRO_STRONG_SUPERNOVA','HYDRO_STRONGER_AGN_STRONG_SUPERNOVA','HYDRO_STRONG_JETS']
-        #sim_list2 = ['HYDRO_FIDUCIAL','HYDRO_PLANCK','HYDRO_PLANCK_LARGE_NU_FIXED','HYDRO_PLANCK_LARGE_NU_VARY','HYDRO_STRONG_AGN','HYDRO_WEAK_AGN','HYDRO_LOW_SIGMA8','HYDRO_STRONGER_AGN','HYDRO_JETS_old','HYDRO_STRONGEST_AGN','HYDRO_STRONG_SUPERNOVA','HYDRO_STRONGER_AGN_STRONG_SUPERNOVA','HYDRO_STRONG_JETS_old']
 
         try:
             isim = int(isim)
             self.simname = sim_list[isim]
-            #self.simname2 = sim_list2[isim]
         except (ValueError, IndexError):
             self.simname = str(isim)
-            #idx = sim_list.index(self.simname)
-            #self.simname2 = sim_list2[idx]
             
         if self.simname not in sim_list:
             raise ValueError(f"‘{self.simname}’ is not a valid simulation name; choose one of:\n  {sim_list!r}")
@@ -84,7 +80,6 @@ class patchyScreening:
     def load_lightcones(self, plot=False):
         # Loading tau map from FLAMINGO lightcone shells
         if self.lightcone_method[0] == 'SHELL':
-            #map_lightcone = f'/cosma8/data/dp004/flamingo/Runs/L1000N1800/{self.simname2}/neutrino_corrected_maps/lightcone0_shells/shell_{self.z_sample}/lightcone0.shell_{self.z_sample}.0.hdf5'
             map_lightcone = f'/cosma8/data/dp004/flamingo/Runs/L1000N1800/{self.simname}/neutrino_corrected_maps/lightcone0_shells/shell_{self.z_sample}/lightcone0.shell_{self.z_sample}.0.hdf5'
             g = h5py.File(map_lightcone,'r')
             conversion_factor = g['DM'].attrs['Conversion factor to CGS (not including cosmological corrections)']
@@ -96,21 +91,17 @@ class patchyScreening:
             print(f'Loading first lightcone shell: {time.time() - self.job_start_time}s')
 
             if plot == True:
-                #hp.mollview(DM, title=f"DM map (sim={self.simname2}, lightcone shell={self.z_sample})", cmap="jet", min=2e-5, max=2e-3)
                 hp.mollview(DM, title=f"DM map (sim={self.simname}, lightcone shell={self.z_sample})", cmap="jet", min=2e-5, max=2e-3)
                 hp.graticule()
-                #plt.savefig(f'./Plots/DM_map_{self.simname2}_{self.z_sample_name}_shell_{self.z_sample}.png', dpi=1200)
                 plt.savefig(f'./Plots/DM_map_{self.simname}_{self.z_sample_name}_shell_{self.z_sample}.png', dpi=1200)
                 plt.clf()
 
-            #map_lightcone_lower = f'/cosma8/data/dp004/flamingo/Runs/L1000N1800/{self.simname2}/neutrino_corrected_maps/lightcone0_shells/shell_{self.z_sample-1}/lightcone0.shell_{self.z_sample-1}.0.hdf5'
             map_lightcone_lower = f'/cosma8/data/dp004/flamingo/Runs/L1000N1800/{self.simname}/neutrino_corrected_maps/lightcone0_shells/shell_{self.z_sample-1}/lightcone0.shell_{self.z_sample-1}.0.hdf5'
             g_low = h5py.File(map_lightcone_lower,'r')
             conversion_factor = g_low['DM'].attrs['Conversion factor to CGS (not including cosmological corrections)']
             DM += g_low['DM'][...]*conversion_factor*6.6524587321e-25
             g_low.close()
 
-            #map_lightcone_higher = f'/cosma8/data/dp004/flamingo/Runs/L1000N1800/{self.simname2}/neutrino_corrected_maps/lightcone0_shells/shell_{self.z_sample+1}/lightcone0.shell_{self.z_sample+1}.0.hdf5'
             map_lightcone_higher = f'/cosma8/data/dp004/flamingo/Runs/L1000N1800/{self.simname}/neutrino_corrected_maps/lightcone0_shells/shell_{self.z_sample+1}/lightcone0.shell_{self.z_sample+1}.0.hdf5'
             g_high = h5py.File(map_lightcone_higher,'r')
             conversion_factor = g_high['DM'].attrs['Conversion factor to CGS (not including cosmological corrections)']
@@ -128,16 +119,12 @@ class patchyScreening:
             print(f"Map lightcone integrated up to z=3")
         if plot == True:
             if self.lightcone_method[0] == 'SHELL':
-                #hp.mollview(self.DM_map, title=f"DM map (sim={self.simname2}, lightcone shell={self.z_sample-1}+{self.z_sample}+{self.z_sample+1})", cmap="jet")#, min=2e-5, max=2e-3)
                 hp.mollview(self.DM_map, title=f"DM map (sim={self.simname}, lightcone shell={self.z_sample-1}+{self.z_sample}+{self.z_sample+1})", cmap="jet")#, min=2e-5, max=2e-3)
                 hp.graticule()
-                #plt.savefig(f'./Plots/DM_map_{self.simname2}_{self.z_sample_name}_shell_{self.z_sample-1}-{self.z_sample+1}.png', dpi=1200)
                 plt.savefig(f'./Plots/DM_map_{self.simname}_{self.z_sample_name}_shell_{self.z_sample-1}-{self.z_sample+1}.png', dpi=1200)
             elif self.lightcone_method[0] == 'FULL':
-                #hp.mollview(self.DM_map, title=f"Stacked DM map, integrated up to z=3 (sim={self.simname2})", cmap="jet")#, min=2e-5, max=2e-3)
                 hp.mollview(self.DM_map, title=f"Stacked DM map, integrated up to z=3 (sim={self.simname})", cmap="jet")#, min=2e-5, max=2e-3)
                 hp.graticule()
-                #plt.savefig(f'./Plots/DM_map_{self.simname2}_stacked_z3p0.png', dpi=1200)
                 plt.savefig(f'./Plots/DM_map_{self.simname}_stacked_z3p0.png', dpi=1200)
             plt.clf()
         print(f'Loading relevant lightcone shells: {time.time() - self.job_start_time}s')
@@ -177,7 +164,6 @@ class patchyScreening:
         print(f'D_com = {self.Dcom}, Snap number = {snap}')
 
         if lightcone_type == 'HBT':
-            #HBT_file = f'/cosma8/data/dp004/flamingo/Runs/L1000N1800/{self.simname2}/SOAP-HBT/halo_properties_{snap:04d}.hdf5'
             HBT_file = f'/cosma8/data/dp004/flamingo/Runs/L1000N1800/{self.simname}/SOAP-HBT/halo_properties_{snap:04d}.hdf5'
             f = h5py.File(HBT_file, 'r')
             df_HBT = pd.DataFrame()
@@ -192,7 +178,6 @@ class patchyScreening:
             print(f'Loading halo lightcone data: {time.time() - self.job_start_time}s')
             return halo_lc_data, df_HBT
         elif lightcone_type == 'VR':
-            #VR_file = f'/cosma8/data/dp004/flamingo/Runs/L1000N1800/{self.simname2}/SOAP/halo_properties_{snap:04d}.hdf5'
             VR_file = f'/cosma8/data/dp004/flamingo/Runs/L1000N1800/{self.simname}/SOAP/halo_properties_{snap:04d}.hdf5'
             f = h5py.File(HBT_file, 'r')
             df_VR = pd.DataFrame()
@@ -621,7 +606,7 @@ if __name__ == '__main__':
     plt.xlabel(r'Multipole moment $\ell$')
     plt.ylabel(r'$C^{\kappa g}_{\ell}x10^5$')
     plt.title("\n".join(textwrap.wrap(f"Cross-Spectra of the Galaxy Overdensity map and CMB lensing map (sim={ps.simname}, {ps.z_sample_name} sample, log$M_*$={np.log10(ps.im)}, primary CMB={fits})", width=75)))
-    #plt.xscale("log")
+    plt.xscale("log")
     plt.yscale("log")  # Using a log scale can help if the spectrum spans several orders of magnitude
     plt.xlim(0, l_cross[-1])
     plt.ylim(bottom=0.001)

@@ -14,5 +14,6 @@ batch_files/
 *.sh	
 
 #Ignore SLURM output scripts
+*.dump
 *.out
 *.err

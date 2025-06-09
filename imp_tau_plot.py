@@ -84,7 +84,7 @@ class TauPlotter:
         fig, ax = plt.subplots(figsize=(8,6), constrained_layout=True, dpi=1200)
         ax2 = ax.twiny()
         ax.hlines(y=0, xmin=-1, xmax=12, linestyles='-', color='k', label=None)
-        alpha = [.9,.8,.7,.6,.5,.4,.3,.2]
+        alpha = [a for a in np.linspace(1.0, 0.2, len(mass_bins))] 
         line_colours = {'Blue':'tab:blue', 'Green':'tab:green', 'Red':'tab:red'}
         base_colour = mcolors.to_rgb(line_colours[colour])
         cmap = LinearSegmentedColormap.from_list("my_colour", [(1,1,1), base_colour], N=256)
@@ -201,23 +201,23 @@ class TauPlotter:
 if __name__ == '__main__':
 
     tp = TauPlotter(base_dir="./L1000N1800")
-    tp.plot_by_stellar_bin(sim="HYDRO_FIDUCIAL",
+    '''tp.plot_by_stellar_bin(sim="HYDRO_FIDUCIAL",
                            mass_bin=10.9,
-                           colours=["Blue", "Green", "Red"],
-                           file_method="unlensed")
+                           colours=["Blue"], #"Green"],# "Red"],
+                           file_method="unlensed")'''
     
-    tp.plot_by_colour(sim="HYDRO_FIDUCIAL",
+    tp.plot_by_colour(sim="HYDRO_JETS_published",
                       colour="Blue",
-                      mass_bins=[10.9, 11.0, 11.1, 11.2, 11.3, 11.4, 11.5, 11.6],
+                      mass_bins=[10.3, 10.4, 10.5, 10.6, 10.7, 10.8, 10.9, 11.0, 11.1, 11.2, 11.3],
                       file_method="unlensed")
-    
+    quit()
     tp.plot_by_file_method(sim="HYDRO_FIDUCIAL",
                            colour="Blue",
-                           mass_bin=10.9,
+                           mass_bin=10.7,
                            primary_method="FITS",
-                           file_methods=["unlensed"],
-                           signal_flag=False)
-    
+                           file_methods=["unlensed", "lensed_z2", "lensed_z3"],
+                           )
+    quit()
     tp.generic_plot(file_list=['./L1000N1800/Blue/HYDRO_FIDUCIAL_tau_Mstar_bin11p6_nside8192_FITS_unlensed.pickle', './L1000N1800/Blue/HYDRO_FIDUCIAL_tau_Mstar_bin11p6_nside8192_FITS_unlensed_no_ps.pickle', './L1000N1800/Blue/HYDRO_FIDUCIAL_tau_Mstar_bin11p6_nside8192_FITS_lensed_z2.pickle', './L1000N1800/Blue/HYDRO_FIDUCIAL_tau_Mstar_bin11p6_nside8192_FITS_lensed_z2_no_ps.pickle', './L1000N1800/Blue/HYDRO_FIDUCIAL_tau_Mstar_bin11p6_nside8192_FITS_lensed_z3.pickle', './L1000N1800/Blue/HYDRO_FIDUCIAL_tau_Mstar_bin11p6_nside8192_FITS_lensed_z3_no_ps.pickle'],
                     labels=["unlensed", "unlensed (no PS)", "lensed to z=2", "lensed to z=2 (no PS)", "lensed to z=3", "lensed to z=3 (no PS)"],
                     line_styles=["-", ":", "--", "*", "-.", "+"],

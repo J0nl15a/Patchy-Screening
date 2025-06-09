@@ -8,6 +8,7 @@ import camb
 from camb import model, initialpower
 import time
 from numbers import Real
+from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, wait
 
 
 class patchyScreening:
@@ -352,20 +353,41 @@ class patchyScreening:
         print(f'Writing out data: {time.time() - self.job_start_time}s')
         return
 
-    def run_analysis(self, plot=False):
-        # Full analysis
-        self.generate_cmb_map(plot)
-        self.load_lightcones(plot)
-        self.get_patchy_screening_map(plot)
+    def _run_cmb_branch(self, proc_workers, plot=False):
+        self.generate_cmb_map(plot)          # reads self.CAMB_params, writes self.cmb_map
+        self.load_lightcones(plot)           # reads self.lightcone_params, writes self.lightcones
+        self.get_patchy_screening_map(plot)  # reads cmb_map & lightcones, writes self.patchy_map
+
+        # compute_alm_maps is CPU‐heavy, so run it in its own process:
+        with ProcessPoolExecutor(max_workers=proc_workers) as proc:
+            alm_process = proc.submit(self.compute_alm_maps(plot))
+
+    def _run_halo_branch(self):
         if self.lightcone_method[1] == 'shell':
             halo_lc_data, df_halo = self.load_halo_data()
             self.filter_stellar_mass(halo_lc_data, df_halo)
         elif self.lightcone_method[1] == 'dndz':
-            self.filter_stellar_mass()
-        self.compute_alm_maps(plot)
-        self.get_halo_coordinates()
+            self.filter_stellar_mass()     # reads self.lightcone_method, writes self.filtered_halos
+        self.get_halo_coordinates()    # reads filtered_halos, writes self.halo_coords
+
+    def run_analysis(self, plot=False):
+        # Full analysis
+        n_cpus = os.cpu_count() or 1           # should be 128 on your node
+        n_thread_workers = min(2, n_cpus)      # two “branches” → 2 threads
+        n_proc_workers   = max(1, n_cpus // 2)  # devote half your cores to the CPU‐heavy step
+        
+        # 1) fire off both branches concurrently in threads
+        with ThreadPoolExecutor(max_workers=n_thread_workers) as exe:
+            f_cmb  = exe.submit(self._run_cmb_branch(n_proc_workers, plot))
+            f_halo = exe.submit(self._run_halo_branch)
+
+            # 2) wait for both to finish
+            wait([f_cmb, f_halo])
+
+        # 3) now both self.alm and self.halo_coords exist
         self.run_tau_profiles(plot)
         self.stack_and_save()
+
         return
 
     def get_halo_coordinates(self):
@@ -405,7 +427,7 @@ class patchyScreening:
         if plot == True:
             hp.mollview(self.T_cmb_ps, title="CMB temperature map w/ Patchy Screening", cmap="jet")#, min=-1.5e-4, max=1.5e-4)
             hp.graticule()
-            plt.savefig(f'./Plots/T_ps_map_{self.simname2}_{self.z_sample_name}.png', dpi=1200)
+            plt.savefig(f'./Plots/T_ps_map_{self.simname}_{self.z_sample_name}.png', dpi=1200)
             plt.clf()
         print(f'Generating patchy screening map: {time.time() - self.job_start_time}s')
         return
@@ -426,8 +448,8 @@ if __name__ == '__main__':
 
     ps = patchyScreening(isim, iz, im, im_name, ncpu, theta_d, fits_file=fits, signal=sig, rect_size=20)
     #ps_camb = patchyScreening(isim, iz, im, im_name, ncpu, theta_d, cmb_method='CAMB', signal=sig, rect_size=20)
-    #ps.run_analysis(plot=False)
-    ps.get_halo_coordinates()
+    ps.run_analysis(plot=True)
+    #ps.get_halo_coordinates()
     #quit()
     '''count=0
     vals, freqs = np.unique(ps.merge.ID, return_counts=True)
@@ -527,41 +549,66 @@ if __name__ == '__main__':
     #cl = hp.anafast(healpix_map)
     cl_auto = hp.anafast(galaxy_overdensity) #/(4*np.pi)#/(2*np.pi**2)
     cl_reduced = hp.anafast(galaxy_overdensity_reduced) #/(2*np.pi**2)
-    cl_cross = hp.anafast(galaxy_overdensity, map2=kappa_map)
+    cl_cross_anafast = hp.anafast(galaxy_overdensity, map2=kappa_map)
+
+    print(cl_auto)
+    print(cl_cross_anafast)
+
+    import pymaster as nmt
+    # define a mask map using CMB kappa map
+    mask=kappa_map*0.0+1.0
+    # choose ell binning - here we include 10 modes per ell bin
+    b = nmt.NmtBin.from_nside_linear(2048, 10)
+    ell_namaster = b.get_effective_ells()
+    # make NaMaster spin-0 field for kappa map
+    f_1 = nmt.NmtField(mask, [kappa_map])
+    # make NaMaster spin-0 field for galaxy overdensity
+    f_2 = nmt.NmtField(mask, [galaxy_overdensity])
+    # cross-correlate
+    cl = nmt.compute_full_master(f_1, f_2, b)
+    cl_namaster = np.squeeze(cl)
     
     # Create an array of multipole moments l (the length of cl is usually lmax+1)
     l_auto = np.arange(len(cl_auto))
     l_reduced = np.arange(len(cl_reduced))
-    l_cross = np.arange(len(cl_cross))
+    l_cross_anafast = np.arange(len(cl_cross_anafast))
 
     from scipy.interpolate import interp1d
     from scipy.stats import chisquare
     a = interp1d(l_auto, cl_auto, kind='cubic')
-    c = interp1d(l_cross, cl_cross, kind='cubic')
+    c_anafast = interp1d(l_cross_anafast, cl_cross_anafast, kind='cubic')
+    c_namaster = interp1d(ell_namaster, cl_namaster, kind='cubic')
     if iz=='Blue':
         interp_auto_sim = a(obs_data_blue[:,0])
-        interp_cross_sim = c(obs_data_blue[:,0])
+        interp_cross_sim_anafast = c_anafast(obs_data_blue[:,0])
+        interp_cross_sim_namaster = c_namaster(obs_data_blue[:,0])
     elif iz=='Green':
         interp_auto_sim = a(obs_data_green[:,0])
-        interp_cross_sim = c(obs_data_green[:,0])
+        interp_cross_sim_anafast = c_anafast(obs_data_green[:,0])
+        interp_cross_sim_namaster = c_namaster(obs_data_green[:,0])
     obs_data_blue_covariance = np.loadtxt('./unWISExLens_lklh/data/v1.0/covariances/covmat_Clgg+Clkg_unWISExACT-DR6_blue_baseline.dat')
     obs_data_green_covariance = np.loadtxt('./unWISExLens_lklh/data/v1.0/covariances/covmat_Clgg+Clkg_unWISExACT-DR6_green_baseline.dat')
     #obs_data_blue_covariance = np.loadtxt('./unWISExLens_lklh/data/v1.0/covariances/covmat_Clgg+Clkg_unWISExACT-DR6_blue_cmbmarg.dat')
     print(obs_data_blue_covariance.shape)
     obs_data_blue_variance = np.diag(obs_data_blue_covariance)
-    obs_data_blue_std = np.sqrt(obs_data_blue_variance[:59])
+    obs_data_blue_std = np.sqrt(obs_data_blue_variance[:int(len(obs_data_blue_variance)/2)])
+    obs_data_green_variance = np.diag(obs_data_green_covariance)
+    obs_data_green_std = np.sqrt(obs_data_green_variance[:int(len(obs_data_green_variance)/2)])
 
     print(np.sum(obs_data_blue[:,1]), np.sum(interp_auto_sim), np.sum(obs_data_blue[:,1]) - np.sum(interp_auto_sim))
     print(obs_data_blue_std.shape)
     #quit()
-    chi2 = np.sum(((interp_auto_sim - obs_data_blue[:,1])/obs_data_blue_std)**2)
-    #chi2, pvalue = chisquare(f_obs=obs_data_blue[:,1], f_exp=interp_sim)
-    print(chi2)
+    if iz=='Blue':
+        chi2 = np.sum(((interp_auto_sim - obs_data_blue[:,1])/obs_data_blue_std)**2)
+    elif iz=='Green':
+        chi2 = np.sum(((interp_auto_sim - obs_data_green[:,1])/obs_data_green_std)**2)
+    #chi2, pvalue = chisquare(f_obs=obs_data_blue[:,1], f_exp=interp_auto_sim)
+    print(f'chi2 = {chi2}')
     #quit()
-    '''textstr = (
-        rf"$\chi^2 = {chi2:.2f}$" "\n"
-        rf"$p = {p_value:.2g}$"
-    )'''
+    textstr = (
+        rf"$\chi^2 = {chi2:.2f}$"# "\n"
+        #rf"$p = {p_value:.2g}$"
+    )
     
     # Plot the auto power spectrum
     plt.figure(figsize=(8,6))
@@ -574,13 +621,14 @@ if __name__ == '__main__':
         plt.plot(l_auto, cl_auto*1e5, color='tab:green', label=r'FLAMINGO')
         plt.plot(obs_data_green[:,0], interp_auto_sim*1e5, color='r', marker='.', markersize=5, label='FLAMINGO (interpolated)')
         plt.plot(obs_data_green[:,0], obs_data_green[:,1]*1e5, color='g', marker='.', markersize=5, label='Farren et al. (2023)')
-    '''plt.text(0.90, 0.70,
-             textstr,
-             transform=plt.transAxes,
-             fontsize=12,
-             verticalalignment='top',
-             bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.7)
-             )'''
+    ax = plt.gca()
+    ax.text(0.75, 0.80,
+            textstr,
+            transform=ax.transAxes,
+            fontsize=12,
+            verticalalignment='top',
+            bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.7)
+            )
     plt.xlabel(r'Multipole moment $\ell$')
     plt.ylabel(r'$C^{gg}_{\ell}x10^5$')
     plt.title("\n".join(textwrap.wrap(f"Power Spectrum of the Galaxy Overdensity map\n(sim={ps.simname}, {ps.z_sample_name} sample, log$M_*$={np.log10(ps.im)}, primary CMB={fits})", width=75)))
@@ -596,25 +644,29 @@ if __name__ == '__main__':
     #Plot cross-spectra
     plt.figure(figsize=(8,6))
     if iz=='Blue':
-        plt.plot(l_cross, cl_cross*1e5, color='tab:blue', label=r'FLAMINGO')
-        plt.plot(obs_data_blue[:,0], interp_cross_sim*1e5, color='r', marker='.', markersize=5, label='FLAMINGO (interpolated)')
+        #plt.plot(l_cross, cl_cross*1e5, color='tab:blue', label=r'FLAMINGO')
+        plt.plot(ell_namaster, cl_namaster*1e5, color='tab:blue', label=r'FLAMINGO (NaMaster)')
+        plt.plot(obs_data_blue[:,0], interp_cross_sim_namaster*1e5, color='r', marker='.', markersize=5, label='FLAMINGO (NaMaster, interpolated)')
+        #plt.plot(obs_data_blue[:,0], interp_cross_sim*1e5, color='r', marker='.', markersize=5, label='FLAMINGO (interpolated)')
         plt.plot(obs_data_blue[:,0], obs_data_blue[:,2]*1e5, color='b', marker='.', markersize=5, label='Farren et al. (2023)')
     elif iz=='Green':
-        plt.plot(l_cross, cl_cross*1e5, color='tab:green', label=r'FLAMINGO')
-        plt.plot(obs_data_green[:,0], interp_cross_sim*1e5, color='r', marker='.', markersize=5, label='FLAMINGO (interpolated)')
+        #plt.plot(l_cross, cl_cross*1e5, color='tab:green', label=r'FLAMINGO')
+        #plt.plot(obs_data_green[:,0], interp_cross_sim*1e5, color='r', marker='.', markersize=5, label='FLAMINGO (interpolated)')
+        plt.plot(ell_namaster, cl_namaster*1e5, color='tab:green', label=r'FLAMINGO (NaMaster)')
+        plt.plot(obs_data_green[:,0], interp_cross_sim_namaster*1e5, color='r', marker='.', markersize=5, label='FLAMINGO (NaMaster, interpolated)')
         plt.plot(obs_data_green[:,0], obs_data_green[:,2]*1e5, color='g', marker='.', markersize=5, label='Farren et al. (2023)')
     plt.xlabel(r'Multipole moment $\ell$')
     plt.ylabel(r'$C^{\kappa g}_{\ell}x10^5$')
     plt.title("\n".join(textwrap.wrap(f"Cross-Spectra of the Galaxy Overdensity map and CMB lensing map (sim={ps.simname}, {ps.z_sample_name} sample, log$M_*$={np.log10(ps.im)}, primary CMB={fits})", width=75)))
     plt.xscale("log")
     plt.yscale("log")  # Using a log scale can help if the spectrum spans several orders of magnitude
-    plt.xlim(0, l_cross[-1])
-    plt.ylim(bottom=0.001)
+    plt.xlim(0, ell_namaster[-1])#l_cross[-1])
+    #plt.ylim(bottom=0.001)
     plt.legend()
     plt.savefig(f'./Plots/halo_map_kg_power_spectrum_{ps.simname}_{ps.z_sample_name}_{ps.im_name}_{fits}_ntotal.png', dpi=1200)
     plt.clf()
 
-    print(f'For stellar cut of {np.log10(ps.im)}: {interp_sim/obs_data_blue[:,1]}')
+    print(f'For stellar cut of {np.log10(ps.im)}: {interp_auto_sim/obs_data_blue[:,1]}')
     
     if iz=='Blue':
         plt.plot(obs_data_blue[:,0], interp_auto_sim/obs_data_blue[:,1])

@@ -105,7 +105,7 @@ jid3=$(sbatch --parsable \
 #SBATCH --job-name=FLAMINGO_halo_sampling
 #SBATCH --output=./batch_files/job.FLAMINGO_halo_sampling.%j.dump
 #SBATCH --error=./batch_files/job.FLAMINGO_halo_sampling.%j.err
-#SBATCH --time=01:00:00
+#SBATCH --time=01:30:00
 
 module purge
 mamba activate patchy_screening

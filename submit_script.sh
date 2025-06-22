@@ -1,7 +1,6 @@
 #!/bin/bash -l
 
-#SBATCH --ntasks=1
-#SBATCH --cpus-per-task=128
+#SBATCH -c 128
 #SBATCH -J patchy_screening
 #SBATCH -o ./batch_files/job.patchy_screening.%J.dump
 #SBATCH -e ./batch_files/job.patchy_screening.%J.err
@@ -10,7 +9,7 @@
 #SBATCH --exclusive
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=ARIJCONL@ljmu.ac.uk 
-#SBATCH -t 1:30:00
+#SBATCH -t 0:10:00
 
 # Queue the job to be restarted
 output=$(sbatch --dependency=afternotok:$SLURM_JOBID $0)
@@ -24,8 +23,7 @@ echo "Running job with script: $PYTHON_SCRIPT"
 # Activate conda environment
 conda activate patchy_screening
 # Run the copied Python script
-#python3 $PYTHON_SCRIPT 128 0 0 0 0 True $SLURM_JOBID
-python3 $PYTHON_SCRIPT 128 "$@" $SLURM_JOBID
+python3 $PYTHON_SCRIPT $SLURM_CPUS_PER_TASK "$@" $SLURM_JOBID
 
 # ---- CLEANUP AFTER JOB COMPLETION ----
 echo "Job completed. Cleaning up temporary files..."

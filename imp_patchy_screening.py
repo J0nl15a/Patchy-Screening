@@ -1,4 +1,5 @@
 import sys, os, pickle
+os.environ["POLARS_MAX_THREADS"] = str(sys.argv[1])
 import h5py, pandas as pd, numpy as np, polars as pl
 import healpy as hp, matplotlib.pyplot as plt
 import astropy.units as u
@@ -12,14 +13,14 @@ from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, wait
 
 
 class patchyScreening:
-    def __init__(self, isim, iz, im, n_cut, ncpu, theta_d, nside=8192, cmb_method='FITS', fits_file='unlensed', lightcone_method=('FULL','dndz'), signal=True, rotate=False, rect_size=20):
+    def __init__(self, isim, iz, im, n_cut, ncpu, theta_d=np.arange(0.5, 11, 0.5), nside=8192, cmb_method='FITS', fits_file='unlensed', lightcone_method=('FULL','dndz'), signal=True, rotate=False, rect_size=20):
 
         self.job_start_time = time.time()
         sim_list = ['HYDRO_FIDUCIAL','HYDRO_PLANCK','HYDRO_PLANCK_LARGE_NU_FIXED','HYDRO_PLANCK_LARGE_NU_VARY','HYDRO_STRONG_AGN','HYDRO_WEAK_AGN','HYDRO_LOW_SIGMA8','HYDRO_STRONGER_AGN','HYDRO_JETS_published','HYDRO_STRONGEST_AGN','HYDRO_STRONG_SUPERNOVA','HYDRO_STRONGER_AGN_STRONG_SUPERNOVA','HYDRO_STRONG_JETS']
 
         try:
             isim = int(isim)
-            self.simname = sim_list[isim]
+            self.simname = sim_list[isim]                
         except (ValueError, IndexError):
             self.simname = str(isim)
             
@@ -54,7 +55,20 @@ class patchyScreening:
         self.cosmology = FlatLambdaCDM(H0=68.1, Om0=0.3, Tcmb0=2.725)
         self.mock_CMB_primary = None
 
+        
+    def _path(self, name):
+        return os.path.join(self.ckpt, f"{name}.pkl")
+
+    
     def generate_cmb_map(self, plot=False):
+        try:
+            checkpoint_path = self._path("primary_cmb_map")
+            if os.path.exists(checkpoint_path):
+                with open(checkpoint_path, "rb") as f:
+                    self.mock_CMB_primary = pickle.load(f)
+        except AttributeError:
+            pass
+                
         # Generating primary CMB map with CAMB or loading pre-generated FITS
         np.random.seed(1000)
         if self.cmb_method == 'CAMB':
@@ -80,9 +94,24 @@ class patchyScreening:
             plt.savefig(f'./Plots/primary_CMB_map_{self.simname}.png', dpi=400)
             plt.clf()
         print(f'Generating mock primary CMB: {time.time() - self.job_start_time}s')
+
+        try:
+            with open(checkpoint_path, "wb") as f:
+                pickle.dump(self.mock_CMB_primary, f)
+        except NameError:
+            pass
         return
 
+    
     def load_lightcones(self, plot=False):
+        try:
+            checkpoint_path = self._path("lightcone_maps")
+            if os.path.exists(checkpoint_path):
+                with open(checkpoint_path, "rb") as f:
+                    self.DM_map = pickle.load(f)
+        except AttributeError:
+            pass
+                
         # Loading tau map from FLAMINGO lightcone shells
         if self.lightcone_method[0] == 'SHELL':
             map_lightcone = f'/cosma8/data/dp004/flamingo/Runs/L1000N1800/{self.simname}/neutrino_corrected_maps/lightcone0_shells/shell_{self.z_sample}/lightcone0.shell_{self.z_sample}.0.hdf5'
@@ -133,21 +162,34 @@ class patchyScreening:
                 plt.savefig(f'./Plots/DM_map_{self.simname}_stacked_z3p0.png', dpi=400)
             plt.clf()
         print(f'Loading relevant lightcone shells: {time.time() - self.job_start_time}s')
+
+        try:
+            with open(checkpoint_path, "wb") as f:
+                pickle.dump(self.DM_map, f)
+        except NameError:
+            pass
         return
 
+    
     def load_halo_data(self, lightcone_type='HBT'):
+        try:
+            checkpoint_path = self._path("halo_lightcones")
+            if os.path.exists(checkpoint_path):
+                with open(checkpoint_path, "rb") as f:
+                    data = pickle.load(f)
+                self.Dcom = data["Dcom"]
+                halo_lc_data = data["halo_lc_data"]
+                if lightcone_type == 'HBT':
+                    df_HBT = data["df_HBT"]
+                elif lightcone_type == 'VR':
+                    df_VR = data["df_VR"]
+        except AttributeError:
+            pass
+        
         # Load halo lightcone and SOAP data into DataFrames
-        #halo_lc_data = pd.DataFrame()
         if lightcone_type == 'HBT':
             halo_lightcone = f'/cosma8/data/dp004/flamingo/Runs/L1000N1800/{self.simname}/hbt_lightcone_halos/lightcone0/lightcone_halos_{77-self.z_sample:04d}.hdf5'
             f = h5py.File(halo_lightcone, 'r')
-            '''halo_lc_data['ID'] = f['InputHalos/HaloCatalogueIndex'][...]
-            halo_lc_data['SnapNum'] = f['Lightcone/SnapshotNumber'][...]
-            halo_lc_data['z'] = f['Lightcone/Redshift'][...]
-            halo_centre = f['Lightcone/HaloCentre'][...]
-            halo_lc_data['xminpot'] = halo_centre[:,0]
-            halo_lc_data['yminpot'] = halo_centre[:,1]
-            halo_lc_data['zminpot'] = halo_centre[:,2]'''
             halo_lc_data = pl.DataFrame({
                 'ID':          f['InputHalos/HaloCatalogueIndex'][...],
                 'SnapNum':     f['Lightcone/SnapshotNumber'][...],
@@ -168,28 +210,15 @@ class patchyScreening:
             halo_lc_data['zminpot'] = f['Subhalo/LightconeZcminpot'][...]
             f.close()
 
-        #print(f'Halo lightcone z = [{np.min(halo_lc_data.z)},{np.max(halo_lc_data.z)}]')
-        #Dcom = self.cosmology.comoving_distance(np.mean(halo_lc_data.z))*0.681  # comoving distance to galaxy in Mpc/h
         print(f"Halo lightcone z = [{halo_lc_data['z'].min()},{halo_lc_data['z'].max()}]")
         Dcom = self.cosmology.comoving_distance(halo_lc_data['z'].mean())*0.681  # comoving distance to galaxy in Mpc/h
         self.Dcom = Dcom.value
-        #halo_lc_data.sort_values(by='ID', inplace=True)
-        #halo_lc_data.reset_index(inplace=True, drop=True)
-        #snap = int(halo_lc_data.iloc[0]['SnapNum'])
         snap = int(halo_lc_data['SnapNum'].first())
         print(f'D_com = {self.Dcom}, Snap number = {snap}')
 
         if lightcone_type == 'HBT':
             HBT_file = f'/cosma8/data/dp004/flamingo/Runs/L1000N1800/{self.simname}/SOAP-HBT/halo_properties_{snap:04d}.hdf5'
             f = h5py.File(HBT_file, 'r')
-            '''df_HBT = pd.DataFrame()
-            df_HBT['ID'] = f['InputHalos/HaloCatalogueIndex'][...]
-            #df_HBT['hostHaloID'] = f['HBT/HostHaloID'][...]
-            df_HBT['Structuretype'] = f['InputHalos/IsCentral'][...]
-            df_HBT['m_vir'] = f['SO/500_crit/TotalMass'][...]
-            df_HBT['mstar'] = f['ExclusiveSphere/50kpc/StellarMass'][...]
-            df_HBT.mstar*=1e10
-            df_HBT.m_vir*=1e10'''
             df_HBT = pl.DataFrame({
                 'ID':          f['InputHalos/HaloCatalogueIndex'][...],
                 'Structuretype': f['InputHalos/IsCentral'][...],
@@ -198,6 +227,17 @@ class patchyScreening:
             })
             f.close()
             print(f'Loading halo lightcone data: {time.time() - self.job_start_time}s')
+
+            try:
+                data = {
+                    "Dcom": self.Dcom,
+                    "halo_lc_data": halo_lc_data,
+                    "df_HBT": df_HBT
+                }
+                with open(p,"wb") as f:
+                    pickle.dump(data, f)
+            except NameError:
+                pass
             return halo_lc_data, df_HBT
         elif lightcone_type == 'VR':
             VR_file = f'/cosma8/data/dp004/flamingo/Runs/L1000N1800/{self.simname}/SOAP/halo_properties_{snap:04d}.hdf5'
@@ -210,25 +250,45 @@ class patchyScreening:
             df_VR['mstar'] = f['ExclusiveSphere/50kpc/StellarMass'][...]
             f.close()
             print(f'Loading halo lightcone data: {time.time() - self.job_start_time}s')
+
+            try:
+                data = {
+                    "Dcom": self.Dcom,
+                    "halo_lc_data": halo_lc_data,
+                    "df_VR": df_VR
+                }
+                with open(p,"wb") as f:
+                    pickle.dump(data, f)
+            except NameError:
+                pass
             return halo_lc_data, df_VR
 
-    def filter_stellar_mass(self, halo_lc_data=None, df_halo=None):        
+        
+    def filter_stellar_mass(self, halo_lc_data=None, df_halo=None):
+        try:
+            checkpoint_path = self._path("mock_halo_catalog")
+            if os.path.exists(checkpoint_path):
+                with open(checkpoint_path, "rb") as f:
+                    data = pickle.load(f)
+                self.merge = data["merge"]
+                self.Dcom = data["Dcom"] 
+                self.x = data["x"]
+                self.y = data["y"]
+                self.z = data["z"]
+                self.nhalo = data["nhalo"]
+        except AttributeError:
+            pass
+        
         # Merge and filter the DataFrames based on stellar mass bin
         if self.lightcone_method[1] == 'shell':
             if halo_lc_data is None or df_halo is None:
                 halo_lc_data, df_halo = self.load_halo_data()
-            '''df_mass = df_halo
-            df_mass = df_mass.loc[df_mass.mstar > self.im]
-            df_mass.sort_values(by='ID', inplace=True)
-            df_mass.reset_index(inplace=True, drop=True)
-            self.merge = pd.merge_ordered(df_mass, halo_lc_data, on=['ID'], how='inner')'''
+                
             df_mass = df_halo.filter(pl.col('mstar') > self.im)
             self.merge = df_mass.join(halo_lc_data, on='ID', how='inner').sort('ID')
             if self.merge.is_empty():
                 self.merge = np.nan
-            #self.merge = merged
         elif self.lightcone_method[1] == 'dndz':
-            #self.merge = pd.read_parquet(f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/mock_halo_catalogs/sampled_halo_data_{self.simname}_{self.z_sample_name}_{self.im_name}_{self.slope_name}.parquet', engine='pyarrow')
             self.merge = pl.read_parquet(
                 f"/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/mock_halo_catalogs/sampled_halo_data_{self.simname}_{self.z_sample_name}_{self.im_name}_{self.slope_name}.parquet"
             )
@@ -241,24 +301,43 @@ class patchyScreening:
             self.nhalo = 0
             return
         else:
-            '''self.x=np.asarray(self.merge.xminpot)
-            self.y=np.asarray(self.merge.yminpot)
-            self.z=np.asarray(self.merge.zminpot)'''
             self.x = self.merge['xminpot'].to_numpy()
             self.y = self.merge['yminpot'].to_numpy()
             self.z = self.merge['zminpot'].to_numpy()
-            '''mvir=np.asarray(self.merge.m_vir)
-            mstar=np.asarray(self.merge.mstar)
-            print(self.nhalo)'''
             mvir = self.merge['mvir'].to_numpy()
             mstar = self.merge['mstar'].to_numpy()
             self.nhalo = mvir.size
             print(self.nhalo)
             print(np.log10(self.im), np.log10(np.min(mstar)), np.log10(np.mean(mstar)), np.log10(np.mean(mvir)), self.nhalo)
             print(f'Identifying stackable objects: {time.time() - self.job_start_time}s')
+
+            try:
+                data = {
+                    "merge": self.merge,
+                    "Dcom": self.Dcom,
+                    "x": self.x,
+                    "y": self.y,
+                    "z": self.z,
+                    "nhalo": self.nhalo
+                }
+                with open(p,"wb") as f:
+                    pickle.dump(data, f)
+            except NameError:
+                pass
             return
 
     def compute_alm_maps(self, plot=False):
+        try:
+            checkpoint_path = self._path("alm_filtered_maps")
+            if os.path.exists(checkpoint_path):
+                with open(checkpoint_path, "rb") as f:
+                    data = pickle.load(f)
+                self.large_scale_map = data["large_scale_map"]
+                self.small_scale_map = data["small_scale_map"]
+                self.mean_mod_T_large_scale = data["mean_mod_T_large_scale"]
+        except AttributeError:
+            pass
+                    
         # Computing and filtering spherical harmonic coefficients to create large and small scale maps
         try:
             alm = hp.map2alm(self.T_cmb_ps, lmax=3*self.nside-1)
@@ -293,7 +372,7 @@ class patchyScreening:
             plt.clf()
             hp.mollview(self.small_scale_map.copy(), title=f"Small scale CMB temperature map (sim={self.simname})", cmap="jet")#, min=-1e-6, max=1e-6)
             hp.graticule()
-            plt.savefig(f'./Plots/T_ps_map_small_scale_{self.simname}_{self.z_sample_name}_{self.im_name}_{slope_name}.png', dpi=400)
+            plt.savefig(f'./Plots/T_ps_map_small_scale_{self.simname}_{self.z_sample_name}_{self.im_name}_{self.slope_name}.png', dpi=400)
             plt.clf()
         self.mean_mod_T_large_scale = np.mean(np.abs(self.large_scale_map.copy()))
         print(self.mean_mod_T_large_scale)
@@ -301,25 +380,36 @@ class patchyScreening:
             print(f'Computing, rotating and filtering alms: {time.time() - self.job_start_time}s')
         elif self.rotate == False:
             print(f'Computing and filtering alms: {time.time() - self.job_start_time}s')
+
+        try:
+            data = {
+                "large_scale_map": self.large_scale_map,
+                "small_scale_map": self.small_scale_map,
+                "mean_mod_T_large_scale": self.mean_mod_T_large_scale
+            }
+            with open(p,"wb") as f:
+                pickle.dump(data, f)
+        except NameError:
+            pass
         return
 
     def f_lowpass(self, l):
         # Low frequency bandpass filter
-        if l < 2000:
+        if l < 600:
             return 1
-        elif l > 2150:
+        elif l >= 650:
             return 0
         else:
-            return np.cos(((l - 2000) * np.pi) / 300)
+            return np.cos(((l - 600) * np.pi) / 100)
 
     def f_highpass(self, l):
         # High frequency bandpass filter
-        if l < 2350:
+        if l < 850:
             return 0
-        elif l > 2500:
+        elif l >= 900:
             return 1
         else:
-            return np.sin(((l - 2350) * np.pi) / 300)
+            return np.sin(((l - 850) * np.pi) / 100)
 
     def tau_prof(self, i, plot=(False,False)):
         # Compute the tau profiles in annuli around halo centres
@@ -364,6 +454,7 @@ class patchyScreening:
         batch_size=max(1, self.nhalo // (self.ncpu*2))
         randint = np.random.randint(self.nhalo)        
         print(f'Starting profile loop: {time.time() - self.job_start_time}s')
+        
         results = Parallel(n_jobs=self.ncpu, backend="loky", batch_size=batch_size)(delayed(self.tau_prof)(i, (plot,randint)) for i in range(self.nhalo))
         self.data_1D = np.asarray(results)
         print(f'Ending profile loop: {time.time() - self.job_start_time}s')
@@ -413,6 +504,11 @@ class patchyScreening:
         self.get_halo_coordinates()    # reads filtered_halos, writes self.halo_coords
 
     def run_analysis(self, plot=False):
+        jobid = os.environ.get("SLURM_JOB_ID", "nojobid")
+        self.ckpt = os.environ.get('CHECKPOINT_DIR',
+                                  f"/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/batch_files/checkpoints/{jobid}")
+        os.makedirs(self.ckpt, exist_ok=True)
+        
         # Full analysis
         n_cpus = os.cpu_count() or 1           # should be 128 on your node
         n_thread_workers = min(2, n_cpus)      # two “branches” → 2 threads
@@ -433,6 +529,17 @@ class patchyScreening:
         return
 
     def get_halo_coordinates(self):
+        try:
+            checkpoint_path = self._path("source_vector")
+            if os.path.exists(checkpoint_path):
+                with open(checkpoint_path, "rb") as f:
+                    data = pickle.load(f)
+                self.theta = data["theta"]
+                self.phi = data["phi"]
+                self.source_vector = data["source_vector"]
+        except AttributeError:
+            pass
+
         # Compute source vectors of each halo
         try:
             rows, cols = (self.nhalo, 3)
@@ -450,9 +557,28 @@ class patchyScreening:
         self.theta, self.phi = hp.pixelfunc.vec2ang(vec, lonlat=True)
         self.source_vector = hp.ang2vec(self.theta, self.phi, lonlat=True)
         print(f'Computing halo source vectors: {time.time() - self.job_start_time}s')
+
+        try:
+            data = {
+                "theta": self.theta,
+                "phi": self.phi,
+                "source_vector": self.source_vector
+            }
+            with open(checkpoint_path, "wb") as f:
+                pickle.dump(data, f)
+        except NameError:
+            pass
         return
 
     def get_patchy_screening_map(self, plot=False):
+        try:
+            checkpoint_path = self._path("patchy_screening_T_map")
+            if os.path.exists(checkpoint_path):
+                with open(checkpoint_path, "rb") as f:
+                    self.T_cmb_ps = pickle.load(f)
+        except AttributeError:
+            pass
+
         # Incorporate patchy screening signal into primary CMB
         if self.signal == True:
             try:
@@ -475,14 +601,16 @@ class patchyScreening:
             plt.savefig(f'./Plots/T_ps_map_{self.simname}_{self.z_sample_name}.png', dpi=400)
             plt.clf()
         print(f'Generating patchy screening map: {time.time() - self.job_start_time}s')
+
+        try:
+            with open(checkpoint_path, "wb") as f:
+                pickle.dump(self.T_cmb_ps, f)
+        except NameError:
+            pass
         return
 
 if __name__ == '__main__':
-    import textwrap
-    
-    sim_list = ['HYDRO_FIDUCIAL','HYDRO_PLANCK','HYDRO_PLANCK_LARGE_NU_FIXED','HYDRO_PLANCK_LARGE_NU_VARY','HYDRO_STRONG_AGN','HYDRO_WEAK_AGN','HYDRO_LOW_SIGMA8','HYDRO_STRONGER_AGN','HYDRO_JETS','HYDRO_STRONGEST_AGN','HYDRO_STRONG_SUPERNOVA','HYDRO_STRONGER_AGN_STRONG_SUPERNOVA','HYDRO_STRONG_JETS']
-    
-    theta_d = np.arange(0.5, 11, 0.5)
+
     ncpu = sys.argv[1]
     isim = sys.argv[2]
     iz = sys.argv[3]
@@ -491,245 +619,9 @@ if __name__ == '__main__':
     fits = sys.argv[6]
     sig = sys.argv[7]
 
-    ps = patchyScreening(isim, iz, im, slope, ncpu, theta_d, fits_file=fits, signal=sig, rect_size=20)
-    #ps_camb = patchyScreening(isim, iz, im, im_name, ncpu, theta_d, cmb_method='CAMB', signal=sig, rect_size=20)
-    #ps.run_analysis(plot=True)
-    ps.get_halo_coordinates()
-    #quit()
-
-    num_to_keep = int(ps.nhalo) // 2
-    chosen_indices = np.random.choice(int(ps.nhalo), size=num_to_keep, replace=False)
-    
-    vals, freqs = np.unique(chosen_indices, return_counts=True)
-    for v, f in zip(vals, freqs):
-        if f > 1:
-            print('FAIL')
-
-    obs_data_blue = np.loadtxt('./unWISExLens_lklh/data/v1.0/bandpowers/unWISExACT-DR6_blue_baseline_Clgg+Clkk+Clkg.dat', usecols=(0,1,2,3))
-    obs_data_green = np.loadtxt('./unWISExLens_lklh/data/v1.0/bandpowers/unWISExACT-DR6_green_baseline_Clgg+Clkk+Clkg.dat', usecols=(0,1,2,3))
-    obs_clkk_data_blue = np.loadtxt('./unWISExLens_lklh/data/v1.0/bandpowers/clkk_bandpowers_act.txt', skiprows=2)
-
-    ##on unit sphere---might not be necessary, but a standard way
-    # Create an empty HEALPix map
-    # This creates a map with all pixels initialized to zero
-    nside_cl = 2048
-    npix = hp.nside2npix(nside_cl)
-        
-    # Convert vectors to HEALPix pixel indices
-    pixels = hp.pixelfunc.vec2pix(nside_cl, ps.source_vector[:,0], ps.source_vector[:,1], ps.source_vector[:,2])  ##in ring order by default
-            
-    # Increment the map values at the halo positions
-    # If you have weights for each halo (e.g., halo mass), you could use np.bincount with weights, or other functions to compute
-    #other statistics such as mean blablabla
-    galaxy_number = ps.nhalo
-    number_density= galaxy_number/npix
-    print(galaxy_number/41253)
-    print(number_density)
-    
-    density_map = np.bincount(pixels, minlength=npix).astype(np.float64)
-    density_map_reduced = np.bincount(pixels[chosen_indices], minlength=npix).astype(np.float64)
-    index=np.where(density_map>1)
-    print(density_map[index], len(density_map[index]))
-
-    vals, freqs = np.unique(density_map, return_counts=True)
-    # vals[i] = the count‐value (e.g. 0,1,2,…)
-    # freqs[i] = the number of pixels that have that count
-    for v, f in zip(vals, freqs):
-        print(f"Value {v} appears {f} times")
-    
-    mean_density = np.mean(density_map)
-    mean_density_reduced = np.mean(density_map_reduced)
-    print(mean_density)
-    galaxy_overdensity = ((density_map - mean_density) / mean_density)
-    galaxy_overdensity_reduced = (density_map_reduced - mean_density_reduced) / mean_density_reduced
-    print(galaxy_overdensity.shape)
-
-    kappa_map = hp.read_map(f'./data_files/kappa_map_z3.fits', dtype=np.float64, verbose=False)
-    kappa_map = hp.pixelfunc.ud_grade(kappa_map, nside_cl)
-    
-    hp.mollview(galaxy_overdensity,
-                title=("\n".join(textwrap.wrap(
-                    rf"Galaxy Overdensity Map"
-                    rf"(sim={ps.simname}, {ps.z_sample_name} sample, log$M_*$={np.log10(ps.im)}, "
-                    rf"$n_{{cut}}$={ps.slope}, primary CMB={ps.fits_file})",
-                    width=75))),
-                unit=r"$\delta_g$",
-                cmap="viridis")
-    hp.graticule()
-    plt.savefig(f'./Plots/halo_galaxy_overdensity_{ps.simname}_{ps.z_sample_name}_{ps.im_name}_{ps.slope_name}_{ps.fits_file}_ntotal.png', dpi=400)
-    plt.clf()
-
-    hp.mollview(kappa_map,
-                title=("\n".join(textwrap.wrap(
-                    f"Stacked CMB Lensing Map up to z=3 (sim={ps.simname})",
-                    width=75))),
-                unit=r"$\kappa$",
-                cmap="viridis")
-    hp.graticule()
-    plt.savefig(f'./Plots/kappa_map_{ps.simname}.png', dpi=400)
-    plt.clf()
-
-    # Compute the power spectrum from your halo map
-    cl_auto = hp.anafast(galaxy_overdensity) 
-    cl_reduced = hp.anafast(galaxy_overdensity_reduced) 
-    cl_cross_anafast = hp.anafast(galaxy_overdensity, map2=kappa_map)
-
-    print(cl_auto)
-    print(cl_cross_anafast)
-
-    import pymaster as nmt
-    
-    # choose ell binning - here we include 10 modes per ell bin
-    b = nmt.NmtBin.from_nside_linear(nside_cl, 10)
-    ell_namaster = b.get_effective_ells()
-    
-    galaxy_mask=galaxy_overdensity*0.0+1.0
-    f_auto = nmt.NmtField(galaxy_mask, [galaxy_overdensity])
-    cl_namaster = nmt.compute_full_master(f_auto, f_auto, b)
-    cl_auto_namaster = np.squeeze(cl_namaster)
-    
-    # define a mask map using CMB kappa map
-    kappa_mask=kappa_map*0.0+1.0
-    # make NaMaster spin-0 field for kappa map
-    f_1 = nmt.NmtField(kappa_mask, [kappa_map])
-    # make NaMaster spin-0 field for galaxy overdensity
-    f_2 = nmt.NmtField(kappa_mask, [galaxy_overdensity])
-    # cross-correlate
-    cl = nmt.compute_full_master(f_1, f_2, b)
-    cl_namaster = np.squeeze(cl)
-    
-    cl_kappa_auto = nmt.compute_full_master(f_1, f_1, b)
-    cl_kappa_auto = np.squeeze(cl_kappa_auto)
-    
-    # Create an array of multipole moments l (the length of cl is usually lmax+1)
-    l_auto = np.arange(len(cl_auto))
-    l_reduced = np.arange(len(cl_reduced))
-    l_cross_anafast = np.arange(len(cl_cross_anafast))
-
-    from scipy.interpolate import interp1d
-    from scipy.stats import chisquare
-    a_anafast = interp1d(l_auto, cl_auto, kind='cubic')
-    a_namaster = interp1d(ell_namaster, cl_auto_namaster, kind='cubic')
-    c_anafast = interp1d(l_cross_anafast, cl_cross_anafast, kind='cubic')
-    c_namaster = interp1d(ell_namaster, cl_namaster, kind='cubic')
-    if iz=='Blue':
-        interp_auto_sim_anafast = a_anafast(obs_data_blue[:,0])
-        interp_auto_sim_namaster = a_namaster(obs_data_blue[:,0])
-        interp_cross_sim_anafast = c_anafast(obs_data_blue[:,0])
-        interp_cross_sim_namaster = c_namaster(obs_data_blue[:,0])
-    elif iz=='Green':
-        interp_auto_sim_anafast = a_anafast(obs_data_green[:,0])
-        interp_auto_sim_namaster = a_namaster(obs_data_green[:,0])
-        interp_cross_sim_anafast = c_anafast(obs_data_green[:,0])
-        interp_cross_sim_namaster = c_namaster(obs_data_green[:,0])
-    obs_data_blue_covariance = np.loadtxt('./unWISExLens_lklh/data/v1.0/covariances/covmat_Clgg+Clkg_unWISExACT-DR6_blue_baseline.dat')
-    obs_data_green_covariance = np.loadtxt('./unWISExLens_lklh/data/v1.0/covariances/covmat_Clgg+Clkg_unWISExACT-DR6_green_baseline.dat')
-    #obs_data_blue_covariance = np.loadtxt('./unWISExLens_lklh/data/v1.0/covariances/covmat_Clgg+Clkg_unWISExACT-DR6_blue_cmbmarg.dat')
-    print(obs_data_blue_covariance.shape)
-    obs_data_blue_variance = np.diag(obs_data_blue_covariance)
-    obs_data_blue_std = np.sqrt(obs_data_blue_variance[:int(len(obs_data_blue_variance)/2)])
-    obs_data_green_variance = np.diag(obs_data_green_covariance)
-    obs_data_green_std = np.sqrt(obs_data_green_variance[:int(len(obs_data_green_variance)/2)])
-
-    print(np.sum(obs_data_blue[:,1]), np.sum(interp_auto_sim_namaster), np.sum(obs_data_blue[:,1]) - np.sum(interp_auto_sim_namaster))
-    print(obs_data_blue_std.shape)
-    #quit()
-    if iz=='Blue':
-        chi2 = np.sum(((interp_auto_sim_namaster - obs_data_blue[:,1])/obs_data_blue_std)**2)
-    elif iz=='Green':
-        chi2 = np.sum(((interp_auto_sim_namaster - obs_data_green[:,1])/obs_data_green_std)**2)
-    #chi2, pvalue = chisquare(f_obs=obs_data_blue[:,1], f_exp=interp_auto_sim)
-    print(f'chi2 = {chi2}')
-    #quit()
-    textstr = (
-        rf"$\chi^2 = {chi2:.2f}$"# "\n"
-        #rf"$p = {p_value:.2g}$"
-    )
-    
-    # Plot the auto power spectrum
-    plt.figure(figsize=(8,6))
-    if iz=='Blue':
-        #plt.plot(l_auto, cl_auto*1e5, color='tab:blue', label=r'FLAMINGO (anafast)')
-        plt.plot(ell_namaster, cl_auto_namaster*1e5, color='tab:blue', label=r'FLAMINGO (NaMaster)')
-        #plt.plot(obs_data_blue[:,0], interp_auto_sim_namaster*1e5, color='r', marker='.', markersize=5, label='FLAMINGO (NaMaster, interpolated)')
-        #plt.plot(l_reduced, cl_reduced*1e5, color='tab:red', label='FLAMINGO (reduced)')
-        plt.plot(obs_data_blue[:,0], obs_data_blue[:,1]*1e5, color='b', marker='.', markersize=5, label='Farren et al. (2023)')
-    elif iz=='Green':
-        plt.plot(ell_namaster, cl_auto_namaster*1e5, color='tab:green', label=r'FLAMINGO (NaMaster)')
-        #plt.plot(obs_data_green[:,0], interp_auto_sim_namaster*1e5, color='r', marker='.', markersize=5, label='FLAMINGO (interpolated)')
-        plt.plot(obs_data_green[:,0], obs_data_green[:,1]*1e5, color='g', marker='.', markersize=5, label='Farren et al. (2023)')
-    ax = plt.gca()
-    ax.text(0.75, 0.80,
-            textstr,
-            transform=ax.transAxes,
-            fontsize=12,
-            verticalalignment='top',
-            bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.7)
-            )
-    plt.xlabel(r'Multipole moment $\ell$')
-    plt.ylabel(r'$C^{gg}_{\ell}x10^5$')
-    plt.title("\n".join(textwrap.wrap(
-        rf"Power Spectrum of the Galaxy Overdensity map"
-        rf"(sim={ps.simname}, {ps.z_sample_name} sample, log$M_*$={np.log10(ps.im)}, "
-        rf"$n_{{cut}}$={ps.slope}, primary CMB={ps.fits_file})",
-        width=75)))
-    plt.xscale("log")
-    plt.yscale("log")  # Using a log scale can help if the spectrum spans several orders of magnitude
-    plt.xlim(0, l_auto[-1])
-    plt.ylim(bottom=0.001)
-    plt.legend()
-    plt.savefig(f'./Plots/halo_map_gg_power_spectrum_{ps.simname}_{ps.z_sample_name}_{ps.im_name}_{ps.slope_name}_{ps.fits_file}_ntotal.png', dpi=400)
-    plt.clf()
-
-    plt.figure(figsize=(8,6))
-    plt.plot(ell_namaster, cl_kappa_auto*1e5, color='tab:red', label=r'FLAMINGO (NaMaster)')
-    plt.plot(obs_data_blue[:,0], obs_data_blue[:,2]*1e5, color='r', marker='.', markersize=5, label='Farren et al. (2023)')
-    #plt.plot(obs_data_blue[:,0], obs_clkk_data_blue*1e5, color='r', marker='.', markersize=5, label='Farren et al. (2023)')
-    plt.xlabel(r'Multipole moment $\ell$')
-    plt.ylabel(r'$C^{\kappa\kappa}_{\ell}x10^5$')
-    plt.title("\n".join(textwrap.wrap(
-        rf"Power Spectrum of the $\kappa$ map"
-        rf"(sim={ps.simname}, {ps.z_sample_name} sample, log$M_*$={np.log10(ps.im)}, "
-        rf"$n_{{cut}}$={ps.slope}, primary CMB={ps.fits_file})",
-        width=75)))
-    plt.xscale("log")
-    plt.yscale("log")  # Using a log scale can help if the spectrum spans several orders of magnitude
-    plt.xlim(0, ell_namaster[-1])
-    #plt.ylim(bottom=0.001)
-    plt.legend()
-    plt.savefig(f'./Plots/kappa_power_spectrum_{ps.simname}_{ps.z_sample_name}_{ps.im_name}_{ps.slope_name}_{ps.fits_file}_ntotal.png', dpi=400)
-    plt.clf()
-
-    #Plot cross-spectra
-    plt.figure(figsize=(8,6))
-    if iz=='Blue':
-        #plt.plot(l_cross, cl_cross*1e5, color='tab:blue', label=r'FLAMINGO')
-        plt.plot(ell_namaster, ell_namaster*cl_namaster*1e5, color='tab:blue', label=r'FLAMINGO (NaMaster)')
-        #plt.plot(obs_data_blue[:,0], interp_cross_sim_namaster*1e5, color='r', marker='.', markersize=5, label='FLAMINGO (NaMaster, interpolated)')
-        #plt.plot(obs_data_blue[:,0], interp_cross_sim*1e5, color='r', marker='.', markersize=5, label='FLAMINGO (interpolated)')
-        plt.plot(obs_data_blue[:,0], obs_data_blue[:,0]*obs_data_blue[:,3]*1e5, color='b', marker='.', markersize=5, label='Farren et al. (2023)')
-        #plt.plot(obs_data_blue[:,0], obs_data_blue[:,0]*obs_clkk_data_blue*1e5, color='b', marker='.', markersize=5, label='Farren et al. (2023)')
-    elif iz=='Green':
-        #plt.plot(l_cross, cl_cross*1e5, color='tab:green', label=r'FLAMINGO')
-        #plt.plot(obs_data_green[:,0], interp_cross_sim*1e5, color='r', marker='.', markersize=5, label='FLAMINGO (interpolated)')
-        plt.plot(ell_namaster, cl_namaster*1e5, color='tab:green', label=r'FLAMINGO (NaMaster)')
-        #plt.plot(obs_data_green[:,0], interp_cross_sim_namaster*1e5, color='r', marker='.', markersize=5, label='FLAMINGO (NaMaster, interpolated)')
-        plt.plot(obs_data_green[:,0], obs_data_green[:,3]*1e5, color='g', marker='.', markersize=5, label='Farren et al. (2023)')
-    plt.xlabel(r'Multipole moment $\ell$')
-    plt.ylabel(r'$\ell C^{\kappa g}_{\ell}x10^5$')
-    plt.title("\n".join(textwrap.wrap(
-        rf"Cross-Spectra of the Galaxy Overdensity map and CMB lensing map "
-        rf"(sim={ps.simname}, {ps.z_sample_name} sample, log$M_*$={np.log10(ps.im)}, "
-        rf"$n_{{cut}}$={ps.slope}, primary CMB={ps.fits_file})",
-        width=75)))
-    plt.xscale("log")
-    plt.yscale("log")  # Using a log scale can help if the spectrum spans several orders of magnitude
-    plt.xlim(0, ell_namaster[-1])
-    #plt.ylim(bottom=0.001)
-    plt.legend()
-    plt.savefig(f'./Plots/halo_map_kg_power_spectrum_{ps.simname}_{ps.z_sample_name}_{ps.im_name}_{ps.slope_name}_{ps.fits_file}_ntotal.png', dpi=400)
-    plt.clf()
-
-    print(f'For stellar cut of {np.log10(ps.im)}: {interp_auto_sim_namaster/obs_data_blue[:,1]}')
+    ps = patchyScreening(isim, iz, im, slope, ncpu, fits_file=fits, signal=sig, cmb_method='CAMB')
+    ps.run_analysis(plot=False)
+    #ps.get_halo_coordinates()
+    #ps.generate_cmb_map()
 
 ####################################################################################################################################

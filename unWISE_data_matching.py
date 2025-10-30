@@ -17,7 +17,10 @@ def unWISE_data_matching(simname, z_sample, mass_cut, n_cut, nsamp='ntotal', plo
         simname = str(simname)
     z_sample = str(z_sample)
     im_name = f"{float(mass_cut):.1f}".replace('.', 'p')
-    slope_name = f"{float(n_cut):.1f}".replace('.', 'p')
+    if round(float(n_cut), 1) == float(n_cut):
+        slope_name = f"{float(n_cut):.1f}".replace('.', 'p')
+    else:
+        slope_name = f"{float(n_cut)}".replace('.', 'p')
     if float(n_cut) < 0.0:
         slope_name = f"{slope_name}".replace('-', 'minus')
 
@@ -204,8 +207,6 @@ def rescale_dndz(difference, halo_lightcones, galaxies_required, nsamp, FLAMINGO
             print(galaxies_required[np.where(FLAMINGO_mid_point > 2.0)], halo_lightcones[np.where(FLAMINGO_mid_point > 2.0), 1])
             galaxies_required[np.where(FLAMINGO_mid_point > 2.0)] = halo_lightcones[np.where(FLAMINGO_mid_point > 2.0), 1]
             print(galaxies_required)
-            if count > 7:
-                quit()
             return nsamp, galaxies_required, False, count
         elif FLAMINGO_mid_point[np.argmin(diff_indicies)] <= 2.0: #and FLAMINGO_mid_point[max_diff_index] <= 2.0:
             print('Rescaling required')
@@ -228,7 +229,7 @@ def rescale_dndz(difference, halo_lightcones, galaxies_required, nsamp, FLAMINGO
 if __name__ == '__main__':
     import sys
 
-    plot=False
+    plot=True
     try:
         unWISE_data_matching(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], plot=plot)
     except IndexError:

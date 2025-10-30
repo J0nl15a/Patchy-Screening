@@ -16,7 +16,10 @@ def halo_lightcones(simname, z_sample, mass_cut, n_cut, ncpu, max_z=3.0):
     im = float(mass_cut)
     im_name = f"{float(mass_cut):.1f}".replace('.', 'p')
     slope = float(n_cut)
-    slope_name = f"{float(n_cut):.1f}".replace('.', 'p')
+    if round(slope, 1) == slope:
+        slope_name = f"{float(n_cut):.1f}".replace('.', 'p')
+    else:
+        slope_name = f"{float(n_cut)}".replace('.', 'p')
     if slope < 0.0:
         slope_name = f"{slope_name}".replace('-', 'minus')
     output_path = f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/halo_totals/FLAMINGO_halo_totals_{simname}_{z_sample}_{im_name}_{slope_name}.txt'
@@ -105,13 +108,13 @@ if __name__ == '__main__':
     FLAMINGO_mid_point = halo_z_bins['mid_z'][np.where(halo_z_bins['mid_z'] <= 3.0)]
     print(FLAMINGO_mid_point)
     
-    for s in [round(n, 2) for n in np.arange(-1.0,0.6,0.1)]:
+    for s in [round(n, 2) for n in np.arange(-1.0,1.1,0.1)]:
         print(s)
         slope_name = f"{float(s):.1f}".replace('.', 'p')
         if s < 0.0:
             slope_name = f"{slope_name}".replace('-', 'minus')
-            if s == -0.0:
-                slope_name = "0p0"
+        if s == 0.0:
+            slope_name = "0p0"
         with open(f"/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/halo_totals/FLAMINGO_halo_totals_{simname}_{z_sample}_{im_name}_{slope_name}.txt", "r") as f:
             first_line = f.readline().strip()
             remaining_lines = f.readlines()

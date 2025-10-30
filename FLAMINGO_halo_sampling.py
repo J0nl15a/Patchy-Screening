@@ -16,7 +16,10 @@ def halo_sampling(simname, z_sample, mass_cut, n_cut, ncpu):
     im = float(mass_cut)
     im_name = f"{float(mass_cut):.1f}".replace('.', 'p')
     slope = float(n_cut)
-    slope_name = f"{float(n_cut):.1f}".replace('.', 'p')
+    if round(slope, 1) == slope:
+        slope_name = f"{float(n_cut):.1f}".replace('.', 'p')
+    else:
+        slope_name = f"{float(n_cut)}".replace('.', 'p')
     if slope < 0.0:
         slope_name = f"{slope_name}".replace('-', 'minus')
     output_path = f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/mock_halo_catalogs/sampled_halo_data_{simname}_{z_sample}_{im_name}_{slope_name}.parquet'
@@ -60,14 +63,14 @@ def process_snapshot(sim, iz, stellar_cuts, halo_z_bins, dndz_sample):
     if halo_z_bins['mid_z'][iz] > 3.0:
         return None
 
-    im = stellar_cuts[int(iz)][1]
+    im = stellar_cuts[iz][1]
     
     ps = patchyScreening(sim, iz, im,  # or however you pass
                          0, 0, 1,
                          lightcone_method=('FULL','shell'))
     ps.filter_stellar_mass()
 
-    nsamp = int(dndz_sample[iz][2])
+    nsamp = int(dndz_sample[iz][1])
     print(iz, nsamp)
 
     try:

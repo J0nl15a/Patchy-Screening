@@ -10,6 +10,9 @@ Plots/
 #Ignore batch files directory
 batch_files/
 
+#Ignore data files directory
+data_files/
+
 #Ignore bash scripts
 *.sh	
 
@@ -17,3 +20,7 @@ batch_files/
 *.dump
 *.out
 *.err
+coulton_mock_parallel_test.py
+coulton_mock_parallel.py
+imp_patchy_screening_IAN.py
+cmb.py

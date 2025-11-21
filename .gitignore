@@ -5,7 +5,7 @@ Thumbs.db
 L1000N1800/
 
 #Ignore plotting directory
-Plots/	
+Plots/
 
 #Ignore batch files directory
 batch_files/

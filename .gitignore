@@ -13,9 +13,6 @@ batch_files/
 #Ignore data files directory
 data_files/
 
-#Ignore results directory
-L1000N1800/
-
 #Ignore bash scripts
 *.sh	
 

@@ -14,7 +14,10 @@ def halo_lightcones(simname, z_sample, mass_cut, n_cut, ncpu, max_z=3.0):
 
     z_sample = str(z_sample)
     im = float(mass_cut)
-    im_name = f"{float(mass_cut):.1f}".replace('.', 'p')
+    if round(im, 1) == im:
+        im_name = f"{float(mass_cut):.1f}".replace('.', 'p')
+    else:
+        im_name = f"{float(mass_cut)}".replace('.', 'p')
     slope = float(n_cut)
     if round(slope, 1) == slope:
         slope_name = f"{float(n_cut):.1f}".replace('.', 'p')

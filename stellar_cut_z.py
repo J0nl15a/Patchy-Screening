@@ -4,7 +4,10 @@ def stellar_cut_z(z_sample, mean_z_mass_cut, slope):
 
     z_sample = str(z_sample)
     im = float(mean_z_mass_cut)
-    im_name = f"{float(mean_z_mass_cut):.1f}".replace('.', 'p')
+    if round(im, 1) == im:
+        im_name = f"{im:.1f}".replace('.', 'p')
+    else:
+        im_name = f"{im}".replace('.', 'p')
     slope = float(slope)
     if round(slope, 1) == slope:
         slope_name = f"{float(slope):.1f}".replace('.', 'p')

@@ -14,7 +14,10 @@ def halo_sampling(simname, z_sample, mass_cut, n_cut, ncpu):
         
     z_sample = str(z_sample)
     im = float(mass_cut)
-    im_name = f"{float(mass_cut):.1f}".replace('.', 'p')
+    if round(im, 1) == im:
+        im_name = f"{float(mass_cut):.1f}".replace('.', 'p')
+    else:
+        im_name = f"{float(mass_cut)}".replace('.', 'p')
     slope = float(n_cut)
     if round(slope, 1) == slope:
         slope_name = f"{float(n_cut):.1f}".replace('.', 'p')
@@ -59,7 +62,7 @@ def halo_sampling(simname, z_sample, mass_cut, n_cut, ncpu):
 
 def process_snapshot(sim, iz, stellar_cuts, halo_z_bins, dndz_sample):
     """Process a single redshift‐bin index i.  
-       Returns (subdf_blue, subdf_green) or None on failure/skip."""
+       Returns subdf or None on failure/skip."""
     if halo_z_bins['mid_z'][iz] > 3.0:
         return None
 

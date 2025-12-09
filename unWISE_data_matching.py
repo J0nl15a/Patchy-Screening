@@ -16,7 +16,10 @@ def unWISE_data_matching(simname, z_sample, mass_cut, n_cut, nsamp='ntotal', plo
     except (ValueError, IndexError):
         simname = str(simname)
     z_sample = str(z_sample)
-    im_name = f"{float(mass_cut):.1f}".replace('.', 'p')
+    if round(float(mass_cut), 1) == float(mass_cut):
+        im_name = f"{float(mass_cut):.1f}".replace('.', 'p')
+    else:
+        im_name = f"{float(mass_cut)}".replace('.', 'p')
     if round(float(n_cut), 1) == float(n_cut):
         slope_name = f"{float(n_cut):.1f}".replace('.', 'p')
     else:
@@ -29,10 +32,7 @@ def unWISE_data_matching(simname, z_sample, mass_cut, n_cut, nsamp='ntotal', plo
     except ValueError:
         nsamp = str(nsamp)
 
-    if z_sample == 'Blue':
-        dndz_match = np.loadtxt("/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/unWISExLens_lklh/data/v1.0/aux_data/dndz/unWISE_blue_xmatch_dndz.txt", usecols=(0,1))
-    elif z_sample == 'Green':
-        dndz_match = np.loadtxt("/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/unWISExLens_lklh/data/v1.0/aux_data/dndz/unWISE_green_xmatch_dndz.txt", usecols=(0,1))
+    dndz_match = np.loadtxt(f"/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/unWISExLens_lklh/data/v1.0/aux_data/dndz/unWISE_{z_sample.lower()}_xmatch_dndz.txt", usecols=(0,1))
 
     print(min(dndz_match[:,0]), max(dndz_match[:,0]))
 
@@ -94,13 +94,12 @@ def unWISE_data_matching(simname, z_sample, mass_cut, n_cut, nsamp='ntotal', plo
 
     if nsamp == 'ntotal':
         if z_sample == 'Blue':
-            kusiak_nbar_blue = 3409 #From Kusiak paper
-            kusiak_ntotal_blue = kusiak_nbar_blue * 41253 #4pi steradians
-            nsamp = kusiak_ntotal_blue
+            kusiak_nbar = 3409 #From Kusiak paper
         elif z_sample == 'Green':
-            kusiak_nbar_green = 1846 #From Kusiak paper
-            kusiak_ntotal_green = kusiak_nbar_green * 41253
-            nsamp = kusiak_ntotal_green
+            kusiak_nbar = 1846 #From Kusiak paper
+            
+        kusiak_ntotal = kusiak_nbar * 41253 #4pi steradians
+        nsamp = kusiak_ntotal
     
     if nsamp > total_available_halos:
         nsamp = total_available_halos
@@ -115,7 +114,7 @@ def unWISE_data_matching(simname, z_sample, mass_cut, n_cut, nsamp='ntotal', plo
         galaxies_required = compute_galaxies_required(FLAMINGO_mid_point, FLAMINGO_z_bins, m, nsamp, total_area, halo_lightcones[:,1])
         #conflict, difference = validate_required_vs_available(galaxies_required, halo_lightcones[:,1])
         difference = validate_required_vs_available(galaxies_required, halo_lightcones[:,1])
-        nsamp, galaxies_required, conflict, count = rescale_dndz(difference, halo_lightcones, galaxies_required, nsamp, FLAMINGO_mid_point, count)
+        nsamp, galaxies_required, conflict, count = rescale_dndz(difference, halo_lightcones, galaxies_required, nsamp, FLAMINGO_mid_point, count, z_sample)
 
         if plot==True:
             pb.plot(FLAMINGO_mid_point, galaxies_required, color='b', marker='.', label='Galaxies required')
@@ -164,7 +163,7 @@ def compute_galaxies_required(FLAMINGO_mid_point, FLAMINGO_z_bins, dndz_func, ns
     for i in range(len(FLAMINGO_mid_point)):
         if halo_lightcones[i] == 0:
             galaxies_required.append(0)
-            '''elif FLAMINGO_mid_point[i] > 2.0:
+            '''elif FLAMINGO_mid_point[i] > z_limit:
             galaxies_required.append(halo_lightcones[i])'''
         else:
             delta_z = FLAMINGO_z_bins[i+1] - FLAMINGO_z_bins[i]
@@ -188,8 +187,12 @@ def write_sampled_galaxies_file(outfile_name, FLAMINGO_mid_point, galaxies_requi
     print(f"Wrote file: {outfile_name}")
     return
 
-def rescale_dndz(difference, halo_lightcones, galaxies_required, nsamp, FLAMINGO_mid_point, count):
+def rescale_dndz(difference, halo_lightcones, galaxies_required, nsamp, FLAMINGO_mid_point, count, galaxy_sample):
     count+=1
+    if galaxy_sample == 'Blue':
+        z_limit = 2.0
+    elif galaxy_sample == 'Green':
+        z_limit = 2.5
     print(difference)
     excess = difference > 0.0
     if excess.any() == False:
@@ -198,17 +201,17 @@ def rescale_dndz(difference, halo_lightcones, galaxies_required, nsamp, FLAMINGO
     elif excess.any() == True:
         diff_indicies = np.where(difference > 0.0)[0]
         print(diff_indicies)
-        max_diff_index = np.argmax(difference[np.where(FLAMINGO_mid_point <= 2.0)])
+        max_diff_index = np.argmax(difference[np.where(FLAMINGO_mid_point <= z_limit)])
         print(max_diff_index)
         print(FLAMINGO_mid_point[np.argmin(diff_indicies)])
-        print(np.argmax(np.where(FLAMINGO_mid_point <= 2.0)))
-        if FLAMINGO_mid_point[np.argmin(diff_indicies)] > 2.0 or difference[max_diff_index] < 0.0: 
-            print('Past z=2.0')
-            print(galaxies_required[np.where(FLAMINGO_mid_point > 2.0)], halo_lightcones[np.where(FLAMINGO_mid_point > 2.0), 1])
-            galaxies_required[np.where(FLAMINGO_mid_point > 2.0)] = halo_lightcones[np.where(FLAMINGO_mid_point > 2.0), 1]
+        print(np.argmax(np.where(FLAMINGO_mid_point <= z_limit)))
+        if FLAMINGO_mid_point[np.argmin(diff_indicies)] > z_limit or difference[max_diff_index] < 0.0: 
+            print(f'Past z={z_limit}')
+            print(galaxies_required[np.where(FLAMINGO_mid_point > z_limit)], halo_lightcones[np.where(FLAMINGO_mid_point > z_limit), 1])
+            galaxies_required[np.where(FLAMINGO_mid_point > z_limit)] = halo_lightcones[np.where(FLAMINGO_mid_point > z_limit), 1]
             print(galaxies_required)
             return nsamp, galaxies_required, False, count
-        elif FLAMINGO_mid_point[np.argmin(diff_indicies)] <= 2.0: #and FLAMINGO_mid_point[max_diff_index] <= 2.0:
+        elif FLAMINGO_mid_point[np.argmin(diff_indicies)] <= z_limit: #and FLAMINGO_mid_point[max_diff_index] <= z_limit:
             print('Rescaling required')
             print(FLAMINGO_mid_point[max_diff_index])
             print(difference[max_diff_index])
@@ -226,10 +229,11 @@ def rescale_dndz(difference, halo_lightcones, galaxies_required, nsamp, FLAMINGO
             quit()
 
 
+
 if __name__ == '__main__':
     import sys
 
-    plot=True
+    plot=False
     try:
         unWISE_data_matching(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], plot=plot)
     except IndexError:

@@ -15,7 +15,10 @@ for i in range(len(lightcone_shell_redshifts)): #sample_redshift_shell.items():
         map_lightcone = f'/cosma8/data/dp004/flamingo/Runs/L1000N1800/HYDRO_FIDUCIAL/neutrino_corrected_maps/lightcone0_shells/shell_{i}/lightcone0.shell_{i}.0.hdf5'
         g = h5py.File(map_lightcone,'r')
         DM = g['DM'][...]*g['DM'].attrs['Conversion factor to CGS (not including cosmological corrections)']*6.6524587321e-25
-        DM_total += DM
         redshift = g['DM'].attrs['Central redshift assumed for correction']
-        print(redshift)
+        DM *= (1+redshift)
+        DM_total += DM
+        print(redshift, DM)
+        g.close()
     map_write = hp.write_map(f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/stacked_DM_map_z3p0.fits', DM_total, overwrite=True)
+print(DM_total, np.mean(DM_total))

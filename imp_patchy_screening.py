@@ -1,5 +1,4 @@
 import sys, os, pickle
-os.environ["POLARS_MAX_THREADS"] = str(sys.argv[1])
 import h5py, pandas as pd, numpy as np, polars as pl
 import healpy as hp, matplotlib.pyplot as plt
 import astropy.units as u
@@ -10,11 +9,16 @@ from camb import model, initialpower
 import time
 from numbers import Real
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, wait
+from mpi4py import MPI
 
+'''comm = MPI.COMM_WORLD
+rank = comm.Get_rank()
+size = comm.Get_size()'''
 
 class patchyScreening:
     def __init__(self, isim, iz, im, n_cut, ncpu, theta_d=np.arange(0.5, 11, 0.5), nside=8192, cmb_method='FITS', fits_file='unlensed', lightcone_method=('FULL','dndz'), signal=True, rotate=False, rect_size=20):
 
+        os.environ["POLARS_MAX_THREADS"] = str(ncpu)
         self.job_start_time = time.time()
         sim_list = ['HYDRO_FIDUCIAL','HYDRO_PLANCK','HYDRO_PLANCK_LARGE_NU_FIXED','HYDRO_PLANCK_LARGE_NU_VARY','HYDRO_STRONG_AGN','HYDRO_WEAK_AGN','HYDRO_LOW_SIGMA8','HYDRO_STRONGER_AGN','HYDRO_JETS_published','HYDRO_STRONGEST_AGN','HYDRO_STRONG_SUPERNOVA','HYDRO_STRONGER_AGN_STRONG_SUPERNOVA','HYDRO_STRONG_JETS']
 
@@ -37,46 +41,50 @@ class patchyScreening:
             self.z_sample_name = iz
             
         self.im = 10**np.array(float(im))
-        self.im_name = f"{float(im):.1f}".replace('.', 'p')
+        if round(self.im, 1) == self.im:
+            self.im_name = f"{float(im):.1f}".replace('.', 'p')
+        else:
+            self.im_name = f"{float(im)}".replace('.', 'p')
+
         self.slope = float(n_cut)
-        self.slope_name = f"{float(n_cut):.1f}".replace('.', 'p')
+        if round(self.slope, 1) == self.slope:
+            self.slope_name = f"{float(n_cut):.1f}".replace('.', 'p')
+        else:
+            self.slope_name = f"{float(n_cut):.3f}".replace('.', 'p')
+
         if self.slope < 0.0:
             self.slope_name = f"{self.slope_name}".replace('-', 'minus')
+
         self.ncpu = int(ncpu)
         self.theta_d = theta_d
         self.nside = nside
         self.cmb_method = cmb_method
         self.fits_file = str(fits_file)
         self.lightcone_method = lightcone_method
-        self.signal = bool(signal)
+        if isinstance(signal, bool):
+            self.signal = signal
+        else:
+            self.signal = signal.lower() in ("true", "1", "yes", "y")
         self.rotate = rotate
         self.rect_size = rect_size
 
         self.cosmology = FlatLambdaCDM(H0=68.1, Om0=0.3, Tcmb0=2.725)
         self.mock_CMB_primary = None
 
-        
-    def _path(self, name):
-        return os.path.join(self.ckpt, f"{name}.pkl")
-
     
     def generate_cmb_map(self, plot=False):
-        try:
-            checkpoint_path = self._path("primary_cmb_map")
-            if os.path.exists(checkpoint_path):
-                with open(checkpoint_path, "rb") as f:
-                    self.mock_CMB_primary = pickle.load(f)
-        except AttributeError:
-            pass
                 
         # Generating primary CMB map with CAMB or loading pre-generated FITS
         np.random.seed(1000)
         if self.cmb_method == 'CAMB':
-            pars = camb.set_params(H0=68.1, ombh2=0.048600*(0.681**2), omch2=0.256011*(0.681**2), mnu=0.06, As=2.099e-9, ns=0.967, lmax=3*self.nside-1)
+            pars = camb.set_params(H0=68.1, ombh2=0.048600*(0.681**2), omch2=0.256011*(0.681**2), mnu=0.06, As=2.099e-9, ns=0.967, lmax=3*self.nside-1+10)
             results = camb.get_results(pars)
-            powers = results.get_cmb_power_spectra(pars, raw_cl=True, CMB_unit='muK')
+            powers = results.get_cmb_power_spectra(pars, raw_cl=True, CMB_unit='muK', lmax=3*self.nside-1)
             unlensed_total_CL = powers['unlensed_total']
-            self.mock_CMB_primary = hp.synfast(unlensed_total_CL[:,0], nside=self.nside)
+            print(len(unlensed_total_CL))
+            self.mock_CMB_primary = hp.synfast(unlensed_total_CL[:,0], nside=self.nside, lmax=5024, mmax=5024) # order of CMB modes: TT, EE, BB, TE
+            #self.mock_CMB_primary = hp.synfast(unlensed_scalar_CL[:,1], nside=self.nside)
+            
         elif self.cmb_method == 'FITS':
             lensed_dir = '/cosma8/data/dp004/dc-yang3/maps/L1000N1800/HYDRO_FIDUCIAL/lightcone0_shells/patchy_screening_folder'
             if self.fits_file == 'unlensed':
@@ -95,22 +103,10 @@ class patchyScreening:
             plt.clf()
         print(f'Generating mock primary CMB: {time.time() - self.job_start_time}s')
 
-        try:
-            with open(checkpoint_path, "wb") as f:
-                pickle.dump(self.mock_CMB_primary, f)
-        except NameError:
-            pass
         return
 
     
     def load_lightcones(self, plot=False):
-        try:
-            checkpoint_path = self._path("lightcone_maps")
-            if os.path.exists(checkpoint_path):
-                with open(checkpoint_path, "rb") as f:
-                    self.DM_map = pickle.load(f)
-        except AttributeError:
-            pass
                 
         # Loading tau map from FLAMINGO lightcone shells
         if self.lightcone_method[0] == 'SHELL':
@@ -119,6 +115,7 @@ class patchyScreening:
             conversion_factor = g['DM'].attrs['Conversion factor to CGS (not including cosmological corrections)']
             DM = g['DM'][...]*conversion_factor*6.6524587321e-25 #6.65246e-25 = Thomson cross-section (in cgs)
             redshift = g['DM'].attrs['Central redshift assumed for correction']
+            DM *= (1+redshift)
             g.close()
             print(f'Map z of {self.z_sample_name} sample = {redshift} (shell: {self.z_sample})')
             print(DM)
@@ -134,23 +131,35 @@ class patchyScreening:
             g_low = h5py.File(map_lightcone_lower,'r')
             conversion_factor = g_low['DM'].attrs['Conversion factor to CGS (not including cosmological corrections)']
             DM += g_low['DM'][...]*conversion_factor*6.6524587321e-25
-            g_low.close()
+            redshift_low = g_low['DM'].attrs['Central redshift assumed for correction']
+            DM *= (1+redshift_low)
 
             map_lightcone_higher = f'/cosma8/data/dp004/flamingo/Runs/L1000N1800/{self.simname}/neutrino_corrected_maps/lightcone0_shells/shell_{self.z_sample+1}/lightcone0.shell_{self.z_sample+1}.0.hdf5'
             g_high = h5py.File(map_lightcone_higher,'r')
             conversion_factor = g_high['DM'].attrs['Conversion factor to CGS (not including cosmological corrections)']
             DM += g_high['DM'][...]*conversion_factor*6.6524587321e-25
+            redshift_high = g_high['DM'].attrs['Central redshift assumed for correction']
+            DM *= (1+redshift_high)
+
+            print(f"Map lightcone z = [{g_low['DM'].attrs['Central redshift assumed for correction']},{g_high['DM'].attrs['Central redshift assumed for correction']}]")
+            g_low.close()
             g_high.close()
 
         elif self.lightcone_method[0] == 'FULL':
             DM = hp.read_map(f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/DM_maps/stacked_DM_map_z3p0.fits', dtype=np.float64, verbose=False)
+            DM_2 = hp.pixelfunc.ud_grade(DM,self.nside)
+            alm = hp.map2alm(DM_2)
+            #DM_2 = hp.alm2map(alm, nside=self.nside, lmax=5024)
+            DM_2 = hp.sphtfunc.resize_alm(alm, lmax=3*self.nside-1, mmax=3*self.nside-1, lmax_out=5024, mmax_out=5024)
+            print(f"Map lightcone integrated up to z=3")
 
         self.DM_map = hp.pixelfunc.ud_grade(DM,self.nside)
+        #alm = hp.map2alm(self.DM_map)
+        #self.DM_map_2 = hp.pixelfunc.ud_grade(DM_2,self.nside)
+        self.DM_map_2 = hp.alm2map(DM_2, nside=self.nside, lmax=5024)
         print(self.DM_map)
-        if self.lightcone_method[0] == 'SHELL':
-            print(f"Map lightcone z = [{g_low['DM'].attrs['Central redshift assumed for correction']},{g_high['DM'].attrs['Central redshift assumed for correction']}]")
-        elif self.lightcone_method[0] == 'FULL':
-            print(f"Map lightcone integrated up to z=3")
+        print(self.DM_map_2)
+
         if plot == True:
             if self.lightcone_method[0] == 'SHELL':
                 hp.mollview(self.DM_map, title=f"DM map (sim={self.simname}, lightcone shell={self.z_sample-1}+{self.z_sample}+{self.z_sample+1})", cmap="jet")#, min=2e-5, max=2e-3)
@@ -163,28 +172,10 @@ class patchyScreening:
             plt.clf()
         print(f'Loading relevant lightcone shells: {time.time() - self.job_start_time}s')
 
-        try:
-            with open(checkpoint_path, "wb") as f:
-                pickle.dump(self.DM_map, f)
-        except NameError:
-            pass
         return
 
     
     def load_halo_data(self, lightcone_type='HBT'):
-        try:
-            checkpoint_path = self._path("halo_lightcones")
-            if os.path.exists(checkpoint_path):
-                with open(checkpoint_path, "rb") as f:
-                    data = pickle.load(f)
-                self.Dcom = data["Dcom"]
-                halo_lc_data = data["halo_lc_data"]
-                if lightcone_type == 'HBT':
-                    df_HBT = data["df_HBT"]
-                elif lightcone_type == 'VR':
-                    df_VR = data["df_VR"]
-        except AttributeError:
-            pass
         
         # Load halo lightcone and SOAP data into DataFrames
         if lightcone_type == 'HBT':
@@ -228,16 +219,6 @@ class patchyScreening:
             f.close()
             print(f'Loading halo lightcone data: {time.time() - self.job_start_time}s')
 
-            try:
-                data = {
-                    "Dcom": self.Dcom,
-                    "halo_lc_data": halo_lc_data,
-                    "df_HBT": df_HBT
-                }
-                with open(p,"wb") as f:
-                    pickle.dump(data, f)
-            except NameError:
-                pass
             return halo_lc_data, df_HBT
         elif lightcone_type == 'VR':
             VR_file = f'/cosma8/data/dp004/flamingo/Runs/L1000N1800/{self.simname}/SOAP/halo_properties_{snap:04d}.hdf5'
@@ -251,33 +232,10 @@ class patchyScreening:
             f.close()
             print(f'Loading halo lightcone data: {time.time() - self.job_start_time}s')
 
-            try:
-                data = {
-                    "Dcom": self.Dcom,
-                    "halo_lc_data": halo_lc_data,
-                    "df_VR": df_VR
-                }
-                with open(p,"wb") as f:
-                    pickle.dump(data, f)
-            except NameError:
-                pass
             return halo_lc_data, df_VR
 
         
     def filter_stellar_mass(self, halo_lc_data=None, df_halo=None):
-        try:
-            checkpoint_path = self._path("mock_halo_catalog")
-            if os.path.exists(checkpoint_path):
-                with open(checkpoint_path, "rb") as f:
-                    data = pickle.load(f)
-                self.merge = data["merge"]
-                self.Dcom = data["Dcom"] 
-                self.x = data["x"]
-                self.y = data["y"]
-                self.z = data["z"]
-                self.nhalo = data["nhalo"]
-        except AttributeError:
-            pass
         
         # Merge and filter the DataFrames based on stellar mass bin
         if self.lightcone_method[1] == 'shell':
@@ -311,32 +269,9 @@ class patchyScreening:
             print(np.log10(self.im), np.log10(np.min(mstar)), np.log10(np.mean(mstar)), np.log10(np.mean(mvir)), self.nhalo)
             print(f'Identifying stackable objects: {time.time() - self.job_start_time}s')
 
-            try:
-                data = {
-                    "merge": self.merge,
-                    "Dcom": self.Dcom,
-                    "x": self.x,
-                    "y": self.y,
-                    "z": self.z,
-                    "nhalo": self.nhalo
-                }
-                with open(p,"wb") as f:
-                    pickle.dump(data, f)
-            except NameError:
-                pass
             return
 
     def compute_alm_maps(self, plot=False):
-        try:
-            checkpoint_path = self._path("alm_filtered_maps")
-            if os.path.exists(checkpoint_path):
-                with open(checkpoint_path, "rb") as f:
-                    data = pickle.load(f)
-                self.large_scale_map = data["large_scale_map"]
-                self.small_scale_map = data["small_scale_map"]
-                self.mean_mod_T_large_scale = data["mean_mod_T_large_scale"]
-        except AttributeError:
-            pass
                     
         # Computing and filtering spherical harmonic coefficients to create large and small scale maps
         try:
@@ -381,16 +316,6 @@ class patchyScreening:
         elif self.rotate == False:
             print(f'Computing and filtering alms: {time.time() - self.job_start_time}s')
 
-        try:
-            data = {
-                "large_scale_map": self.large_scale_map,
-                "small_scale_map": self.small_scale_map,
-                "mean_mod_T_large_scale": self.mean_mod_T_large_scale
-            }
-            with open(p,"wb") as f:
-                pickle.dump(data, f)
-        except NameError:
-            pass
         return
 
     def f_lowpass(self, l):
@@ -452,7 +377,24 @@ class patchyScreening:
     def run_tau_profiles(self, plot):
         # Parallelisation of computing tau profiles for each halo
         batch_size=max(1, self.nhalo // (self.ncpu*2))
-        randint = np.random.randint(self.nhalo)        
+        randint = np.random.randint(self.nhalo)
+
+        '''all_indices = np.arange(self.nhalo)
+        my_indices  = all_indices[rank::size]
+
+        # each rank computes its subset
+        results = [ self.tau_prof(i, (plot, randint)) for i in my_indices ]
+
+        # gather lists of arrays at root
+        gathered = comm.gather(results, root=0)
+
+        if rank == 0:
+            # flatten and store
+            flat = np.concatenate([np.stack(x, axis=0) for x in gathered], axis=0)
+            self.data_1D = flat
+
+        comm.Barrier()'''
+
         print(f'Starting profile loop: {time.time() - self.job_start_time}s')
         
         results = Parallel(n_jobs=self.ncpu, backend="loky", batch_size=batch_size)(delayed(self.tau_prof)(i, (plot,randint)) for i in range(self.nhalo))
@@ -461,13 +403,20 @@ class patchyScreening:
         return
 
     def stack_and_save(self):
+
+        '''if rank != 0:
+            return'''
+        
         # Stacking of tau profiles and save as pickle files
         tau_1D_stack = np.zeros(len(self.theta_d))
         for i in range(self.nhalo):
             tau_1D = self.data_1D[i,:]
             tau_1D_stack += tau_1D
         tau_1D_stack /= self.nhalo
+
+        '''tau_1D_stack = np.mean(self.data_1D, axis=0)
         print(self.simname,tau_1D_stack)
+        quit()'''
         
         rows, cols = (len(self.theta_d), 4)
         data = [0]*cols
@@ -478,7 +427,7 @@ class patchyScreening:
         fits_suffix = "" if self.cmb_method=='CAMB' else f"_{self.fits_file}"
         signal_suffix = "" if self.signal==True else "_no_ps"
         noise_suffix = "" if self.rotate==False else "_noise"
-        outfile = os.path.join('./L1000N1800', self.z_sample_name, f'{self.simname}_tau_Mstar_bin{self.im_name}_{self.slope_name}_nside{self.nside}_{self.cmb_method}{fits_suffix}{signal_suffix}{noise_suffix}.pickle')
+        outfile = os.path.join('./L1000N1800', self.z_sample_name, f'{self.simname}_tau_Mstar_bin{self.im_name}_{self.slope_name}_nside{self.nside}_{self.cmb_method}{fits_suffix}{signal_suffix}{noise_suffix}_ell_limited.pickle')
         os.makedirs(os.path.dirname(outfile), exist_ok=True)
         with open(outfile, 'wb') as f:
             pickle.dump(data, f)
@@ -504,10 +453,6 @@ class patchyScreening:
         self.get_halo_coordinates()    # reads filtered_halos, writes self.halo_coords
 
     def run_analysis(self, plot=False):
-        jobid = os.environ.get("SLURM_JOB_ID", "nojobid")
-        self.ckpt = os.environ.get('CHECKPOINT_DIR',
-                                  f"/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/batch_files/checkpoints/{jobid}")
-        os.makedirs(self.ckpt, exist_ok=True)
         
         # Full analysis
         n_cpus = os.cpu_count() or 1           # should be 128 on your node
@@ -523,22 +468,23 @@ class patchyScreening:
             wait([f_cmb, f_halo])
 
         # 3) now both self.alm and self.halo_coords exist
+        '''self.generate_cmb_map(plot)
+        self.load_lightcones(plot)
+        self.get_patchy_screening_map(plot)
+        if self.lightcone_method[1] == 'shell':
+            halo_lc_data, df_halo = self.load_halo_data()
+            self.filter_stellar_mass(halo_lc_data, df_halo)
+        elif self.lightcone_method[1] == 'dndz':
+            self.filter_stellar_mass()
+        self.compute_alm_maps(plot)
+        self.get_halo_coordinates()'''
+        
         self.run_tau_profiles(plot)
         self.stack_and_save()
 
         return
 
     def get_halo_coordinates(self):
-        try:
-            checkpoint_path = self._path("source_vector")
-            if os.path.exists(checkpoint_path):
-                with open(checkpoint_path, "rb") as f:
-                    data = pickle.load(f)
-                self.theta = data["theta"]
-                self.phi = data["phi"]
-                self.source_vector = data["source_vector"]
-        except AttributeError:
-            pass
 
         # Compute source vectors of each halo
         try:
@@ -558,37 +504,28 @@ class patchyScreening:
         self.source_vector = hp.ang2vec(self.theta, self.phi, lonlat=True)
         print(f'Computing halo source vectors: {time.time() - self.job_start_time}s')
 
-        try:
-            data = {
-                "theta": self.theta,
-                "phi": self.phi,
-                "source_vector": self.source_vector
-            }
-            with open(checkpoint_path, "wb") as f:
-                pickle.dump(data, f)
-        except NameError:
-            pass
         return
 
     def get_patchy_screening_map(self, plot=False):
-        try:
-            checkpoint_path = self._path("patchy_screening_T_map")
-            if os.path.exists(checkpoint_path):
-                with open(checkpoint_path, "rb") as f:
-                    self.T_cmb_ps = pickle.load(f)
-        except AttributeError:
-            pass
 
         # Incorporate patchy screening signal into primary CMB
         if self.signal == True:
             try:
                 T_patchy_screening = -1 * self.DM_map.copy() * self.mock_CMB_primary.copy()
+                T_patchy_screening_2 = -1 * self.DM_map_2.copy() * self.mock_CMB_primary.copy()
             except AttributeError:
                 self.generate_cmb_map(plot)
                 self.load_lightcones(plot)
                 T_patchy_screening = -1 * self.DM_map.copy() * self.mock_CMB_primary.copy()
+                T_patchy_screening_2 = -1 * self.DM_map_2.copy() * self.mock_CMB_primary.copy()
             self.T_cmb_ps = T_patchy_screening + self.mock_CMB_primary.copy()
+            self.T_cmb_ps_2 = T_patchy_screening_2 + self.mock_CMB_primary.copy()
+            
+            #alm = hp.map2alm(self.T_cmb_ps, lmax=3*self.nside-1)
+            #self.T_cmb_ps = hp.alm2map(alm, nside=self.nside, lmax=5024)
+            
             self.T_cmb_ps = hp.smoothing(self.T_cmb_ps,fwhm=1.3*np.pi/60.0/180.0)
+            self.T_cmb_ps_2 = hp.smoothing(self.T_cmb_ps_2,fwhm=1.3*np.pi/60.0/180.0)
         elif self.signal == False:
             try:
                 self.T_cmb_ps = hp.smoothing(self.mock_CMB_primary.copy(),fwhm=1.3*np.pi/60.0/180.0)
@@ -602,11 +539,6 @@ class patchyScreening:
             plt.clf()
         print(f'Generating patchy screening map: {time.time() - self.job_start_time}s')
 
-        try:
-            with open(checkpoint_path, "wb") as f:
-                pickle.dump(self.T_cmb_ps, f)
-        except NameError:
-            pass
         return
 
 if __name__ == '__main__':
@@ -619,9 +551,66 @@ if __name__ == '__main__':
     fits = sys.argv[6]
     sig = sys.argv[7]
 
-    ps = patchyScreening(isim, iz, im, slope, ncpu, fits_file=fits, signal=sig, cmb_method='CAMB')
+    ps = patchyScreening(isim, iz, im, slope, ncpu, fits_file=fits, signal=sig)#, cmb_method='CAMB')#, lightcone_method=('SHELL','shell'))#, cmb_method='CAMB')
     ps.run_analysis(plot=False)
+    quit()
     #ps.get_halo_coordinates()
-    #ps.generate_cmb_map()
+    #ps.generate_cmb_map(plot=True)
+    ps.get_patchy_screening_map(plot=True)
 
+    unlensed_total_CL = hp.anafast(ps.T_cmb_ps)
+    unlensed_total_CL_2 = hp.anafast(ps.T_cmb_ps_2)
+    ell = np.arange(len(unlensed_total_CL))
+    ell_2 = np.arange(len(unlensed_total_CL_2))
+
+    ps_fits = patchyScreening(isim, iz, im, slope, ncpu, fits_file=fits, signal=sig)
+    ps_fits.get_patchy_screening_map(plot=True)
+
+    unlensed_total_CL_fits = hp.anafast(ps_fits.T_cmb_ps)
+    ell_fits = np.arange(len(unlensed_total_CL_fits))
+
+    print(ell, ell_2)
+    print(unlensed_total_CL.shape)
+
+    no_cut_tau = (ell*(ell+1)*unlensed_total_CL)/(2*np.pi)
+    cut_tau = (ell_2*(ell_2+1)*unlensed_total_CL_2)/(2*np.pi)
+    fits_result = (ell_fits*(ell_fits+1)*unlensed_total_CL_fits)/(2*np.pi)
+
+    print(unlensed_total_CL_fits.shape)
+    
+    '''from mpl_toolkits.axes_grid1 import make_axes_locatable
+    fig, ax = plt.subplots(figsize=(8,6), sharey=True, sharex=True)
+
+    divider = make_axes_locatable(ax)
+    ax2 = divider.append_axes("bottom", size="35%", pad=0)
+    ax.figure.add_axes(ax2)
+
+    ax.plot(ell, no_cut_tau, label='CMB cut at $\ell$=5024, no cut in tau')
+    ax.plot(ell_2, cut_tau, label='CMB cut at $\ell$=5024, cut in tau map at $\ell$=5024')
+    ax2.plot(ell, unlensed_total_CL_2/unlensed_total_CL, color="tab:red", label='$\frac{cut}{no cut}$')
+
+    ax.set_xticks([])
+    ax.set_xlabel(r'Multipole moment $\ell$')
+    ax.set_ylabel(r'$\frac{\ell(\ell+1)C_{\ell}}{2\pi}$')
+    ax.set_ylabel('Residual')
+    ax.set_xscale('log')
+    ax2.set_xscale('log')
+    ax.set_title('Primary CMB comparison')
+    ax.legend(loc='upper right')
+    plt.tight_layout()
+    plt.savefig(f'./Plots/cmb_comp_tau.png', dpi=400)
+    plt.clf()'''
+
+    plt.plot(ell, (ell*(ell+1)*unlensed_total_CL)/(2*np.pi), label='CMB cut at $\ell$=5024, no cut in tau')
+    plt.plot(ell_2, (ell_2*(ell_2+1)*unlensed_total_CL_2)/(2*np.pi), label='CMB cut at $\ell$=5024, cut in tau map at $\ell$=5024')
+    plt.plot(ell_fits, (ell_fits*(ell_fits+1)*unlensed_total_CL_fits)/(2*np.pi), label='FITS')
+    
+    plt.xlabel(r'Multipole moment $\ell$')
+    plt.ylabel(r'$\frac{\ell(\ell+1)C_{\ell}}{2\pi}$')
+    plt.xscale('log')
+    plt.title('Primary CMB comparison')
+    plt.legend(loc='upper right')
+    plt.savefig(f'./Plots/cmb_comp_tau.png', dpi=400)
+    plt.clf()
+    
 ####################################################################################################################################

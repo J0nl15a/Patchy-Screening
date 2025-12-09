@@ -25,18 +25,19 @@ class TauPlotter:
         # Base directory for the simulation results, e.g., "./L1000N1800"
         self.base_dir = base_dir
 
-    def construct_filepath(self, sim, colour, mass_bin, nside=8192, primary_method='FITS', file_method='unlensed', has_signal=True):
+    def construct_filepath(self, sim, colour, mass_bin, slope_bin, nside=8192, primary_method='FITS', file_method='unlensed', has_signal=True):
         signal_suffix = "" if has_signal else "_no_ps"
         fits_suffix = "" if primary_method != 'FITS' else f"_{file_method}"
         self.stellar_bins = f"{mass_bin:.1f}".replace('.', 'p')
-        filename = f"{sim}_tau_Mstar_bin{self.stellar_bins}_nside{nside}_{primary_method}{fits_suffix}{signal_suffix}.pickle"
+        self.slope = f"{slope_bin:.1f}".replace('.', 'p')
+        filename = f"{sim}_tau_Mstar_bin{self.stellar_bins}_{self.slope}_nside{nside}_{primary_method}{fits_suffix}{signal_suffix}.pickle"
         filepath = os.path.join(self.base_dir, colour, filename)
         return filepath
 
 
-    def load_data(self, sim, colour, mass_bin, nside=8192, primary_method='FITS', file_method='unlensed', signal_flag=True):
+    def load_data(self, sim, colour, mass_bin, slope_bin, nside=8192, primary_method='FITS', file_method='unlensed', signal_flag=True):
         # Load the pickle file corresponding to the given parameters.
-        filepath = self.construct_filepath(sim, colour, mass_bin, nside, primary_method, file_method, signal_flag)
+        filepath = self.construct_filepath(sim, colour, mass_bin, slope_bin, nside, primary_method, file_method, signal_flag)
         if not os.path.exists(filepath):
             raise FileNotFoundError(f"File not found: {filepath}")
         with open(filepath, 'rb') as f:
@@ -44,14 +45,14 @@ class TauPlotter:
         # Assume data is a list [theta_d, tau_profile, converted_distance] (adjust if needed)
         return data
 
-    def plot_by_stellar_bin(self, sim, mass_bin, colours, nside=8192, primary_method='FITS', file_method='unlensed', signal_flag=True, noise_data=None):
+    def plot_by_stellar_bin(self, sim, mass_bin, slope_bin, colours, nside=8192, primary_method='FITS', file_method='unlensed', signal_flag=True, noise_data=None):
         # For a fixed stellar bin, plot tau profiles for multiple colours.
         fig, ax = plt.subplots(figsize=(8,6), constrained_layout=True, dpi=1200)
         ax2 = ax.twiny()
         ax.hlines(y=0, xmin=-1, xmax=12, linestyles='-', color='k', label=None)
         line_colours = {'Blue':'tab:blue', 'Green':'tab:green', 'Red':'tab:red'}
         for colour in colours:
-            data = self.load_data(sim, colour, mass_bin, nside, primary_method, file_method, signal_flag)
+            data = self.load_data(sim, colour, mass_bin, slope_bin, nside, primary_method, file_method, signal_flag)
             theta_d = data[0]
             tau_profile = data[1]
             ax.plot(theta_d, tau_profile, color=line_colours[colour], label=f"{colour}")
@@ -76,10 +77,10 @@ class TauPlotter:
         file_suffix = "" if file_method==False else f"_{file_method}"
         signal_suffix = "" if signal_flag==True else "_no_ps"
         noise_suffix = "" if noise_data==None else "_noise"
-        plt.savefig(f"./Plots/{sim}_stellar_bin_{self.stellar_bins}_nside{nside}{primary_suffix}{file_suffix}{signal_suffix}{noise_suffix}.png", dpi=1200)
+        plt.savefig(f"./Plots/{sim}_stellar_bin_{self.stellar_bins}_{self.slope}_nside{nside}{primary_suffix}{file_suffix}{signal_suffix}{noise_suffix}.png", dpi=1200)
         plt.clf()
 
-    def plot_by_colour(self, sim, colour, mass_bins, nside=8192, primary_method='FITS', file_method='unlensed', signal_flag=True, noise_data=None):
+    def plot_by_colour(self, sim, colour, mass_bins, slope_bin, nside=8192, primary_method='FITS', file_method='unlensed', signal_flag=True, noise_data=None):
         # For a fixed colour, plot tau profiles for multiple stellar mass bins.
         fig, ax = plt.subplots(figsize=(8,6), constrained_layout=True, dpi=1200)
         ax2 = ax.twiny()
@@ -89,13 +90,13 @@ class TauPlotter:
         base_colour = mcolors.to_rgb(line_colours[colour])
         cmap = LinearSegmentedColormap.from_list("my_colour", [(1,1,1), base_colour], N=256)
         for i, mass_bin in enumerate(mass_bins):
-            data = self.load_data(sim, colour, mass_bin, nside, primary_method, file_method, signal_flag)
+            data = self.load_data(sim, colour, mass_bin, slope_bin, nside, primary_method, file_method, signal_flag)
             theta_d = data[0]
             tau_profile = data[1]
             colour_shade = cmap(alpha[i])
             ax.plot(theta_d, tau_profile, color=colour_shade, label=f"{mass_bin}")
-            if noise_data is not None and stellar_bin in noise_data and i==0:
-                ax.plot(theta_d, noise_data[stellar_bin], '--', color=line_colours[colour], label=f"{mass_bin} noise")
+            if noise_data is not None and mass_bin in noise_data and i==0:
+                ax.plot(theta_d, noise_data[mass_bin], '--', color=line_colours[colour], label=f"{mass_bin} noise")
 
         formatter = ScalarFormatter(useMathText=True)
         formatter.set_powerlimits((-4, -4))
@@ -115,10 +116,10 @@ class TauPlotter:
         file_suffix = "" if file_method==False else f"_{file_method}"
         signal_suffix = "" if signal_flag==True else "_no_ps"
         noise_suffix = "" if noise_data==None else "_noise"
-        plt.savefig(f"./Plots/{sim}_sample_{colour}_nside{nside}{primary_suffix}{file_suffix}{signal_suffix}{noise_suffix}.png", dpi=1200)
+        plt.savefig(f"./Plots/{sim}_sample_{colour}_{self.slope}_nside{nside}{primary_suffix}{file_suffix}{signal_suffix}{noise_suffix}.png", dpi=1200)
         plt.clf()
 
-    def plot_by_file_method(self, sim, colour, mass_bin, nside=8192, primary_method='FITS', file_methods='unlensed', signal_flag=True, noise_data=None):
+    def plot_by_file_method(self, sim, colour, mass_bin, slope_bin, nside=8192, primary_method='FITS', file_methods='unlensed', signal_flag=True, noise_data=None):
         # For a fixed stellar bin and colour, plot tau profiles for different file method suffixes.
         fig, ax = plt.subplots(figsize=(8,6), constrained_layout=True, dpi=1200)
         ax2 = ax.twiny()
@@ -127,19 +128,19 @@ class TauPlotter:
         line_styles = {'unlensed':'-', 'lensed_z2':'--', 'lensed_z3':':'}
         if signal_flag == False:
             for file_method in file_methods:
-                data = self.load_data(sim, colour, mass_bin, nside, primary_method, file_method, signal_flag=True)
+                data = self.load_data(sim, colour, mass_bin, slope_bin, nside, primary_method, file_method, signal_flag=True)
                 theta_d = data[0]
                 tau_profile = data[1]
                 ax.plot(theta_d, tau_profile, line_styles[file_method], color=line_colours[colour], label=f"{file_method}")
                 if noise_data is not None and file_method in noise_data:
                     ax.plot(theta_d, noise_data[file_method], '--', color=line_colours[colour], label=f"{file_method} noise")
-            data = self.load_data(sim, colour, mass_bin, nside, primary_method, file_method, signal_flag)
+            data = self.load_data(sim, colour, mass_bin, slope_bin, nside, primary_method, file_method, signal_flag)
             theta_d = data[0]
             tau_profile = data[1]
             ax.plot(theta_d, tau_profile, '-.', color=line_colours[colour], label=f"{file_method} (no PS)")
         else:
             for file_method in file_methods:
-                data = self.load_data(sim, colour, mass_bin, nside, primary_method, file_method, signal_flag)
+                data = self.load_data(sim, colour, mass_bin, slope_bin, nside, primary_method, file_method, signal_flag)
                 theta_d = data[0]
                 tau_profile = data[1]
                 ax.plot(theta_d, tau_profile, line_styles[file_method], color=line_colours[colour], label=f"{file_method}")
@@ -163,13 +164,13 @@ class TauPlotter:
         primary_suffix = "_CAMB" if primary_method=='CAMB' else "_FITS"
         signal_suffix = "" if signal_flag==True else "_no_ps"
         noise_suffix = "" if noise_data==None else "_noise"
-        plt.savefig(f"./Plots/{sim}_method_comp_{colour}_{self.stellar_bins}_nside{nside}{primary_suffix}{signal_suffix}{noise_suffix}.png", dpi=1200)
+        plt.savefig(f"./Plots/{sim}_method_comp_{colour}_{self.stellar_bins}_{self.slope}_nside{nside}{primary_suffix}{signal_suffix}{noise_suffix}.png", dpi=1200)
         plt.clf()
 
     def generic_plot(self, file_list, labels, line_styles, colours, alpha, plot_title, outname, noise_data=None):
         # file_list: list of file paths to load
         # labels: list of labels corresponding to each file
-        fig, ax = plt.subplots(figsize=(8,6), constrained_layout=True, dpi=1200)
+        fig, ax = plt.subplots(figsize=(8,6), constrained_layout=True, dpi=400)
         ax2 = ax.twiny()
         ax.hlines(y=0, xmin=-1, xmax=12, linestyles='-', color='k', label=None)
         for fp, lab, style, colour, alpha in zip(file_list, labels, line_styles, colours, alpha):
@@ -194,17 +195,57 @@ class TauPlotter:
         ax2.plot(data[2], data[1], alpha=0)
         ax2.set_xlabel('r [Mpc/h]')
 
-        plt.savefig(os.path.join("./Plots", outname), dpi=1200)
+        plt.savefig(os.path.join("./Plots", outname), dpi=400)
         plt.clf()
 
 
 if __name__ == '__main__':
 
     tp = TauPlotter(base_dir="./L1000N1800")
-    '''tp.plot_by_stellar_bin(sim="HYDRO_FIDUCIAL",
+    
+    '''tp.generic_plot(file_list=['./L1000N1800/Blue/HYDRO_FIDUCIAL_tau_Mstar_bin10p77_0p878_nside8192_FITS_unlensed_ell_limited.pickle'],
+                    labels=["Optimized catalog method"],
+                    line_styles=["-"],
+                    colours=["tab:blue"],
+                    alpha=[1],
+                    plot_title=f'$\\tau$ Profiles for Blue sample, $\log M_*$=10.77, $n_{{cut}}$=0.878, with optimized mock catalog, \n(sim=HYDRO_FIDUCIAL, nside=8192)',      
+                    outname='HYDRO_FIDUCIAL_optimum_catalog_Blue_10p77_0p878_nside8192.png')
+    quit()'''
+    
+    tp.generic_plot(file_list=['./L1000N1800/Blue/HYDRO_FIDUCIAL_tau_Mstar_bin10p77_0p878_nside8192_FITS_unlensed_ell_limited.pickle', 
+                               './L1000N1800/Blue/HYDRO_FIDUCIAL_tau_Mstar_bin10p77_0p878_nside8192_FITS_unlensed_no_ps_ell_limited.pickle', 
+                               './L1000N1800/Blue/HYDRO_FIDUCIAL_tau_Mstar_bin10p77_0p878_nside8192_FITS_lensed_z2_ell_limited.pickle', 
+                               './L1000N1800/Blue/HYDRO_FIDUCIAL_tau_Mstar_bin10p77_0p878_nside8192_FITS_lensed_z2_no_ps_ell_limited.pickle', 
+                               './L1000N1800/Blue/HYDRO_FIDUCIAL_tau_Mstar_bin10p77_0p878_nside8192_FITS_lensed_z3_ell_limited.pickle', 
+                               './L1000N1800/Blue/HYDRO_FIDUCIAL_tau_Mstar_bin10p77_0p878_nside8192_FITS_lensed_z3_no_ps_ell_limited.pickle',
+                               './L1000N1800/Blue/HYDRO_FIDUCIAL_tau_Mstar_bin10p77_0p878_nside8192_CAMB_ell_limited.pickle'],
+                    #labels=["CAMB", "FITS", f"CAMB ($\ell$ limited, no signal)", "CAMB (scalar)", "FITS no signal"],
+                    #line_styles=["--", "-", "-.", ":", ":"],
+                    #colours=["tab:blue", "tab:red", "tab:green", "tab:orange", "tab:brown"],#for _ in range(4)],
+                    #alpha=[1 for _ in range(5)],
+                    #plot_title=f'$\\tau$ Profiles for Blue sample, $\log M_*$=10.7 for different\slopes of the z-dependant stellar cut\n(sim=HYDRO_FIDUCIAL, nside=8192)',                        
+                    #plot_title=f'$\\tau$ Profiles for Blue sample, $\log M_*$=10.7, $n_{{cut}}$=0.0, for a difference in primary CMB method, \n(sim=HYDRO_FIDUCIAL, nside=8192)',      
+                    #outname='HYDRO_FIDUCIAL_cmb_comp_Blue_10p7_0p0_nside8192.png')
+                    labels=["unlensed", "unlensed (no PS)", "lensed to z=2", "lensed to z=2 (no PS)", "lensed to z=3", "lensed to z=3 (no PS)", "CAMB"],
+                    line_styles=["-", ":", "--", "*", "-.", "+", "-"],
+                    colours=["tab:blue" for _ in range(6)] + ["darkblue"],
+                    alpha=[1. for _ in range(7)],
+                    plot_title=f'$\\tau$ Profiles for Blue sample, $\log M_*$=10.77, $n_{{cut}}$=0.878, for different lensing methods\n(sim=HYDRO_FIDUCIAL, nside=8192)',
+                    outname='HYDRO_FIDUCIAL_method_comp_full_Blue_10p77_0p878_nside8192_FITS.png')
+    quit()
+    tp.generic_plot(file_list=['./L1000N1800/Blue/HYDRO_FIDUCIAL_tau_Mstar_bin10p7_0p0_nside8192_CAMB.pickle', './L1000N1800/Blue/HYDRO_FIDUCIAL_tau_Mstar_bin10p7_0p1_nside8192_CAMB.pickle', './L1000N1800/Blue/HYDRO_FIDUCIAL_tau_Mstar_bin10p7_0p2_nside8192_CAMB.pickle', './L1000N1800/Blue/HYDRO_FIDUCIAL_tau_Mstar_bin10p7_0p3_nside8192_CAMB.pickle', './L1000N1800/Blue/HYDRO_FIDUCIAL_tau_Mstar_bin10p7_0p4_nside8192_CAMB.pickle', './L1000N1800/Blue/HYDRO_FIDUCIAL_tau_Mstar_bin10p7_0p5_nside8192_CAMB.pickle', './L1000N1800/Blue/HYDRO_FIDUCIAL_tau_Mstar_bin10p7_0p6_nside8192_CAMB.pickle', './L1000N1800/Blue/HYDRO_FIDUCIAL_tau_Mstar_bin10p7_0p7_nside8192_CAMB.pickle', './L1000N1800/Blue/HYDRO_FIDUCIAL_tau_Mstar_bin10p7_0p8_nside8192_CAMB.pickle', './L1000N1800/Blue/HYDRO_FIDUCIAL_tau_Mstar_bin10p7_0p9_nside8192_CAMB.pickle', './L1000N1800/Blue/HYDRO_FIDUCIAL_tau_Mstar_bin10p7_1p0_nside8192_CAMB.pickle'],
+                    labels=["0.0", "0.1", "0.2" ,"0.3","0.4","0.5","0.6","0.7","0.8","0.9","1.0"],
+                    line_styles=["-" for _ in range(11)], 
+                    colours=["tab:blue" for _ in range(11)],
+                    alpha=[a for a in np.linspace(1.0, 0.1, 11)],
+                    #plot_title=f'$\\tau$ Profiles for Blue sample, $\log M_*$=10.7 for different slopes of the z-dependant stellar cut\n(sim=HYDRO_FIDUCIAL, nside=8192)',
+                    plot_title=f'$\\tau$ Profiles for Blue sample, $\log M_*$=10.7, for different slopes of a\n z-dependant stellar cut\n(sim=HYDRO_FIDUCIAL, nside=8192, primary CMB=CAMB)',
+                    outname='HYDRO_FIDUCIAL_slope_comp_Blue_10p7_nside8192_CAMB.png')              
+    quit()
+    tp.plot_by_stellar_bin(sim="HYDRO_FIDUCIAL",
                            mass_bin=10.9,
                            colours=["Blue"], #"Green"],# "Red"],
-                           file_method="unlensed")'''
+                           file_method="unlensed")
     
     tp.plot_by_colour(sim="HYDRO_JETS_published",
                       colour="Blue",

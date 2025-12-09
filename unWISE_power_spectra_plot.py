@@ -345,25 +345,25 @@ def power_spectra_plot(isim, iz, im, slope, fits, single, template=False, multi_
     pb.yscale("log")
     pb.xlim(200, 4000)#ell_namaster[-1])
     if single:
-        pb.legend(title="Slope, $N_{halo}$, $\log \mathcal{L}(\\theta \mid x)$" if data == None else "Slope, $log_{10}M_{*,mean}$, $N_{halo}$, $\chi^2$", fontsize=8, ncols=1, loc='upper right')
+        pb.legend(title="Slope, $N_{halo}$, $-\log \mathcal{L}(\\theta \mid x)$" if data == None else "Slope, $log_{10}M_{*,mean}$, $N_{halo}$, $\chi^2$", fontsize=8, ncols=1, loc='upper right')
         if shot_noise:
             pb.savefig(f'./Plots/halo_map_gg_power_spectrum_{isim}_{iz}_{im_name}_{slope_name}_{fits}_ntotal{template_prefix}.png', dpi=400)
         else:
             pb.savefig(f'./Plots/halo_map_gg_power_spectrum_{isim}_{iz}_{im_name}_{slope_name}_{fits}_ntotal_shot_noise_subtracted{template_prefix}.png', dpi=400)
     elif multi_slope:
-        pb.legend(title="Slope, $N_{halo}$, $\log \mathcal{L}(\\theta \mid x)$" if data == None else "Slope, $log_{10}M_{*,mean}$, $N_{halo}$, $\chi^2$", fontsize=6, ncols=2, loc='upper right')
+        pb.legend(title="Slope, $N_{halo}$, $-\log \mathcal{L}(\\theta \mid x)$" if data == None else "Slope, $log_{10}M_{*,mean}$, $N_{halo}$, $\chi^2$", fontsize=6, ncols=2, loc='upper right')
         if shot_noise:
             pb.savefig(f'./Plots/halo_map_gg_power_spectrum_{isim}_{iz}_{im_name}_all_slopes_{fits}_ntotal{template_prefix}.png', dpi=400)
         else:   
             pb.savefig(f'./Plots/halo_map_gg_power_spectrum_{isim}_{iz}_{im_name}_all_slopes_{fits}_ntotal_shot_noise_subtracted{template_prefix}.png', dpi=400)
     elif multi_im:
-        pb.legend(title="Mass cut, $N_{halo}$, $\log \mathcal{L}(\\theta \mid x)$" if data == None else "Mass cut, $log_{10}M_{*,mean}$, $N_{halo}$, $\chi^2$", fontsize=6, ncols=2, loc='upper right')
+        pb.legend(title="Mass cut, $N_{halo}$, $-\log \mathcal{L}(\\theta \mid x)$" if data == None else "Mass cut, $log_{10}M_{*,mean}$, $N_{halo}$, $\chi^2$", fontsize=6, ncols=2, loc='upper right')
         if shot_noise:
             pb.savefig(f'./Plots/halo_map_gg_power_spectrum_{isim}_{iz}_{slope_name}_all_mass_cuts_{fits}_ntotal{template_prefix}.png', dpi=400)
         else:
             pb.savefig(f'./Plots/halo_map_gg_power_spectrum_{isim}_{iz}_{slope_name}_all_mass_cuts_{fits}_ntotal_shot_noise_subtracted{template_prefix}.png', dpi=400)
     elif multi_sim:
-        pb.legend(title="Simulation, Amp, Slope, $N_{halo}$, $\log \mathcal{L}(\\theta \mid x)$" if data == None else "Simulation, Amp, Slope, $log_{10}M_{*,mean}$, $N_{halo}$, $\chi^2$", fontsize=6, ncols=1, loc='upper right')
+        pb.legend(title="Simulation, Amp, Slope, $N_{halo}$, $-\log \mathcal{L}(\\theta \mid x)$" if data == None else "Simulation, Amp, Slope, $log_{10}M_{*,mean}$, $N_{halo}$, $\chi^2$", fontsize=6, ncols=1, loc='upper right')
         if shot_noise:
             pb.savefig(f'./Plots/halo_map_gg_power_spectrum_all_sims_{iz}_mle_amp_slope_{fits}_ntotal{template_prefix}.png', dpi=400)
         else:
@@ -438,13 +438,13 @@ def power_spectra_plot(isim, iz, im, slope, fits, single, template=False, multi_
     pb.yscale("log")
     pb.xlim(200, 4000)#ell_namaster[-1])
     if single or multi_slope:
-        pb.legend(title="Slope, $N_{halo}$, $\log \mathcal{L}(\\theta \mid x)$" if data == None else "Slope, $log_{10}M_{*,mean}$, $N_{halo}$, $\chi^2$", fontsize=8, ncols=2, loc='upper right')
+        pb.legend(title="Slope, $N_{halo}$, $-\log \mathcal{L}(\\theta \mid x)$" if data == None else "Slope, $log_{10}M_{*,mean}$, $N_{halo}$, $\chi^2$", fontsize=8, ncols=2, loc='upper right')
         pb.savefig(f'./Plots/halo_map_gg_power_spectrum_{isim}_{iz}_{im_name}_all_slopes_{fits}_ntotal_shot_noise_subtracted{template_prefix}_ell.png', dpi=400)
     elif multi_im:
-        pb.legend(title="Mass cut, $N_{halo}$, $\log \mathcal{L}(\\theta \mid x)$" if data == None else "Mass cut, $log_{10}M_{*,mean}$, $N_{halo}$, $\chi^2$", fontsize=6, ncols=2, loc='upper right')
+        pb.legend(title="Mass cut, $N_{halo}$, $-\log \mathcal{L}(\\theta \mid x)$" if data == None else "Mass cut, $log_{10}M_{*,mean}$, $N_{halo}$, $\chi^2$", fontsize=6, ncols=2, loc='upper right')
         pb.savefig(f'./Plots/halo_map_gg_power_spectrum_{isim}_{iz}_{slope_name}_all_mass_cuts_{fits}_ntotal_shot_noise_subtracted{template_prefix}_ell.png', dpi=400)
     elif multi_sim:
-        pb.legend(title="Simulation, Amp, Slope, $N_{halo}$, $\log \mathcal{L}(\\theta \mid x)$" if data == None else "Simulation, Amp, Slope, $log_{10}M_{*,mean}$, $N_{halo}$, $\chi^2$", fontsize=6, ncols=1, loc='upper right')
+        pb.legend(title="Simulation, Amp, Slope, $N_{halo}$, $-\log \mathcal{L}(\\theta \mid x)$" if data == None else "Simulation, Amp, Slope, $log_{10}M_{*,mean}$, $N_{halo}$, $\chi^2$", fontsize=6, ncols=1, loc='upper right')
         pb.savefig(f'./Plots/halo_map_gg_power_spectrum_all_sims_{iz}_mle_amp_slope_{fits}_ntotal_shot_noise_subtracted{template_prefix}_ell.png', dpi=400)
     pb.clf()
 
@@ -516,13 +516,13 @@ def power_spectra_plot(isim, iz, im, slope, fits, single, template=False, multi_
     pb.yscale("log")
     pb.xlim(200, 4000)#ell_namaster[-1])
     if single or multi_slope:
-        pb.legend(title="Slope, $N_{halo}$, $\log \mathcal{L}(\\theta \mid x)$" if data == None else "Slope, $log_{10}M_{*,mean}$, $N_{halo}$, $\chi^2$", fontsize=8, ncols=2, loc='upper right')
+        pb.legend(title="Slope, $N_{halo}$, $-\log \mathcal{L}(\\theta \mid x)$" if data == None else "Slope, $log_{10}M_{*,mean}$, $N_{halo}$, $\chi^2$", fontsize=8, ncols=2, loc='upper right')
         pb.savefig(f'./Plots/halo_map_kg_power_spectrum_{isim}_{iz}_{im_name}_all_slopes_{fits}_ntotal{template_prefix}.png', dpi=400)
     elif multi_im:
-        pb.legend(title="Mass cut, $N_{halo}$, $\log \mathcal{L}(\\theta \mid x)$" if data == None else "Mass cut, $log_{10}M_{*,mean}$, $N_{halo}$, $\chi^2$", fontsize=6, ncols=2, loc='upper right')
+        pb.legend(title="Mass cut, $N_{halo}$, $-\log \mathcal{L}(\\theta \mid x)$" if data == None else "Mass cut, $log_{10}M_{*,mean}$, $N_{halo}$, $\chi^2$", fontsize=6, ncols=2, loc='upper right')
         pb.savefig(f'./Plots/halo_map_kg_power_spectrum_{isim}_{iz}_{slope_name}_all_mass_cuts_{fits}_ntotal{template_prefix}.png', dpi=400)
     elif multi_sim:
-        pb.legend(title="Simulation, Amp, Slope, $N_{halo}$, $\log \mathcal{L}(\\theta \mid x)$" if data == None else "Simulation, Amp, Slope, $log_{10}M_{*,mean}$, $N_{halo}$, $\chi^2$", fontsize=6, ncols=1, loc='upper right')
+        pb.legend(title="Simulation, Amp, Slope, $N_{halo}$, $-\log \mathcal{L}(\\theta \mid x)$" if data == None else "Simulation, Amp, Slope, $log_{10}M_{*,mean}$, $N_{halo}$, $\chi^2$", fontsize=6, ncols=1, loc='upper right')
         pb.savefig(f'./Plots/halo_map_kg_power_spectrum_all_sims_{iz}_mle_amp_slope_{fits}_ntotal{template_prefix}.png', dpi=400)
     pb.clf()
 
@@ -594,13 +594,13 @@ def power_spectra_plot(isim, iz, im, slope, fits, single, template=False, multi_
     pb.yscale("log")
     pb.xlim(200, 4000)#ell_namaster[-1])
     if single or multi_slope:
-        pb.legend(title="Slope, $N_{halo}$, $\log \mathcal{L}(\\theta \mid x)$" if data == None else "Slope, $log_{10}M_{*,mean}$, $N_{halo}$, $\chi^2$", fontsize=8, ncols=2, loc='upper right')
+        pb.legend(title="Slope, $N_{halo}$, $-\log \mathcal{L}(\\theta \mid x)$" if data == None else "Slope, $log_{10}M_{*,mean}$, $N_{halo}$, $\chi^2$", fontsize=8, ncols=2, loc='upper right')
         pb.savefig(f'./Plots/halo_map_kg_power_spectrum_{isim}_{iz}_{im_name}_all_slopes_{fits}_ntotal{template_prefix}_ell.png', dpi=400)
     elif multi_im:
-        pb.legend(title="Mass cut, $N_{halo}$, $\log \mathcal{L}(\\theta \mid x)$" if data == None else "Mass cut, $log_{10}M_{*,mean}$, $N_{halo}$, $\chi^2$", fontsize=6, ncols=2, loc='upper right')
+        pb.legend(title="Mass cut, $N_{halo}$, $-\log \mathcal{L}(\\theta \mid x)$" if data == None else "Mass cut, $log_{10}M_{*,mean}$, $N_{halo}$, $\chi^2$", fontsize=6, ncols=2, loc='upper right')
         pb.savefig(f'./Plots/halo_map_kg_power_spectrum_{isim}_{iz}_{slope_name}_all_mass_cuts_{fits}_ntotal{template_prefix}_ell.png', dpi=400)
     elif multi_sim:
-        pb.legend(title="Simulation, Amp, Slope, $N_{halo}$, $\log \mathcal{L}(\\theta \mid x)$" if data == None else "Simulation, Amp, Slope, $log_{10}M_{*,mean}$, $N_{halo}$, $\chi^2$", fontsize=6, ncols=1, loc='upper right')
+        pb.legend(title="Simulation, Amp, Slope, $N_{halo}$, $-\log \mathcal{L}(\\theta \mid x)$" if data == None else "Simulation, Amp, Slope, $log_{10}M_{*,mean}$, $N_{halo}$, $\chi^2$", fontsize=6, ncols=1, loc='upper right')
         pb.savefig(f'./Plots/halo_map_kg_power_spectrum_all_sims_{iz}_mle_amp_slope_{fits}_ntotal{template_prefix}_ell.png', dpi=400)
     pb.clf()
 

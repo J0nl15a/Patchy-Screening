@@ -10,9 +10,9 @@ ARR_ID=$(sbatch --parsable \
                 -c 128 \
                 -p cosma8 \
                 -A dp004 \
-                -t 03:30:00 \
-                -o ./batch_files/pipeline_logs/job.%j.dump \
-                -e ./batch_files/pipeline_logs/job.%j.err \
+                -t 12:00:00 \
+                -o ./batch_files/pipeline_logs/job.${ISIM}_${IZ}_%j.dump \
+                -e ./batch_files/pipeline_logs/job.${ISIM}_${IZ}_%j.err \
                 <<EOF
 #!/usr/bin/env bash
 #SBATCH --mail-type=ALL
@@ -125,12 +125,12 @@ jid6=$(sbatch --parsable \
               --dependency=afterok:$ARR_ID \
               --kill-on-invalid-dep=yes \
               --job-name=mock_catalog_maximum_likelihood_estimation \
-              -c 4 \
+              -c 8 \
               -p cosma8 \
               -A dp004 \
-              -t 00:10:00 \
-              -o ./batch_files/maximum_likelihood_logs/job.%j.dump \
-              -e ./batch_files/maximum_likelihood_logs/job.%j.err \
+              -t 00:30:00 \
+              -o ./batch_files/maximum_likelihood_logs/job.${ISIM}_${IZ}_%j.dump \
+              -e ./batch_files/maximum_likelihood_logs/job.${ISIM}_${IZ}_%j.err \
               <<EOF
 #!/usr/bin/env bash
 #SBATCH --mail-type=ALL
@@ -177,8 +177,8 @@ jid7=$(sbatch --parsable \
               -p cosma8 \
               -A dp004 \
               -t 01:30:00 \
-              -o ./batch_files/pipeline_logs/job.%j.dump \
-              -e ./batch_files/pipeline_logs/job.%j.err \
+              -o ./batch_files/pipeline_logs/job.mle_${ISIM}_${IZ}_%j.dump \
+              -e ./batch_files/pipeline_logs/job.mle_${ISIM}_${IZ}_%j.err \
               <<EOF
 #!/usr/bin/env bash
 #SBATCH --mail-type=ALL
@@ -186,9 +186,9 @@ jid7=$(sbatch --parsable \
 
 set -euo pipefail
 
-# Read MLEs from file written by the MLE job
-amp=\$(grep 'AMP'   "${MLE_FILE}" | cut -d'=' -f2)
-slope=\$(grep 'SLOPE' "${MLE_FILE}" | cut -d'=' -f2)
+# Read MLEs from file written by the MLE job (use only the first matching line)
+amp=\$(grep -m1 '^AMP'   "${MLE_FILE}" | cut -d'=' -f2)
+slope=\$(grep -m1 '^SLOPE' "${MLE_FILE}" | cut -d'=' -f2)
 echo "Read MLEs: amp=\$amp, slope=\$slope"
 
 echo ">>> Launching pipeline with Sim='${ISIM}' Sample='${IZ}' M_cut(z_mean)='\$amp' n_cut='\$slope' nsamp='ntotal'"

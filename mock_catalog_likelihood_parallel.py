@@ -53,12 +53,12 @@ def log_probability(theta, f_obs, f_obs_err, isim, iz, plateau_point, m, c):
         return -np.inf
     return lp + log_likelihood(theta, f_obs, f_obs_err, isim, iz)
 
-def multiprocess(f_obs, f_obs_err, isim, iz, plateau_point, m, c, backend):
+def multiprocess(f_obs, f_obs_err, isim, iz, plateau_point, m, c): #, backend):
 
     with multiprocessing.get_context("spawn").Pool() as pool:
         start = time.time()
         sampler = emcee.EnsembleSampler(
-            nwalkers, ndim, log_probability, args=(f_obs, f_obs_err, isim, iz, plateau_point, m, c), backend=backend, pool=pool
+            nwalkers, ndim, log_probability, args=(f_obs, f_obs_err, isim, iz, plateau_point, m, c), pool=pool #, backend=backend
         )
         sampler.run_mcmc(pos, steps, progress=True)
         end = time.time()
@@ -74,7 +74,7 @@ if __name__ == '__main__':
     iz = sys.argv[3]
 
     farren_data_ = np.loadtxt(f'./unWISExLens_lklh/data/v1.0/bandpowers/unWISExACT-DR6_{str(iz).lower()}_baseline_Clgg+Clkk+Clkg.dat', usecols=(0,1,3)).reshape(-1,3)
-    obs_data__covariance = np.loadtxt(f'./unWISExLens_lklh/data/v1.0/covariances/covmat_Clgg+Clkg_unWISExACT-DR6_{str(iz).lower()}_baseline.dat')
+    obs_data_covariance = np.loadtxt(f'./unWISExLens_lklh/data/v1.0/covariances/covmat_Clgg+Clkg_unWISExACT-DR6_{str(iz).lower()}_baseline.dat')
     ell_200_mask = np.where(farren_data_[:,0] > 200)
 
     f_sim_auto = module.emulator(np.array((10.65, 0.45)), 'auto', isim, iz, save=True, retrain=True) #module.emulator(x, 'auto', isim, iz, load=True)
@@ -86,12 +86,12 @@ if __name__ == '__main__':
     vertical_limit = prior_limits[2]
     print(plateau_point, c, vertical_limit)
 
-    farren_data__variance = np.diag(obs_data__covariance)
-    farren_data__var_auto = farren_data__variance[:int(len(farren_data__variance)/2)][ell_200_mask]
-    farren_data__var_cross = farren_data__variance[int(len(farren_data__variance)/2):][ell_200_mask]
+    farren_data_variance = np.diag(obs_data_covariance)
+    farren_data_var_auto = farren_data_variance[:int(len(farren_data_variance)/2)][ell_200_mask]
+    farren_data_var_cross = farren_data_variance[int(len(farren_data_variance)/2):][ell_200_mask]
     
     f_obs = {'auto': farren_data_[:,1][ell_200_mask] * 1e5, 'cross': farren_data_[:,2][ell_200_mask] * 1e5}
-    f_obs_err = {'auto': farren_data__var_auto * 1e5, 'cross': farren_data__var_cross * 1e5}
+    f_obs_err = {'auto': farren_data_var_auto * 1e5, 'cross': farren_data_var_cross * 1e5}
     
     np.random.seed(1000)
     #nll = lambda *args: -log_likelihood(*args)
@@ -109,14 +109,14 @@ if __name__ == '__main__':
     prec = 4  # <-- change this to the number of decimals you want
     fmt  = f"%.{prec}f"
 
-    f_sim_auto = module.emulator(np.array((10.65, 0.45)), 'auto', isim, iz, save=True, retrain=True) #module.emulator(x, 'auto', isim, iz, load=True)
-    f_sim_cross = module.emulator(np.array((10.65, 0.45)), 'cross', isim, iz, save=True, retrain=True) #module.emulator(x, 'cross', isim, iz, load=True)
+    f_sim_auto = module.emulator(np.array((10.65, 0.45)), 'auto', isim, iz, save=True, retrain=True) 
+    f_sim_cross = module.emulator(np.array((10.65, 0.45)), 'cross', isim, iz, save=True, retrain=True) 
 
-    filename = f"./data_files/mcmc_chains/chain_walkers{nwalkers}_steps{steps}.h5"
-    backend = emcee.backends.HDFBackend(filename)
-    backend.reset(nwalkers, ndim)
+    # filename = f"./data_files/mcmc_chains/chain_walkers{nwalkers}_steps{steps}.h5"
+    # backend = emcee.backends.HDFBackend(filename)
+    # backend.reset(nwalkers, ndim)
 
-    sampler = multiprocess(f_obs, f_obs_err, isim, iz, plateau_point, c, vertical_limit, backend)
+    sampler = multiprocess(f_obs, f_obs_err, isim, iz, plateau_point, c, vertical_limit)#, backend)
 
     print(np.mean(sampler.acceptance_fraction))
 
@@ -148,13 +148,22 @@ if __name__ == '__main__':
     import corner
 
     mle = []
+    mle_err_lower = []
+    mle_err_upper = []
+
     for i in range(ndim):
         mcmc = np.percentile(flat_samples[:, i], [16, 50, 84])
         q = np.diff(mcmc)
         mle.append(mcmc[1])
+        mle_err_lower.append(q[0])   # 50th - 16th percentile
+        mle_err_upper.append(q[1])   # 84th - 50th percentile
 
     mle_amp = mle[0]
     mle_slope = mle[1]
+    err_amp_lower = mle_err_lower[0]
+    err_amp_upper = mle_err_upper[0]
+    err_slope_lower = mle_err_lower[1]
+    err_slope_upper = mle_err_upper[1]
     print(f"[INFO] MLE AMP: {mle_amp}, MLE SLOPE: {mle_slope}")
 
     log_likelihood_mle = log_likelihood((mle_amp, mle_slope), f_obs, f_obs_err, isim, iz)
@@ -166,6 +175,10 @@ if __name__ == '__main__':
         f.write(f"LOG_LIKELIHOOD={log_likelihood_mle:.13f}\n")
         f.write(f"AMP={mle_amp:.3f}\n")
         f.write(f"SLOPE={mle_slope:.3f}\n")
+        f.write(f"AMP_ERR_LOWER={err_amp_lower:.4f}\n")
+        f.write(f"AMP_ERR_UPPER={err_amp_upper:.4f}\n")
+        f.write(f"SLOPE_ERR_LOWER={err_slope_lower:.4f}\n")
+        f.write(f"SLOPE_ERR_UPPER={err_slope_upper:.4f}\n")
 
     print(f"[INFO] Wrote MLEs to {outfile}")
 

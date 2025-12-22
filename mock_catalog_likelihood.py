@@ -53,12 +53,12 @@ def log_probability(theta, f_obs, f_obs_err, isim, iz, plateau_point, m, c):
         return -np.inf
     return lp + log_likelihood(theta, f_obs, f_obs_err, isim, iz)
 
-def multiprocess(f_obs, f_obs_err, isim, iz, plateau_point, m, c, backend):
+def multiprocess(f_obs, f_obs_err, isim, iz, plateau_point, m, c): #, backend):
 
     with multiprocessing.get_context("spawn").Pool() as pool:
         start = time.time()
         sampler = emcee.EnsembleSampler(
-            nwalkers, ndim, log_probability, args=(f_obs, f_obs_err, isim, iz, plateau_point, m, c), backend=backend, pool=pool
+            nwalkers, ndim, log_probability, args=(f_obs, f_obs_err, isim, iz, plateau_point, m, c), pool=pool #, backend=backend
         )
         sampler.run_mcmc(pos, steps, progress=True)
         end = time.time()
@@ -88,16 +88,18 @@ if __name__ == '__main__':
     farren_data_var_auto = farren_data_variance[:int(len(farren_data_variance)/2)][ell_200_mask]
     farren_data_var_cross = farren_data_variance[int(len(farren_data_variance)/2):][ell_200_mask]
 
-    if isim == 'HYDRO_FIDUCIAL':
-        test_points = np.loadtxt('./data_files/mock_catalog_test_points.txt', delimiter=' ')[1,:]
-        test_name = [f"{float(test_points[0]):.1f}".replace('.', 'p'), f"{float(test_points[1]):.3f}".replace('.', 'p')]
-        test_auto = np.loadtxt(f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/power_spectra/galaxy_galaxy/{str(isim)}_{str(iz)}_{test_name[0]}_{test_name[1]}.txt', 
-                                delimiter=' ', skiprows=1, usecols=(2))
-        test_cross = np.loadtxt(f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/power_spectra/kappa_galaxy/{str(isim)}_{str(iz)}_{test_name[0]}_{test_name[1]}.txt', 
-                                delimiter=' ', skiprows=1, usecols=(1))
+    # if isim == 'HYDRO_FIDUCIAL':
+    #     test_points = np.loadtxt('./data_files/mock_catalog_test_points.txt', delimiter=' ')[1,:]
+    #     test_name = [f"{float(test_points[0]):.1f}".replace('.', 'p'), f"{float(test_points[1]):.3f}".replace('.', 'p')]
+    #     test_auto = np.loadtxt(f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/power_spectra/galaxy_galaxy/{str(isim)}_{str(iz)}_{test_name[0]}_{test_name[1]}.txt', 
+    #                             delimiter=' ', skiprows=1, usecols=(2))
+    #     test_cross = np.loadtxt(f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/power_spectra/kappa_galaxy/{str(isim)}_{str(iz)}_{test_name[0]}_{test_name[1]}.txt', 
+    #                             delimiter=' ', skiprows=1, usecols=(1))
     
     f_obs = {'auto': farren_data[:,1][ell_200_mask] * 1e5, 'cross': farren_data[:,2][ell_200_mask] * 1e5}
     f_obs_err = {'auto': farren_data_var_auto * 1e5, 'cross': farren_data_var_cross * 1e5}
+    print(np.sqrt(f_obs_err['auto'])*1e5, np.sqrt(f_obs_err['cross'])*1e5)
+    quit()
 
     # f_obs = {'auto': test_auto, 'cross': test_cross}
     # f_obs_err = {'auto': (test_auto * .01)**2, 'cross': (test_cross * .01)**2}
@@ -124,11 +126,11 @@ if __name__ == '__main__':
     f_sim_auto = emulator(np.array((10.65, 0.45)), 'auto', isim, iz, save=True, retrain=True) #module.emulator(x, 'auto', isim, iz, load=True)
     f_sim_cross = emulator(np.array((10.65, 0.45)), 'cross', isim, iz, save=True, retrain=True) #module.emulator(x, 'cross', isim, iz, load=True)
 
-    filename = f"./data_files/mcmc_chains/chain_walkers{nwalkers}_steps{steps}.h5"
-    backend = emcee.backends.HDFBackend(filename)
-    backend.reset(nwalkers, ndim)
+    # filename = f"./data_files/mcmc_chains/chain_walkers{nwalkers}_steps{steps}.h5"
+    # backend = emcee.backends.HDFBackend(filename)
+    # backend.reset(nwalkers, ndim)
 
-    sampler = multiprocess(f_obs, f_obs_err, isim, iz, plateau_point, c, vertical_limit, backend)
+    sampler = multiprocess(f_obs, f_obs_err, isim, iz, plateau_point, c, vertical_limit)#, backend)
 
     tau = sampler.get_autocorr_time()
     print(tau)
@@ -157,13 +159,22 @@ if __name__ == '__main__':
     import corner
 
     mle = []
+    mle_err_lower = []
+    mle_err_upper = []
+
     for i in range(ndim):
         mcmc = np.percentile(flat_samples[:, i], [16, 50, 84])
         q = np.diff(mcmc)
         mle.append(mcmc[1])
+        mle_err_lower.append(q[0])   # 50th - 16th percentile
+        mle_err_upper.append(q[1])   # 84th - 50th percentile
 
     mle_amp = mle[0]
     mle_slope = mle[1]
+    err_amp_lower = mle_err_lower[0]
+    err_amp_upper = mle_err_upper[0]
+    err_slope_lower = mle_err_lower[1]
+    err_slope_upper = mle_err_upper[1]
     print(f"[INFO] MLE AMP: {mle_amp}, MLE SLOPE: {mle_slope}")
 
     log_likelihood_mle = log_likelihood((mle_amp, mle_slope), f_obs, f_obs_err, isim, iz)
@@ -175,6 +186,10 @@ if __name__ == '__main__':
         f.write(f"LOG_LIKELIHOOD={log_likelihood_mle:.13f}\n")
         f.write(f"AMP={mle_amp:.3f}\n")
         f.write(f"SLOPE={mle_slope:.3f}\n")
+        f.write(f"AMP_ERR_LOWER={err_amp_lower:.4f}\n")
+        f.write(f"AMP_ERR_UPPER={err_amp_upper:.4f}\n")
+        f.write(f"SLOPE_ERR_LOWER={err_slope_lower:.4f}\n")
+        f.write(f"SLOPE_ERR_UPPER={err_slope_upper:.4f}\n")
 
     print(f"[INFO] Wrote MLEs to {outfile}")
 

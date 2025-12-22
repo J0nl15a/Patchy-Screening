@@ -49,7 +49,10 @@ def data_loader(isim, iz, low_halo_threshold=True, negative_power_threshold=Fals
         y_train_auto = np.delete(y_train_auto, negative_power, 0)
     print(y_train_cross.shape)
 
-    kusiak_observed_nbar_per_sq_deg = 3409
+    if iz == 'Blue':
+        kusiak_observed_nbar_per_sq_deg = 3409
+    elif iz == 'Green':
+        kusiak_observed_nbar_per_sq_deg = 1846
     kusiak_observed_nbar_full_sky = kusiak_observed_nbar_per_sq_deg * 41253  # total sq deg in sky
     nhalo_lower_bound = kusiak_observed_nbar_full_sky * 0.05  # 50% abundance cut
 

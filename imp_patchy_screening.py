@@ -20,7 +20,7 @@ class patchyScreening:
 
         os.environ["POLARS_MAX_THREADS"] = str(ncpu)
         self.job_start_time = time.time()
-        sim_list = ['HYDRO_FIDUCIAL','HYDRO_PLANCK','HYDRO_PLANCK_LARGE_NU_FIXED','HYDRO_PLANCK_LARGE_NU_VARY','HYDRO_STRONG_AGN','HYDRO_WEAK_AGN','HYDRO_LOW_SIGMA8','HYDRO_STRONGER_AGN','HYDRO_JETS_published','HYDRO_STRONGEST_AGN','HYDRO_STRONG_SUPERNOVA','HYDRO_STRONGER_AGN_STRONG_SUPERNOVA','HYDRO_STRONG_JETS']
+        sim_list = ['HYDRO_FIDUCIAL','HYDRO_PLANCK','HYDRO_PLANCK_LARGE_NU_FIXED','HYDRO_PLANCK_LARGE_NU_VARY','HYDRO_STRONG_AGN','HYDRO_WEAK_AGN','HYDRO_LOW_SIGMA8','HYDRO_STRONGER_AGN','HYDRO_JETS_published','HYDRO_STRONGEST_AGN','HYDRO_STRONG_SUPERNOVA','HYDRO_STRONGER_AGN_STRONG_SUPERNOVA','HYDRO_STRONG_JETS_published']
 
         try:
             isim = int(isim)
@@ -44,7 +44,7 @@ class patchyScreening:
         if round(self.im, 1) == self.im:
             self.im_name = f"{float(im):.1f}".replace('.', 'p')
         else:
-            self.im_name = f"{float(im)}".replace('.', 'p')
+            self.im_name = f"{float(im):.3f}".replace('.', 'p')
 
         self.slope = float(n_cut)
         if round(self.slope, 1) == self.slope:

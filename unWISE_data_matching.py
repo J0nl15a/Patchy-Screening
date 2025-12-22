@@ -19,11 +19,11 @@ def unWISE_data_matching(simname, z_sample, mass_cut, n_cut, nsamp='ntotal', plo
     if round(float(mass_cut), 1) == float(mass_cut):
         im_name = f"{float(mass_cut):.1f}".replace('.', 'p')
     else:
-        im_name = f"{float(mass_cut)}".replace('.', 'p')
+        im_name = f"{float(mass_cut):.3f}".replace('.', 'p')
     if round(float(n_cut), 1) == float(n_cut):
         slope_name = f"{float(n_cut):.1f}".replace('.', 'p')
     else:
-        slope_name = f"{float(n_cut)}".replace('.', 'p')
+        slope_name = f"{float(n_cut):.3f}".replace('.', 'p')
     if float(n_cut) < 0.0:
         slope_name = f"{slope_name}".replace('-', 'minus')
 

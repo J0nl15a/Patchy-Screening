@@ -7,12 +7,12 @@ def stellar_cut_z(z_sample, mean_z_mass_cut, slope):
     if round(im, 1) == im:
         im_name = f"{im:.1f}".replace('.', 'p')
     else:
-        im_name = f"{im}".replace('.', 'p')
+        im_name = f"{im:.3f}".replace('.', 'p')
     slope = float(slope)
     if round(slope, 1) == slope:
         slope_name = f"{float(slope):.1f}".replace('.', 'p')
     else:
-        slope_name = f"{float(slope)}".replace('.', 'p')
+        slope_name = f"{float(slope):.3f}".replace('.', 'p')
     if slope < 0.0:
         slope_name = f"{slope_name}".replace('-', 'minus')
     mass_cut_list = []

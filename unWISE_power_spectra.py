@@ -50,7 +50,7 @@ for i in range(len(results)):
     if round(slopes[i], 1) == slopes[i]:
         slopes_name.append(f"{float(slopes[i]):.1f}".replace('.', 'p'))
     else:
-        slopes_name.append(f"{float(slopes[i])}".replace('.', 'p'))
+        slopes_name.append(f"{float(slopes[i]):.3f}".replace('.', 'p'))
     print(slope)
     source_vectors.append(results[i][0])
     nhalos.append(results[i][1])
@@ -68,8 +68,9 @@ print(bin_edges)
 #ell_edges = bin_edges[np.where(bin_edges > 200)]
 #print(ell_edges)
 
-l0 = np.ceil(bin_edges[:-1]).astype(int)
-lf = np.floor(bin_edges[1:]).astype(int)
+edges_int = np.rint(bin_edges).astype(int)  # 19.5->20, 51.5->52, ...
+l0 = edges_int[:-1]
+lf = edges_int[1:]
 b = nmt.NmtBin.from_edges(l0, lf)
 lmax_bins = b.lmax
 

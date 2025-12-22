@@ -17,12 +17,12 @@ def halo_sampling(simname, z_sample, mass_cut, n_cut, ncpu):
     if round(im, 1) == im:
         im_name = f"{float(mass_cut):.1f}".replace('.', 'p')
     else:
-        im_name = f"{float(mass_cut)}".replace('.', 'p')
+        im_name = f"{float(mass_cut):.3f}".replace('.', 'p')
     slope = float(n_cut)
     if round(slope, 1) == slope:
         slope_name = f"{float(n_cut):.1f}".replace('.', 'p')
     else:
-        slope_name = f"{float(n_cut)}".replace('.', 'p')
+        slope_name = f"{float(n_cut):.3f}".replace('.', 'p')
     if slope < 0.0:
         slope_name = f"{slope_name}".replace('-', 'minus')
     output_path = f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/mock_halo_catalogs/sampled_halo_data_{simname}_{z_sample}_{im_name}_{slope_name}.parquet'

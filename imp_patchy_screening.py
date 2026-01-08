@@ -16,7 +16,7 @@ rank = comm.Get_rank()
 size = comm.Get_size()'''
 
 class patchyScreening:
-    def __init__(self, box, isim, iz, im, n_cut, ncpu, theta_d=np.arange(0.5, 11, 0.5), nside=8192, cmb_method='FITS', fits_file='unlensed', lightcone_method=('FULL','dndz'), signal=True, rotate=False, rect_size=20):
+    def __init__(self, box, isim, iz, im, n_cut, ncpu, theta_d=np.arange(0.5, 11, 0.5), nside=8192, cmb_method='FITS', fits_file='unlensed', lightcone_method=('FULL','dndz'), signal=True, rotate=False, rect_size=20, lightcone=0):
 
         os.environ["POLARS_MAX_THREADS"] = str(ncpu)
         self.job_start_time = time.time()
@@ -68,6 +68,9 @@ class patchyScreening:
         self.ncpu = int(ncpu)
         self.theta_d = theta_d
         self.nside = nside
+        if self.boxname == 'L2800N5040' and self.nside > 4096:
+            self.nside = 4096
+            print("Setting nside to 4096 for L2800N5040.")
         self.cmb_method = cmb_method
         self.fits_file = str(fits_file)
         self.lightcone_method = lightcone_method
@@ -77,6 +80,7 @@ class patchyScreening:
             self.signal = signal.lower() in ("true", "1", "yes", "y")
         self.rotate = rotate
         self.rect_size = rect_size
+        self.lightcone = lightcone
 
         self.cosmology = FlatLambdaCDM(H0=68.1, Om0=0.3, Tcmb0=2.725)
         self.mock_CMB_primary = None
@@ -120,7 +124,14 @@ class patchyScreening:
                 
         # Loading tau map from FLAMINGO lightcone shells
         if self.lightcone_method[0] == 'SHELL':
-            map_lightcone = f'/cosma8/data/dp004/flamingo/Runs/{self.boxname}/{self.simname}/neutrino_corrected_maps/lightcone0_shells/shell_{self.z_sample}/lightcone0.shell_{self.z_sample}.0.hdf5'
+            if self.boxname == 'L1000N1800' and self.lightcone == 0:
+                map_dir = 'neutrino_corrected_maps'
+            elif self.boxname == 'L2800N5040' and self.simname == 'HYDRO_FIDUCIAL':
+                map_dir = 'neutrino_corrected_maps_downsampled_4096'
+            else:
+                print("Lightcone map not available for this box/simulation combination.")
+                sys.exit()
+            map_lightcone = f'/cosma8/data/dp004/flamingo/Runs/{self.boxname}/{self.simname}/{map_dir}/lightcone{self.lightcone}_shells/shell_{self.z_sample}/lightcone{self.lightcone}.shell_{self.z_sample}.0.hdf5'
             g = h5py.File(map_lightcone,'r')
             conversion_factor = g['DM'].attrs['Conversion factor to CGS (not including cosmological corrections)']
             DM = g['DM'][...]*conversion_factor*6.6524587321e-25 #6.65246e-25 = Thomson cross-section (in cgs)
@@ -137,14 +148,14 @@ class patchyScreening:
                 plt.savefig(f'./Plots/DM_map_{self.boxname}_{self.simname}_{self.z_sample_name}_shell_{self.z_sample}.png', dpi=400)
                 plt.clf()
 
-            map_lightcone_lower = f'/cosma8/data/dp004/flamingo/Runs/{self.boxname}/{self.simname}/neutrino_corrected_maps/lightcone0_shells/shell_{self.z_sample-1}/lightcone0.shell_{self.z_sample-1}.0.hdf5'
+            map_lightcone_lower = f'/cosma8/data/dp004/flamingo/Runs/{self.boxname}/{self.simname}/{map_dir}/lightcone{self.lightcone}_shells/shell_{self.z_sample-1}/lightcone{self.lightcone}.shell_{self.z_sample-1}.0.hdf5'
             g_low = h5py.File(map_lightcone_lower,'r')
             conversion_factor = g_low['DM'].attrs['Conversion factor to CGS (not including cosmological corrections)']
             DM += g_low['DM'][...]*conversion_factor*6.6524587321e-25
             redshift_low = g_low['DM'].attrs['Central redshift assumed for correction']
             DM *= (1+redshift_low)
 
-            map_lightcone_higher = f'/cosma8/data/dp004/flamingo/Runs/{self.boxname}/{self.simname}/neutrino_corrected_maps/lightcone0_shells/shell_{self.z_sample+1}/lightcone0.shell_{self.z_sample+1}.0.hdf5'
+            map_lightcone_higher = f'/cosma8/data/dp004/flamingo/Runs/{self.boxname}/{self.simname}/{map_dir}/lightcone{self.lightcone}_shells/shell_{self.z_sample+1}/lightcone{self.lightcone}.shell_{self.z_sample+1}.0.hdf5'
             g_high = h5py.File(map_lightcone_higher,'r')
             conversion_factor = g_high['DM'].attrs['Conversion factor to CGS (not including cosmological corrections)']
             DM += g_high['DM'][...]*conversion_factor*6.6524587321e-25
@@ -193,7 +204,14 @@ class patchyScreening:
         
         # Load halo lightcone and SOAP data into DataFrames
         if lightcone_type == 'HBT':
-            halo_lightcone = f'/cosma8/data/dp004/flamingo/Runs/{self.boxname}/{self.simname}/hbt_lightcone_halos/lightcone0/lightcone_halos_{77-self.z_sample:04d}.hdf5'
+            if self.boxname == 'L1000N1800' and self.lightcone == 0:
+                halo_lc_dir = 'hbt_lightcone_halos'
+            elif self.boxname == 'L2800N5040' and self.simname == 'HYDRO_FIDUCIAL':
+                halo_lc_dir = 'sorted_hbt_lightcone_halos'
+            else:
+                print("Halo lightcone not available for this box/simulation combination.")
+                sys.exit()
+            halo_lightcone = f'/cosma8/data/dp004/flamingo/Runs/{self.boxname}/{self.simname}/{halo_lc_dir}/lightcone{self.lightcone}/lightcone_halos_{77-self.z_sample:04d}.hdf5'
             f = h5py.File(halo_lightcone, 'r')
             halo_lc_data = pl.DataFrame({
                 'ID':          f['InputHalos/HaloCatalogueIndex'][...],
@@ -507,7 +525,7 @@ class patchyScreening:
             self.filter_stellar_mass()
             if self.nhalo == 0:
                 print("No halos to compute coordinates")
-                quit()
+                sys.exit()
             rows, cols = (self.nhalo, 3)
         vec = [[0]*cols]*rows
         vec=1.0*np.asarray(vec)

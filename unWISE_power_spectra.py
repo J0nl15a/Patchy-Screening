@@ -7,62 +7,83 @@ from scipy.signal import savgol_filter
 from joblib import Parallel, delayed
 from unWISE_power_spectra_plot import power_spectra_plot
 from kappa_map_gen_forJonah import kappa_map_gen_forJonah
+from pathlib import Path
 
+box_list = ['L1000N1800', 'L2800N5040']
 sim_list = ['HYDRO_FIDUCIAL','HYDRO_PLANCK','HYDRO_PLANCK_LARGE_NU_FIXED','HYDRO_PLANCK_LARGE_NU_VARY','HYDRO_STRONG_AGN','HYDRO_WEAK_AGN','HYDRO_LOW_SIGMA8','HYDRO_STRONGER_AGN','HYDRO_JETS_published','HYDRO_STRONGEST_AGN','HYDRO_STRONG_SUPERNOVA','HYDRO_STRONGER_AGN_STRONG_SUPERNOVA','HYDRO_STRONG_JETS']
 
 theta_d = np.arange(0.5, 11, 0.5)
 ncpu = int(sys.argv[1])
-isim = sys.argv[2]
-iz = sys.argv[3]
-im = float(sys.argv[4])
-slope = float(sys.argv[5])
-fits = str(sys.argv[6])
-sig = sys.argv[7]
+box = sys.argv[2]
+isim = sys.argv[3]
+iz = sys.argv[4]
+im = float(sys.argv[5])
+slope = float(sys.argv[6])
+fits = str(sys.argv[7])
+sig = sys.argv[8]
 
-covariance = sys.argv[8].lower() in ("true", "1", "yes", "y")
-smooth = sys.argv[9].lower() in ("true", "1", "yes", "y")
-single = sys.argv[10].lower() in ("true", "1", "yes", "y")
-save = sys.argv[11].lower() in ("true", "1", "yes", "y")
-plot = sys.argv[12].lower() in ("true", "1", "yes", "y")
+covariance = sys.argv[9].lower() in ("true", "1", "yes", "y")
+smooth = sys.argv[10].lower() in ("true", "1", "yes", "y")
+single = sys.argv[11].lower() in ("true", "1", "yes", "y")
+save = sys.argv[12].lower() in ("true", "1", "yes", "y")
+plot = sys.argv[13].lower() in ("true", "1", "yes", "y")
+
+if round(float(im), 1) == float(im):
+    im_name = f"{float(im):.1f}".replace('.', 'p')
+else:
+    im_name = f"{float(im):.3f}".replace('.', 'p')
 
 if single == False:
     slopes = [round(n, 2) for n in np.arange(0.0, float(slope)+0.1, 0.1)] #CHANGE BACK
 elif single == True:
     slopes = [slope]
 slopes_name = []
+print(im, slopes)
 
 
 source_vectors = []
 nhalos = []
 mean_mstar = []
-ps = patchyScreening(isim, iz, im, slope, ncpu, theta_d, fits_file=fits, signal=sig)
-def compute_catalog(slope, isim=isim, iz=iz, im=im, ncpu=ncpu, theta_d=theta_d, fits=fits, sig=sig):
+# ps = patchyScreening(isim, iz, im, slope, ncpu, theta_d, fits_file=fits, signal=sig)
+# ps.get_halo_coordinates()
+
+def compute_catalog(slope, box=box, isim=isim, iz=iz, im=im, ncpu=ncpu, theta_d=theta_d, fits=fits, sig=sig):
     if slope == 0.0:
         slope = abs(slope)
         
-    ps = patchyScreening(isim, iz, im, slope, ncpu, theta_d, fits_file=fits, signal=sig)
+    ps = patchyScreening(box, isim, iz, im, slope, ncpu, theta_d, fits_file=fits, signal=sig)
     #ps_camb = patchyScreening(isim, iz, im, im_name, ncpu, theta_d, cmb_method='CAMB', signal=sig, rect_size=20)
     ps.get_halo_coordinates()
     return ps.source_vector, ps.nhalo, np.log10(np.mean(ps.merge['mstar'].to_numpy()))
 
-results = Parallel(n_jobs=ncpu, backend="loky")(delayed(compute_catalog)(slope) for slope in slopes)
-for i in range(len(results)):
-    if round(slopes[i], 1) == slopes[i]:
-        slopes_name.append(f"{float(slopes[i]):.1f}".replace('.', 'p'))
+if single == False:
+    results = Parallel(n_jobs=ncpu, backend="loky")(delayed(compute_catalog)(slope) for slope in slopes)
+    for i in range(len(results)):
+        if round(slopes[i], 1) == slopes[i]:
+            slopes_name.append(f"{float(slopes[i]):.1f}".replace('.', 'p'))
+        else:
+            slopes_name.append(f"{float(slopes[i]):.3f}".replace('.', 'p'))
+        print(slope)
+        source_vectors.append(results[i][0])
+        nhalos.append(results[i][1])
+        mean_mstar.append(results[i][2])
+elif single == True:
+    results = compute_catalog(slope)
+    if round(slope, 1) == slope:
+        slopes_name.append(f"{float(slope):.1f}".replace('.', 'p'))
     else:
-        slopes_name.append(f"{float(slopes[i]):.3f}".replace('.', 'p'))
-    print(slope)
-    source_vectors.append(results[i][0])
-    nhalos.append(results[i][1])
-    mean_mstar.append(results[i][2])
+        slopes_name.append(f"{float(slope):.3f}".replace('.', 'p'))
+    source_vectors.append(results[0])
+    nhalos.append(results[1])
+    mean_mstar.append(results[2])
 print(round(mean_mstar[0], 5))
 
 print(mean_mstar)
 
 bin_setup = yaml.safe_load(open("./unWISExLens_lklh/unWISExLens_lklh/config_files/binning_setup.yaml"))
-if ps.z_sample_name == 'Blue':
+if iz == 'Blue':
     bin_edges = np.array(bin_setup["Blue_ACT"]["ell_bin_edges"])
-elif ps.z_sample_name == 'Green':
+elif iz == 'Green':
     bin_edges = np.array(bin_setup["Green_ACT"]["ell_bin_edges"])
 print(bin_edges)
 #ell_edges = bin_edges[np.where(bin_edges > 200)]
@@ -79,23 +100,24 @@ ell_200_mask = np.where(ells > 200)
 ell_namaster = ells[ell_200_mask]
 print(ell_namaster)
 
-wide_bins = bin_edges #np.linspace(4000, np.min(bin_edges), num=30, endpoint=True)[::-1]
-print(wide_bins)
+# wide_bins = bin_edges #np.linspace(4000, np.min(bin_edges), num=30, endpoint=True)[::-1]
+# print(wide_bins)
 
-l0_wide = np.ceil(wide_bins[:-1]).astype(int)
-lf_wide = np.floor(wide_bins[1:]).astype(int)
-b_wide = nmt.NmtBin.from_edges(l0_wide, lf_wide)
-lmax_bins_wide = b_wide.lmax
+# l0_wide = np.ceil(wide_bins[:-1]).astype(int)
+# lf_wide = np.floor(wide_bins[1:]).astype(int)
+# b_wide = nmt.NmtBin.from_edges(l0_wide, lf_wide)
+# lmax_bins_wide = b_wide.lmax
 
-ell_namaster_wide = b_wide.get_effective_ells()
-#ell_200_mask_wide = np.where(ell_namaster_wide > 200)
-#ell_namaster_wide = ell_namaster_wide[ell_200_mask_wide]
-print(ell_namaster_wide)
+# ell_namaster_wide = b_wide.get_effective_ells()
+# #ell_200_mask_wide = np.where(ell_namaster_wide > 200)
+# #ell_namaster_wide = ell_namaster_wide[ell_200_mask_wide]
+# print(ell_namaster_wide)
 
 #print(ell_edges)
 
-auto_output_path = f'./data_files/power_spectra/galaxy_galaxy/{ps.simname}_{ps.z_sample_name}_{ps.im_name}'
-cross_output_path = f'./data_files/power_spectra/kappa_galaxy/{ps.simname}_{ps.z_sample_name}_{ps.im_name}'
+auto_path = f'./data_files/power_spectra/galaxy_galaxy/{box}/{isim}/{iz}/galaxy_galaxy_power_spectrum_{im_name}'
+cross_path = f'./data_files/power_spectra/kappa_galaxy/{box}/{isim}/{iz}/kappa_galaxy_power_spectrum_{im_name}'
+
 
 obs_data = np.loadtxt(f'./unWISExLens_lklh/data/v1.0/bandpowers/unWISExACT-DR6_{str(iz).lower()}_baseline_Clgg+Clkk+Clkg.dat', usecols=(0,1,2,3))[ell_200_mask, :].reshape(-1,4)
 # obs_clkk_data = np.loadtxt(f'./unWISExLens_lklh/data/v1.0/bandpowers/clkk_bandpowers_act.txt', skiprows=2)
@@ -103,9 +125,9 @@ print(obs_data.shape)
 
 Planck_obs_data = np.loadtxt(f'./unWISExLens_lklh/data/v1.0/bandpowers/unWISExPlanck-PR4_{str(iz).lower()}_baseline_Clgg+Clkk+Clkg.dat', usecols=(0,1,2,3))#[ell_200_mask, :]
 
-if ps.z_sample_name == 'Blue':
+if iz == 'Blue':
     obs_nbar_sq_deg = 3409
-elif ps.z_sample_name == 'Green':
+elif iz == 'Green':
     obs_nbar_sq_deg = 1846
 
 obs_nbar_sr = obs_nbar_sq_deg * ((180/np.pi)**2)
@@ -122,10 +144,10 @@ nside_cl = 2048
 npix = hp.nside2npix(nside_cl)
 
 try:
-    kappa_map = hp.read_map(f'./data_files/kappa_maps/L1000N1800_{isim}_kappa_nonrot.fits', dtype=np.float64, verbose=False)
+    kappa_map = hp.read_map(f'./data_files/kappa_maps/{box}/{isim}/kappa_nonrot.fits', dtype=np.float64, verbose=False)
 except FileNotFoundError:
     # kappa_map = load_kappa_map(isim)
-    kappa_map = kappa_map_gen_forJonah(isim)
+    kappa_map = kappa_map_gen_forJonah(box, isim)
 kappa_map = hp.pixelfunc.ud_grade(kappa_map, nside_cl)
 
 ## choose ell binning - here we include 10 modes per ell bin
@@ -158,9 +180,8 @@ anafast_list = []
 
 kappa_mask = kappa_map*0.0+1.0
 f_kappa = nmt.NmtField(kappa_mask, [kappa_map], lmax=lmax_bins, n_iter=0)
-f_kappa_wide = nmt.NmtField(kappa_mask, [kappa_map], lmax=lmax_bins_wide, n_iter=0)
+# f_kappa_wide = nmt.NmtField(kappa_mask, [kappa_map], lmax=lmax_bins_wide, n_iter=0)
 
-#def compute_Pk(nside_cl, source_vectors, npix, lmax_bins, lmax_bins_wide, b, ell_200_mask, bin_edges, ell_namaster, f_kappa, f_kappa_wide, b_wide, ell_namaster_wide, nhalos, obs_shot_noise):
 for i in range(len(nhalos)):
     pixels = hp.pixelfunc.vec2pix(nside_cl, source_vectors[i][:,0], source_vectors[i][:,1], source_vectors[i][:,2])
     density_map = np.bincount(pixels, minlength=npix).astype(np.float64)
@@ -169,7 +190,7 @@ for i in range(len(nhalos)):
 
     galaxy_mask = galaxy_overdensity*0.0+1.0
     f_galaxy = nmt.NmtField(galaxy_mask, [galaxy_overdensity], lmax=lmax_bins, n_iter=0)
-    f_galaxy_wide = nmt.NmtField(galaxy_mask, [galaxy_overdensity], lmax=lmax_bins_wide, n_iter=0)
+    # f_galaxy_wide = nmt.NmtField(galaxy_mask, [galaxy_overdensity], lmax=lmax_bins_wide, n_iter=0)
 
 
     pcl_auto = nmt.compute_coupled_cell(f_galaxy, f_galaxy)
@@ -205,18 +226,26 @@ for i in range(len(nhalos)):
         auto_spectra_covariance_list.append(cov_auto)
 
 
-    pcl_cross = nmt.compute_coupled_cell(f_kappa_wide, f_galaxy_wide)
+    # pcl_cross = nmt.compute_coupled_cell(f_kappa_wide, f_galaxy_wide)
 
-    pcl_shape = (f_kappa_wide.nmaps * f_galaxy_wide.nmaps, f_galaxy_wide.ainfo.lmax+1)
+    # pcl_shape = (f_kappa_wide.nmaps * f_galaxy_wide.nmaps, f_galaxy_wide.ainfo.lmax+1)
+    # clg = np.zeros(pcl_shape)
+    # deproj_cross = nmt.deprojection_bias(f_kappa_wide, f_galaxy_wide, clg)
+
+    # w_cross = nmt.NmtWorkspace.from_fields(f_kappa_wide, f_galaxy_wide, b_wide)
+    # cl_cross_namaster_wide = w_cross.decouple_cell(pcl_cross - deproj_cross).squeeze()#[ell_200_mask]
+    # h = CubicSpline(ell_namaster_wide, cl_cross_namaster_wide)
+    # cl_cross_namaster = h(ells)[ell_200_mask]
+
+    pcl_cross = nmt.compute_coupled_cell(f_kappa, f_galaxy)
+
+    pcl_shape = (f_kappa.nmaps * f_galaxy.nmaps, f_galaxy.ainfo.lmax+1)
     clg = np.zeros(pcl_shape)
-    deproj_cross = nmt.deprojection_bias(f_kappa_wide, f_galaxy_wide, clg)
+    deproj_cross = nmt.deprojection_bias(f_kappa, f_galaxy, clg)
 
-    w_cross = nmt.NmtWorkspace.from_fields(f_kappa_wide, f_galaxy_wide, b_wide)
-    cl_cross_namaster_wide = w_cross.decouple_cell(pcl_cross - deproj_cross).squeeze()#[ell_200_mask]
-    h = CubicSpline(ell_namaster_wide, cl_cross_namaster_wide)
-    cl_cross_namaster = h(ells)[ell_200_mask]
-    #cl_cross_namaster = np.interp(ells, ell_namaster_wide, cl_cross_namaster_wide)[ell_200_mask]
-    #cross_spectra_list.append(cl_cross_namaster)
+    w_cross = nmt.NmtWorkspace.from_fields(f_kappa, f_galaxy, b)
+    cl_cross_namaster = w_cross.decouple_cell(pcl_cross - deproj_cross).squeeze()[ell_200_mask]
+
     cross_spectra_list.append(savgol_filter(cl_cross_namaster, window_length=10, polyorder=5))
 
     if covariance:
@@ -249,16 +278,20 @@ for i in range(len(nhalos)):
     if save == False:
         pass
     elif save == True:
+        auto_output_path = Path(auto_path+f'_{slopes_name[i]}.txt')
+        cross_output_path = Path(cross_path+f'_{slopes_name[i]}.txt')
+        auto_output_path.parent.mkdir(parents=True, exist_ok=True)
+        cross_output_path.parent.mkdir(parents=True, exist_ok=True)
         if covariance:
             auto_out = np.column_stack((ell_namaster, auto_spectra_list[i]*1e5, ((auto_spectra_list[i]-auto_spectra_shot_noise_list[i])+obs_shot_noise)*1e5, np.sqrt(auto_spectra_covariance_list[i].diagonal())*1e5))
             cross_out = np.column_stack((ell_namaster, cross_spectra_list[i]*1e5, np.sqrt(cross_spectra_covariance_list[i].diagonal())*1e5))
-            np.savetxt(auto_output_path+f'_{slopes_name[i]}.txt', auto_out, fmt='%f %.13f %.13f %.13f', header=f"Galaxy-galaxy power spectra for mock catalog with nhalos = {nhalos[i]}", comments='')
-            np.savetxt(cross_output_path+f'_{slopes_name[i]}.txt', cross_out, fmt='%f %.13f %.13f', header=f"Kappa-galaxy cross spectra for mock catalog with nhalos = {nhalos[i]}", comments='')
+            np.savetxt(auto_output_path, auto_out, fmt='%f %.13f %.13f %.13f', header=f"Galaxy-galaxy power spectra for mock catalog with nhalos = {nhalos[i]}", comments='')
+            np.savetxt(cross_output_path, cross_out, fmt='%f %.13f %.13f', header=f"Kappa-galaxy cross spectra for mock catalog with nhalos = {nhalos[i]}", comments='')
         elif not covariance:
             auto_out = np.column_stack((ell_namaster, auto_spectra_list[i]*1e5, ((auto_spectra_list[i]-auto_spectra_shot_noise_list[i])+obs_shot_noise)*1e5))
             cross_out = np.column_stack((ell_namaster, cross_spectra_list[i]*1e5))
-            np.savetxt(auto_output_path+f'_{slopes_name[i]}.txt', auto_out, fmt='%f %.13f %.13f', header=f"Galaxy-galaxy power spectra for mock catalog with nhalos = {nhalos[i]}", comments='')
-            np.savetxt(cross_output_path+f'_{slopes_name[i]}.txt', cross_out, fmt='%f %.13f', header=f"Kappa-galaxy cross spectra for mock catalog with nhalos = {nhalos[i]}", comments='')
+            np.savetxt(auto_output_path, auto_out, fmt='%f %.13f %.13f', header=f"Galaxy-galaxy power spectra for mock catalog with nhalos = {nhalos[i]}", comments='')
+            np.savetxt(cross_output_path, cross_out, fmt='%f %.13f', header=f"Kappa-galaxy cross spectra for mock catalog with nhalos = {nhalos[i]}", comments='')
 
 
 if plot:
@@ -294,6 +327,6 @@ if plot:
         print(auto_spectra_list[0])
         print((auto_spectra_list[0]+np.sqrt(auto_spectra_covariance_list[0].diagonal()))*1e5)
 
-    power_spectra_plot(isim, iz, im, slope, fits, single, covariance=covariance, data=plotting_data)
+    power_spectra_plot(box, isim, iz, im, slope, fits, single, covariance=covariance, data=plotting_data)
 
 ####################################################################################################################################

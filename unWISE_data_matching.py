@@ -6,6 +6,7 @@ import re
 from io import StringIO
 import math
 import textwrap
+from pathlib import Path
 
 def unWISE_data_matching(boxname, simname, z_sample, mass_cut, n_cut, nsamp='ntotal', plot=False):
     box_list = ['L1000N1800', 'L2800N5040']
@@ -99,7 +100,9 @@ def unWISE_data_matching(boxname, simname, z_sample, mass_cut, n_cut, nsamp='nto
         pb.savefig(f'./Plots/unWISE_dndz_match_curve_{z_sample}_test.png', dpi=400)
         pb.clf()
 
-    outfile_name = f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/dndz_samples/{boxname}/{simname}/{z_sample}/dndz_galaxies_sampled_{im_name}_{slope_name}.txt'
+    path = f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/dndz_samples/{boxname}/{simname}/{z_sample}/dndz_galaxies_sampled_{im_name}_{slope_name}.txt'
+    outfile_name = Path(path)
+    outfile_name.parent.mkdir(parents=True, exist_ok=True)
 
     if nsamp == 'ntotal':
         if z_sample == 'Blue':

@@ -19,14 +19,14 @@ import importlib.util
 # spec.loader.exec_module(module)
 
 
-def log_likelihood(theta, f_obs, f_obs_err, isim, iz):
+def log_likelihood(theta, f_obs, f_obs_err, box, isim, iz):
     amp, slope = theta
     # print(theta)
     # print(amp, slope)
     x = np.array((amp, slope))
     # print(x)
-    f_sim_auto = emulator(x, 'auto', isim, iz, load=True) #module.emulator(x, 'auto', isim, iz, load=True)
-    f_sim_cross = emulator(x, 'cross', isim, iz, load=True) #module.emulator(x, 'cross', isim, iz, load=True)
+    f_sim_auto = emulator(x, 'auto', box, isim, iz, load=True) #module.emulator(x, 'auto', box, isim, iz, load=True)
+    f_sim_cross = emulator(x, 'cross', box, isim, iz, load=True) #module.emulator(x, 'cross', box, isim, iz, load=True)
     # print(f'f_sim_auto = {f_sim_auto}, f_sim_cross = {f_sim_cross}')
     # print(f"f_obs['auto'] = {f_obs['auto']}, f_obs['cross'] = {f_obs['cross']}")
     # print(f"f_sim_auto/f_obs['auto'] = {f_sim_auto/f_obs['auto']}, f_sim_cross/f_obs['cross'] = {f_sim_cross/f_obs['cross']}")
@@ -47,18 +47,18 @@ def log_prior(theta, plateau_point, c, vertical_limit):
     else:
         return -np.inf
 
-def log_probability(theta, f_obs, f_obs_err, isim, iz, plateau_point, m, c):
+def log_probability(theta, f_obs, f_obs_err, box, isim, iz, plateau_point, m, c):
     lp = log_prior(theta, plateau_point, m, c)
     if not np.isfinite(lp):
         return -np.inf
-    return lp + log_likelihood(theta, f_obs, f_obs_err, isim, iz)
+    return lp + log_likelihood(theta, f_obs, f_obs_err, box, isim, iz)
 
-def multiprocess(f_obs, f_obs_err, isim, iz, plateau_point, m, c): #, backend):
+def multiprocess(f_obs, f_obs_err, box, isim, iz, plateau_point, m, c): #, backend):
 
     with multiprocessing.get_context("spawn").Pool() as pool:
         start = time.time()
         sampler = emcee.EnsembleSampler(
-            nwalkers, ndim, log_probability, args=(f_obs, f_obs_err, isim, iz, plateau_point, m, c), pool=pool #, backend=backend
+            nwalkers, ndim, log_probability, args=(f_obs, f_obs_err, box, isim, iz, plateau_point, m, c), pool=pool #, backend=backend
         )
         sampler.run_mcmc(pos, steps, progress=True)
         end = time.time()
@@ -70,14 +70,15 @@ def multiprocess(f_obs, f_obs_err, isim, iz, plateau_point, m, c): #, backend):
 if __name__ == '__main__':
     from matplotlib.ticker import FormatStrFormatter
 
-    isim = sys.argv[2]
-    iz = sys.argv[3]
+    box = sys.argv[2]
+    isim = sys.argv[3]
+    iz = sys.argv[4]
 
     farren_data = np.loadtxt(f'./unWISExLens_lklh/data/v1.0/bandpowers/unWISExACT-DR6_{str(iz).lower()}_baseline_Clgg+Clkk+Clkg.dat', usecols=(0,1,3)).reshape(-1,3)
     obs_data_covariance = np.loadtxt(f'./unWISExLens_lklh/data/v1.0/covariances/covmat_Clgg+Clkg_unWISExACT-DR6_{str(iz).lower()}_baseline.dat')
     ell_200_mask = np.where(farren_data[:,0] > 200)
 
-    prior_limits = np.load(f'./gpy_model/training/prior_limits_{isim}_{iz}.npy')
+    prior_limits = np.load(f'./gpy_model/training/prior_limits_{box}_{isim}_{iz}.npy')
     plateau_point = prior_limits[0]
     # m = prior_limits[1]
     c = prior_limits[1]
@@ -91,46 +92,49 @@ if __name__ == '__main__':
     # if isim == 'HYDRO_FIDUCIAL':
     #     test_points = np.loadtxt('./data_files/mock_catalog_test_points.txt', delimiter=' ')[1,:]
     #     test_name = [f"{float(test_points[0]):.1f}".replace('.', 'p'), f"{float(test_points[1]):.3f}".replace('.', 'p')]
-    #     test_auto = np.loadtxt(f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/power_spectra/galaxy_galaxy/{str(isim)}_{str(iz)}_{test_name[0]}_{test_name[1]}.txt', 
+    #     test_auto = np.loadtxt(f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/power_spectra/galaxy_galaxy/{box}/{str(isim)}/{str(iz)}/galaxy_galaxy_power_spectrum_{test_name[0]}_{test_name[1]}.txt', 
     #                             delimiter=' ', skiprows=1, usecols=(2))
-    #     test_cross = np.loadtxt(f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/power_spectra/kappa_galaxy/{str(isim)}_{str(iz)}_{test_name[0]}_{test_name[1]}.txt', 
+    #     test_cross = np.loadtxt(f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/power_spectra/kappa_galaxy/{box}/{str(isim)}/{str(iz)}/kappa_galaxy_power_spectrum_{test_name[0]}_{test_name[1]}.txt', 
     #                             delimiter=' ', skiprows=1, usecols=(1))
     
-    f_obs = {'auto': farren_data[:,1][ell_200_mask] * 1e5, 'cross': farren_data[:,2][ell_200_mask] * 1e5}
-    f_obs_err = {'auto': farren_data_var_auto * 1e5, 'cross': farren_data_var_cross * 1e5}
-    print(np.sqrt(f_obs_err['auto'])*1e5, np.sqrt(f_obs_err['cross'])*1e5)
-    quit()
+    # f_obs = {'auto': farren_data[:,1][ell_200_mask] * 1e5, 'cross': farren_data[:,2][ell_200_mask] * 1e5}
+    # f_obs_err = {'auto': farren_data_var_auto * 1e5, 'cross': farren_data_var_cross * 1e5}
+    # print(np.sqrt(f_obs_err['auto'])*1e5, np.sqrt(f_obs_err['cross'])*1e5)
 
-    # f_obs = {'auto': test_auto, 'cross': test_cross}
-    # f_obs_err = {'auto': (test_auto * .01)**2, 'cross': (test_cross * .01)**2}
+    test_auto = 10.8
+    test_cross = 0.5
+    f_obs = {'auto': test_auto, 'cross': test_cross}
+    f_obs_err = {'auto': (test_auto * .01)**2, 'cross': (test_cross * .01)**2}
 
-    if isim == 'HYDRO_FIDUCIAL':
-        print(log_probability((test_points[0], test_points[1]), f_obs, f_obs_err, isim, iz, plateau_point, c, vertical_limit))
+    # if isim == 'HYDRO_FIDUCIAL':
+        # print(log_probability((test_points[0], test_points[1]), f_obs, f_obs_err, box, isim, iz, plateau_point, c, vertical_limit))
     
     np.random.seed(1000)
-    #nll = lambda *args: -log_likelihood(*args)
-    initial = 10.7, 0.4 #test_points[0], test_points[1]
+    nll = lambda *args: -log_likelihood(*args)
+    initial = 10.85, 0.45 #test_points[0], test_points[1]
     initial_name = f"{float(initial[0]):.3f}".replace('.', 'p'), f"{float(initial[1]):.3f}".replace('.', 'p')
     gaussian_offset = 0.05
     gaussian_offset_name = f"{float(gaussian_offset):.3f}".replace('.', 'p')
     walkers = int(2 ** 5)
-    #soln = minimize(nll, initial, args=(f_obs, f_obs_err, isim, iz, ncpu))
-    #print(soln)
-    pos = initial + gaussian_offset * np.random.randn(walkers, 2) #soln.x + 1e-4 * np.random.randn(32, 3)
+    soln = minimize(nll, initial, args=(f_obs, f_obs_err, box, isim, iz))
+    print(soln)
+    # pos = initial + gaussian_offset * np.random.randn(walkers, 2) 
+    pos = soln.x + 1e-4 * np.random.randn(walkers, 2)
+    
     nwalkers, ndim = pos.shape
-    steps = 5000
+    steps = 5000 * 20
 
     prec = 4  # <-- change this to the number of decimals you want
     fmt  = f"%.{prec}f"
 
-    f_sim_auto = emulator(np.array((10.65, 0.45)), 'auto', isim, iz, save=True, retrain=True) #module.emulator(x, 'auto', isim, iz, load=True)
-    f_sim_cross = emulator(np.array((10.65, 0.45)), 'cross', isim, iz, save=True, retrain=True) #module.emulator(x, 'cross', isim, iz, load=True)
+    f_sim_auto = emulator(np.array((10.65, 0.45)), 'auto', box, isim, iz, save=True, retrain=True) #module.emulator(x, 'auto', isim, iz, load=True)
+    f_sim_cross = emulator(np.array((10.65, 0.45)), 'cross', box, isim, iz, save=True, retrain=True) #module.emulator(x, 'cross', isim, iz, load=True)
 
     # filename = f"./data_files/mcmc_chains/chain_walkers{nwalkers}_steps{steps}.h5"
     # backend = emcee.backends.HDFBackend(filename)
     # backend.reset(nwalkers, ndim)
 
-    sampler = multiprocess(f_obs, f_obs_err, isim, iz, plateau_point, c, vertical_limit)#, backend)
+    sampler = multiprocess(f_obs, f_obs_err, box, isim, iz, plateau_point, c, vertical_limit)#, backend)
 
     tau = sampler.get_autocorr_time()
     print(tau)
@@ -150,7 +154,7 @@ if __name__ == '__main__':
 
     axes[-1].set_xlabel("step number")
     # pb.savefig(f'./Plots/mcmc_chains_{test_name[0]}_{test_name[1]}_steps{steps}_walkers{nwalkers}_initialpos{initial_name[0]}_{initial_name[1]}_offset{gaussian_offset_name}.png', dpi=400)
-    pb.savefig(f'./Plots/mcmc_chains_optimal_value_{isim}_{iz}_steps{steps}_walkers{nwalkers}_initialpos{initial_name[0]}_{initial_name[1]}_offset{gaussian_offset_name}.png', dpi=400)
+    pb.savefig(f'./Plots/mcmc_chains_optimal_value_{box}_{isim}_{iz}_steps{steps}_walkers{nwalkers}_initialpos{initial_name[0]}_{initial_name[1]}_offset{gaussian_offset_name}.png', dpi=400)
     pb.clf()
 
 
@@ -177,21 +181,35 @@ if __name__ == '__main__':
     err_slope_upper = mle_err_upper[1]
     print(f"[INFO] MLE AMP: {mle_amp}, MLE SLOPE: {mle_slope}")
 
-    log_likelihood_mle = log_likelihood((mle_amp, mle_slope), f_obs, f_obs_err, isim, iz)
+    log_likelihood_mle = log_likelihood((mle_amp, mle_slope), f_obs, f_obs_err, box, isim, iz)
     print(f"[INFO] Log-Likelihood at MLE: {log_likelihood_mle}")
 
-    # write to text file in a known place
-    outfile = f"./data_files/mle_values_{isim}_{iz}.txt"
-    with open(outfile, "w") as f:
-        f.write(f"LOG_LIKELIHOOD={log_likelihood_mle:.13f}\n")
-        f.write(f"AMP={mle_amp:.3f}\n")
-        f.write(f"SLOPE={mle_slope:.3f}\n")
-        f.write(f"AMP_ERR_LOWER={err_amp_lower:.4f}\n")
-        f.write(f"AMP_ERR_UPPER={err_amp_upper:.4f}\n")
-        f.write(f"SLOPE_ERR_LOWER={err_slope_lower:.4f}\n")
-        f.write(f"SLOPE_ERR_UPPER={err_slope_upper:.4f}\n")
+    # # write to text file in a known place
+    # outfile = f"./data_files/mle_values_{box}_{isim}_{iz}.txt"
+    # with open(outfile, "w") as f:
+    #     f.write(f"LOG_LIKELIHOOD={log_likelihood_mle:.13f}\n")
+    #     f.write(f"AMP={mle_amp:.3f}\n")
+    #     f.write(f"SLOPE={mle_slope:.3f}\n")
+    #     f.write(f"AMP_ERR_LOWER={err_amp_lower:.4f}\n")
+    #     f.write(f"AMP_ERR_UPPER={err_amp_upper:.4f}\n")
+    #     f.write(f"SLOPE_ERR_LOWER={err_slope_lower:.4f}\n")
+    #     f.write(f"SLOPE_ERR_UPPER={err_slope_upper:.4f}\n")
 
-    print(f"[INFO] Wrote MLEs to {outfile}")
+    # print(f"[INFO] Wrote MLEs to {outfile}")
+
+    x = np.array((mle_amp, mle_slope))
+    f_sim_auto = emulator(x, 'auto', box, isim, iz, load=True) 
+    f_sim_cross = emulator(x, 'cross', box, isim, iz, load=True) 
+    chi_sq_auto = np.sum(((f_obs['auto'] - f_sim_auto)**2)/f_obs_err['auto'])
+    chi_sq_cross = np.sum(((f_obs['cross'] - f_sim_cross)**2)/f_obs_err['cross'])
+    print(f"Auto chi^2 = {chi_sq_auto}")
+    print(f"Auto likelihood = {-0.5 * chi_sq_auto}")
+    print(f"Auto reduced chi^2 (Using N-P as d.o.f.) = {chi_sq_auto / (55-2)}")
+    print(f"Auto reduced chi^2 (Using N-1 as d.o.f.) = {chi_sq_auto / (55-1)}") 
+    print(f"Cross chi^2 = {chi_sq_cross}")
+    print(f"Cross likelihood = {-0.5 * chi_sq_cross}")
+    print(f"Cross reduced chi^2 (Using N-P as d.o.f.) = {chi_sq_cross / (55-2)}")
+    print(f"Cross reduced chi^2 (Using N-1 as d.o.f.) = {chi_sq_cross / (55-1)}")
 
     fig = corner.corner(
         flat_samples, 
@@ -205,7 +223,7 @@ if __name__ == '__main__':
         ax.xaxis.set_major_formatter(FormatStrFormatter(fmt))
         ax.yaxis.set_major_formatter(FormatStrFormatter(fmt))
     # pb.savefig(f'./Plots/mcmc_corner_{test_name[0]}_{test_name[1]}_steps{steps}_walkers{nwalkers}_initialpos{initial_name[0]}_{initial_name[1]}_offset{gaussian_offset_name}.png', dpi=400)
-    pb.savefig(f'./Plots/mcmc_corner_optimal_value_{isim}_{iz}_steps{steps}_walkers{nwalkers}_initialpos{initial_name[0]}_{initial_name[1]}_offset{gaussian_offset_name}.png', dpi=400)
+    pb.savefig(f'./Plots/mcmc_corner_optimal_value_{box}_{isim}_{iz}_steps{steps}_walkers{nwalkers}_initialpos{initial_name[0]}_{initial_name[1]}_offset{gaussian_offset_name}.png', dpi=400)
     pb.clf()
 
     fig = corner.corner(
@@ -219,5 +237,5 @@ if __name__ == '__main__':
         ax.xaxis.set_major_formatter(FormatStrFormatter(fmt))
         ax.yaxis.set_major_formatter(FormatStrFormatter(fmt))
     # pb.savefig(f'./Plots/mcmc_corner_zoom_{test_name[0]}_{test_name[1]}_steps{steps}_walkers{nwalkers}_initialpos{initial_name[0]}_{initial_name[1]}_offset{gaussian_offset_name}.png', dpi=400)
-    pb.savefig(f'./Plots/mcmc_corner_zoom_optimal_value_{isim}_{iz}_steps{steps}_walkers{nwalkers}_initialpos{initial_name[0]}_{initial_name[1]}_offset{gaussian_offset_name}.png', dpi=400)
+    pb.savefig(f'./Plots/mcmc_corner_zoom_optimal_value_{box}_{isim}_{iz}_steps{steps}_walkers{nwalkers}_initialpos{initial_name[0]}_{initial_name[1]}_offset{gaussian_offset_name}.png', dpi=400)
     pb.clf()

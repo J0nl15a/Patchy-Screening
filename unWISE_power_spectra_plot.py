@@ -3,7 +3,7 @@ import sys, yaml, textwrap
 import pymaster as nmt
 import scipy.interpolate as interpolate
 
-def power_spectra_plot(isim, iz, im, slope, fits, single, paper_ready=False, 
+def power_spectra_plot(box, isim, iz, im, slope, fits, single, paper_ready=False, 
                        template=False, multi_im = False, multi_slope = False, multi_sim=False, covariance=False, shot_noise=False, 
                        data=None):
 
@@ -47,9 +47,15 @@ def power_spectra_plot(isim, iz, im, slope, fits, single, paper_ready=False,
             variable_name_list = ims_name
 
         if multi_sim:
-            isim_names = ['HYDRO_FIDUCIAL', 'HYDRO_LOW_SIGMA8', 'HYDRO_PLANCK', 'HYDRO_JETS_published', 'HYDRO_STRONG_JETS_published', 'HYDRO_STRONG_SUPERNOVA', 'HYDRO_WEAK_AGN', 'HYDRO_STRONG_AGN', 'HYDRO_STRONGER_AGN', 'HYDRO_STRONGEST_AGN']
-            FLAMINGO_colors_sorted = ['#117733', '#882255', '#44AA99', '#7EFF4B', '#55E18E', '#FF8C40', '#abd0e6', '#6aaed6', '#3787c0', '#105ba4']
-            
+            if box == 'L1000N1800':
+                isim_names = ['HYDRO_FIDUCIAL', 'HYDRO_LOW_SIGMA8', 'HYDRO_PLANCK', 'HYDRO_JETS_published', 'HYDRO_STRONG_JETS_published', 'HYDRO_STRONG_SUPERNOVA', 'HYDRO_WEAK_AGN', 'HYDRO_STRONG_AGN', 'HYDRO_STRONGER_AGN', 'HYDRO_STRONGEST_AGN']
+                FLAMINGO_names = ['L1_m9', 'LS8', 'Planck', 'Jet', 'Jet_fgas-4$\sigma$', '$M^*$-$\sigma$', 'fgas+2$\sigma$', 'fgas-2$\sigma$', 'fgas-4$\sigma$', 'fgas-8$\sigma$']
+                FLAMINGO_colors_sorted = ['#117733', '#882255', '#44AA99', '#7EFF4B', '#55E18E', '#FF8C40', '#abd0e6', '#6aaed6', '#3787c0', '#105ba4']
+            elif box == 'L2800N5040':
+                isim_names = ['HYDRO_FIDUCIAL']
+                FLAMINGO_names = ['L2p8_m9']
+                FLAMINGO_colors_sorted = ['#332288']
+
             ims = []
             slopes = []
             ims_name = []
@@ -58,8 +64,8 @@ def power_spectra_plot(isim, iz, im, slope, fits, single, paper_ready=False,
             # slope_vals = [0.659, 0.744, 0.635]
             for name in isim_names:
                 # for i in range(len(isim_names)):
-                amp = np.loadtxt(f"./data_files/mle_values_{name}_{iz}.txt", usecols=1, skiprows=1, max_rows=1, delimiter='=')
-                slope = np.loadtxt(f"./data_files/mle_values_{name}_{iz}.txt", usecols=1, skiprows=2, max_rows=1, delimiter='=')
+                amp = np.loadtxt(f"./data_files/mle_values_{box}_{name}_{iz}.txt", usecols=1, skiprows=1, max_rows=1, delimiter='=')
+                slope = np.loadtxt(f"./data_files/mle_values_{box}_{name}_{iz}.txt", usecols=1, skiprows=2, max_rows=1, delimiter='=')
                 # amp = amp_vals[i]
                 # slope = slope_vals[i]
                 print(amp, slope)
@@ -104,9 +110,9 @@ def power_spectra_plot(isim, iz, im, slope, fits, single, paper_ready=False,
     Planck_obs_data_std_cross = np.sqrt(Planck_obs_data_variance[int(len(Planck_obs_data_variance)/2):])[Planck_ell_mask]
 
     if template:
-        initial_auto_spectra = np.loadtxt(f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/power_spectra/galaxy_galaxy/{isim}_{iz}_10p8_0p5.txt', 
+        initial_auto_spectra = np.loadtxt(f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/power_spectra/galaxy_galaxy/{box}/{isim}/{iz}/galaxy_galaxy_power_spectrum_10p8_0p5.txt', 
                                           delimiter=' ', skiprows=1, usecols=2)
-        initial_cross_spectra = np.loadtxt(f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/power_spectra/kappa_galaxy/{isim}_{iz}_10p8_0p5.txt', 
+        initial_cross_spectra = np.loadtxt(f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/power_spectra/kappa_galaxy/{box}/{isim}/{iz}/kappa_galaxy_power_spectrum_10p8_0p5.txt', 
                                            delimiter=' ', skiprows=1, usecols=1)
         obs_data[:,1] /=  initial_auto_spectra
         obs_data[:,3] /=  initial_cross_spectra
@@ -130,68 +136,68 @@ def power_spectra_plot(isim, iz, im, slope, fits, single, paper_ready=False,
 
             if single:
                 if shot_noise:
-                    auto_power_spectra = np.loadtxt(f'./data_files/power_spectra/galaxy_galaxy/{isim}_{iz}_{im_name}_{slope_name}.txt', skiprows=1, usecols=(1,3) if covariance else 1)
-                    with open(f"./data_files/dndz_samples/dndz_galaxies_sampled_{isim}_{iz}_{im_name}_{slope_name}.txt", "r") as f:
+                    auto_power_spectra = np.loadtxt(f'./data_files/power_spectra/galaxy_galaxy/{box}/{isim}/{iz}/galaxy_galaxy_power_spectrum_{im_name}_{slope_name}.txt', skiprows=1, usecols=(1,3) if covariance else 1)
+                    with open(f"./data_files/dndz_samples/{box}/{isim}/{iz}/dndz_galaxies_sampled_{im_name}_{slope_name}.txt", "r") as f:
                         first_line = f.readline().strip()
                         nhalos = int(first_line.split(":")[-1])
                         nhalos_list.append(nhalos)
                         auto_spectra_shot_noise_list.append((4*np.pi)/nhalos)
                 elif not shot_noise:
-                    auto_power_spectra = np.loadtxt(f'./data_files/power_spectra/galaxy_galaxy/{isim}_{iz}_{im_name}_{slope_name}.txt', skiprows=1, usecols=(2,3) if covariance else 2)
-                    with open(f"./data_files/dndz_samples/dndz_galaxies_sampled_{isim}_{iz}_{im_name}_{slope_name}.txt", "r") as f:
+                    auto_power_spectra = np.loadtxt(f'./data_files/power_spectra/galaxy_galaxy/{box}/{isim}/{iz}/galaxy_galaxy_power_spectrum_{im_name}_{slope_name}.txt', skiprows=1, usecols=(2,3) if covariance else 2)
+                    with open(f"./data_files/dndz_samples/{box}/{isim}/{iz}/dndz_galaxies_sampled_{im_name}_{slope_name}.txt", "r") as f:
                         first_line = f.readline().strip()
                         nhalos = int(first_line.split(":")[-1])
                         nhalos_list.append(nhalos)
-                cross_power_spectra = np.loadtxt(f'./data_files/power_spectra/kappa_galaxy/{isim}_{iz}_{im_name}_{slope_name}.txt', skiprows=1, usecols=(1,2) if covariance else 1)
+                cross_power_spectra = np.loadtxt(f'./data_files/power_spectra/kappa_galaxy/{box}/{isim}/{iz}/kappa_galaxy_power_spectrum_{im_name}_{slope_name}.txt', skiprows=1, usecols=(1,2) if covariance else 1)
 
             elif multi_im:
                 if shot_noise:
-                    auto_power_spectra = np.loadtxt(f'./data_files/power_spectra/galaxy_galaxy/{isim}_{iz}_{ims_name[i]}_{slope_name}.txt', skiprows=1, usecols=(1,3) if covariance else 1)
-                    with open(f"./data_files/dndz_samples/dndz_galaxies_sampled_{isim}_{iz}_{ims_name[i]}_{slope_name}.txt", "r") as f:
+                    auto_power_spectra = np.loadtxt(f'./data_files/power_spectra/galaxy_galaxy/{box}/{isim}/{iz}/galaxy_galaxy_power_spectrum_{ims_name[i]}_{slope_name}.txt', skiprows=1, usecols=(1,3) if covariance else 1)
+                    with open(f"./data_files/dndz_samples/{box}/{isim}/{iz}/dndz_galaxies_sampled_{ims_name[i]}_{slope_name}.txt", "r") as f:
                         first_line = f.readline().strip()
                         nhalos = int(first_line.split(":")[-1])
                         nhalos_list.append(nhalos)
                         auto_spectra_shot_noise_list.append((4*np.pi)/nhalos)
                 elif not shot_noise:
-                    auto_power_spectra = np.loadtxt(f'./data_files/power_spectra/galaxy_galaxy/{isim}_{iz}_{ims_name[i]}_{slope_name}.txt', skiprows=1, usecols=(2,3) if covariance else 2)
-                    with open(f"./data_files/dndz_samples/dndz_galaxies_sampled_{isim}_{iz}_{ims_name[i]}_{slope_name}.txt", "r") as f:
+                    auto_power_spectra = np.loadtxt(f'./data_files/power_spectra/galaxy_galaxy/{box}/{isim}/{iz}/galaxy_galaxy_power_spectrum_{ims_name[i]}_{slope_name}.txt', skiprows=1, usecols=(2,3) if covariance else 2)
+                    with open(f"./data_files/dndz_samples/{box}/{isim}/{iz}/dndz_galaxies_sampled_{ims_name[i]}_{slope_name}.txt", "r") as f:
                         first_line = f.readline().strip()
                         nhalos = int(first_line.split(":")[-1])
                         nhalos_list.append(nhalos)
-                cross_power_spectra = np.loadtxt(f'./data_files/power_spectra/kappa_galaxy/{isim}_{iz}_{ims_name[i]}_{slope_name}.txt', skiprows=1, usecols=(1,2) if covariance else 1)
+                cross_power_spectra = np.loadtxt(f'./data_files/power_spectra/kappa_galaxy/{box}/{isim}/{iz}/kappa_galaxy_power_spectrum_{ims_name[i]}_{slope_name}.txt', skiprows=1, usecols=(1,2) if covariance else 1)
                 
 
             elif multi_slope:
                 if shot_noise:
-                    auto_power_spectra = np.loadtxt(f'./data_files/power_spectra/galaxy_galaxy/{isim}_{iz}_{im_name}_{slopes_name[i]}.txt', skiprows=1, usecols=(1,3) if covariance else 1)
-                    with open(f"./data_files/dndz_samples/dndz_galaxies_sampled_{isim}_{iz}_{im_name}_{slopes_name[i]}.txt", "r") as f:
+                    auto_power_spectra = np.loadtxt(f'./data_files/power_spectra/galaxy_galaxy/{box}/{isim}/{iz}/galaxy_galaxy_power_spectrum_{im_name}_{slopes_name[i]}.txt', skiprows=1, usecols=(1,3) if covariance else 1)
+                    with open(f"./data_files/dndz_samples/{box}/{isim}/{iz}/dndz_galaxies_sampled_{im_name}_{slopes_name[i]}.txt", "r") as f:
                         first_line = f.readline().strip()
                         nhalos = int(first_line.split(":")[-1])
                         nhalos_list.append(nhalos)
                         auto_spectra_shot_noise_list.append((4*np.pi)/nhalos)
                 elif not shot_noise:
-                    auto_power_spectra = np.loadtxt(f'./data_files/power_spectra/galaxy_galaxy/{isim}_{iz}_{im_name}_{slopes_name[i]}.txt', skiprows=1, usecols=(2,3) if covariance else 2)
-                    with open(f"./data_files/dndz_samples/dndz_galaxies_sampled_{isim}_{iz}_{im_name}_{slopes_name[i]}.txt", "r") as f:
+                    auto_power_spectra = np.loadtxt(f'./data_files/power_spectra/galaxy_galaxy/{box}/{isim}/{iz}/galaxy_galaxy_power_spectrum_{im_name}_{slopes_name[i]}.txt', skiprows=1, usecols=(2,3) if covariance else 2)
+                    with open(f"./data_files/dndz_samples/{box}/{isim}/{iz}/dndz_galaxies_sampled_{im_name}_{slopes_name[i]}.txt", "r") as f:
                         first_line = f.readline().strip()
                         nhalos = int(first_line.split(":")[-1])
                         nhalos_list.append(nhalos)
-                cross_power_spectra = np.loadtxt(f'./data_files/power_spectra/kappa_galaxy/{isim}_{iz}_{im_name}_{slopes_name[i]}.txt', skiprows=1, usecols=(1,2) if covariance else 1)
+                cross_power_spectra = np.loadtxt(f'./data_files/power_spectra/kappa_galaxy/{box}/{isim}/{iz}/kappa_galaxy_power_spectrum_{im_name}_{slopes_name[i]}.txt', skiprows=1, usecols=(1,2) if covariance else 1)
                 
             elif multi_sim:
                 if shot_noise:
-                    auto_power_spectra = np.loadtxt(f'./data_files/power_spectra/galaxy_galaxy/{isim_names[i]}_{iz}_{ims_name[i]}_{slopes_name[i]}.txt', skiprows=1, usecols=(1,3) if covariance else 1)
-                    with open(f"./data_files/dndz_samples/dndz_galaxies_sampled_{isim_names[i]}_{iz}_{ims_name[i]}_{slopes_name[i]}.txt", "r") as f:
+                    auto_power_spectra = np.loadtxt(f'./data_files/power_spectra/galaxy_galaxy/{box}/{isim_names[i]}/{iz}/galaxy_galaxy_power_spectrum_{ims_name[i]}_{slopes_name[i]}.txt', skiprows=1, usecols=(1,3) if covariance else 1)
+                    with open(f"./data_files/dndz_samples/{box}/{isim_names[i]}/{iz}/dndz_galaxies_sampled_{ims_name[i]}_{slopes_name[i]}.txt", "r") as f:
                         first_line = f.readline().strip()
                         nhalos = int(first_line.split(":")[-1])
                         nhalos_list.append(nhalos)
                         auto_spectra_shot_noise_list.append((4*np.pi)/nhalos)
                 elif not shot_noise:
-                    auto_power_spectra = np.loadtxt(f'./data_files/power_spectra/galaxy_galaxy/{isim_names[i]}_{iz}_{ims_name[i]}_{slopes_name[i]}.txt', skiprows=1, usecols=(2,3) if covariance else 2)
-                    with open(f"./data_files/dndz_samples/dndz_galaxies_sampled_{isim_names[i]}_{iz}_{ims_name[i]}_{slopes_name[i]}.txt", "r") as f:
+                    auto_power_spectra = np.loadtxt(f'./data_files/power_spectra/galaxy_galaxy/{box}/{isim_names[i]}/{iz}/galaxy_galaxy_power_spectrum_{ims_name[i]}_{slopes_name[i]}.txt', skiprows=1, usecols=(2,3) if covariance else 2)
+                    with open(f"./data_files/dndz_samples/{box}/{isim_names[i]}/{iz}/dndz_galaxies_sampled_{ims_name[i]}_{slopes_name[i]}.txt", "r") as f:
                         first_line = f.readline().strip()
                         nhalos = int(first_line.split(":")[-1])
                         nhalos_list.append(nhalos)
-                cross_power_spectra = np.loadtxt(f'./data_files/power_spectra/kappa_galaxy/{isim_names[i]}_{iz}_{ims_name[i]}_{slopes_name[i]}.txt', skiprows=1, usecols=(1,2) if covariance else 1)
+                cross_power_spectra = np.loadtxt(f'./data_files/power_spectra/kappa_galaxy/{box}/{isim_names[i]}/{iz}/kappa_galaxy_power_spectrum_{ims_name[i]}_{slopes_name[i]}.txt', skiprows=1, usecols=(1,2) if covariance else 1)
             
             if template:
                 if covariance:
@@ -231,7 +237,7 @@ def power_spectra_plot(isim, iz, im, slope, fits, single, paper_ready=False,
         elif multi_im:
             ims = ims[::-1]
         elif multi_sim:
-            isim_names = isim_names[::-1]
+            isim_names = FLAMINGO_names[::-1]
             FLAMINGO_colors_sorted = FLAMINGO_colors_sorted[::-1]
             ims = ims[::-1]
             slopes = slopes[::-1]
@@ -253,19 +259,28 @@ def power_spectra_plot(isim, iz, im, slope, fits, single, paper_ready=False,
     mle_log_likelihood = []
     if multi_sim:
         for i in range(len(isim_names)):
-            mle_value = np.loadtxt(f"./data_files/mle_values_{isim_names[i]}_{iz}.txt", usecols=1, max_rows=1, delimiter='=')
-            mle_log_likelihood.append(mle_value)
+            mle_value = np.loadtxt(f"./data_files/mle_values_{box}_{isim_names[i]}_{iz}.txt", usecols=1, max_rows=1, delimiter='=')
+            mle_log_likelihood.append(f"{mle_value:.3f}")
+    elif single:
+        mle_value = np.loadtxt(f"./data_files/mle_values_{box}_{isim}_{iz}.txt", usecols=1, max_rows=1, delimiter='=')
+        mle_log_likelihood.append(f"{mle_value:.3f}")
     else:
-        mle_value = np.loadtxt(f"./data_files/mle_values_{isim}_{iz}.txt", usecols=1, max_rows=1, delimiter='=')
-        mle_log_likelihood.append(mle_value)
+        mle_log_likelihood = ['' for i in range(len(variable_list))]
 
-    fig, (ax, ax_ratio) = pb.subplots(
-    2, 1, figsize=(8, 7.2),
-    sharex=True,
-    gridspec_kw={"height_ratios": [3.0, 1.0], "hspace": 0.05},
-    )
+    # PLOTTING SECTION
 
-    # pb.figure(figsize=(8,6))
+    # galaxy-galaxy auto-power spectra
+
+    if paper_ready and multi_sim:
+        fig, (ax, ax_ratio) = pb.subplots(
+        2, 1, figsize=(8, 7.2),
+        sharex=True,
+        gridspec_kw={"height_ratios": [3.0, 1.0], "hspace": 0.05},
+        )
+    else:
+        fig, ax = pb.subplots(1, 1, figsize=(8,6))
+
+
     for i, var in enumerate(variable_list):
         print(var)
         if var == 0.0:
@@ -282,7 +297,7 @@ def power_spectra_plot(isim, iz, im, slope, fits, single, paper_ready=False,
                 else:
                     line, = ax.plot(ell_namaster, auto_spectra_list[i], 
                                 linestyle='dashed', color=FLAMINGO_colors_sorted[i], alpha=0.8, 
-                                label=f'{var}, {ims[i]}, {slopes[i]}, {mean_mstar[i]:.5f}, {nhalos_list[i]}, {chi2[i]:.3f}' if data != None else f'{var}, {ims[i]}, {slopes[i]}, {nhalos_list[i]}, {mle_log_likelihood[i]:.3f}')
+                                label=f'{var}, {ims[i]}, {slopes[i]}, {mean_mstar[i]:.5f}, {nhalos_list[i]}, {chi2[i]:.3f}' if data != None else f'{var}, {ims[i]}, {slopes[i]}, {nhalos_list[i]}, {mle_log_likelihood[i]}')
 
                 ratio = auto_spectra_list[i] / fiducial_spec
                 ax_ratio.plot(
@@ -295,7 +310,7 @@ def power_spectra_plot(isim, iz, im, slope, fits, single, paper_ready=False,
             else:
                 line, = ax.plot(ell_namaster, auto_spectra_list[i], 
                                 linestyle='dashed', alpha=0.8, 
-                                label=f'{var}, {mean_mstar[i]:.5f}, {nhalos_list[i]}, {chi2[i]:.3f}' if data != None else f'{var}, {nhalos_list[i]}, {mle_log_likelihood[i]:.3f}')
+                                label=f'{var}, {mean_mstar[i]:.5f}, {nhalos_list[i]}, {chi2[i]:.3f}' if data != None else f'{var}, {nhalos_list[i]}, {mle_log_likelihood[i]}')
             if covariance:
                 ax.fill_between(x=ell_namaster, 
                                 y1=(auto_spectra_list[i] + auto_spectra_covariance_list[i]), y2=(auto_spectra_list[i] - auto_spectra_covariance_list[i]), 
@@ -315,7 +330,7 @@ def power_spectra_plot(isim, iz, im, slope, fits, single, paper_ready=False,
                 else:
                     line, = ax.plot(ell_namaster, auto_spectra_list[i], 
                                 linestyle='solid', alpha=0.8, color=FLAMINGO_colors_sorted[i], 
-                                label=f'{var}, {ims[i]}, {slopes[i]}, {mean_mstar[i]:.5f}, {nhalos_list[i]}, {chi2[i]:.3f}' if data != None else f'{var}, {ims[i]}, {slopes[i]}, {nhalos_list[i]}, {mle_log_likelihood[i]:.3f}')
+                                label=f'{var}, {ims[i]}, {slopes[i]}, {mean_mstar[i]:.5f}, {nhalos_list[i]}, {chi2[i]:.3f}' if data != None else f'{var}, {ims[i]}, {slopes[i]}, {nhalos_list[i]}, {mle_log_likelihood[i]}')
                     
                 ratio = auto_spectra_list[i] / fiducial_spec
                 ax_ratio.plot(
@@ -328,7 +343,7 @@ def power_spectra_plot(isim, iz, im, slope, fits, single, paper_ready=False,
             else:
                 line, = ax.plot(ell_namaster, auto_spectra_list[i], 
                                 linestyle='dotted' if var < 0 else 'solid', alpha=0.8, 
-                                label=f'{var}, {mean_mstar[i]:.5f}, {nhalos_list[i]}, {chi2[i]:.3f}' if data != None else f'{var}, {nhalos_list[i]}, {mle_log_likelihood[i]:.3f}')
+                                label=f'{var}, {mean_mstar[i]:.5f}, {nhalos_list[i]}, {chi2[i]:.3f}' if data != None else f'{var}, {nhalos_list[i]}, {mle_log_likelihood[i]}')
             if covariance:
                 ax.fill_between(x=ell_namaster, 
                                 y1=(auto_spectra_list[i] + auto_spectra_covariance_list[i]), y2=(auto_spectra_list[i] - auto_spectra_covariance_list[i]), 
@@ -342,90 +357,95 @@ def power_spectra_plot(isim, iz, im, slope, fits, single, paper_ready=False,
     ax.fill_between(x=obs_data[:,0], 
                     y1=(obs_data[:,1]+obs_data_std)*1e5, y2=(obs_data[:,1]-obs_data_std)*1e5, 
                     color='k', linewidth=0, alpha=.3)
-    ratio_act_obs = obs_data[:,1]*1e5 / fiducial_spec
-    ax_ratio.plot(
-        ell_namaster, ratio_act_obs,
-        marker='.', markersize=5,
-        color='k', linewidth=0,
-        alpha=0.9
-    )
-    # simple propagation assuming +/- is 1σ on the model only (reference treated fixed)
-    ratio_hi = (obs_data[:,1] + obs_data_std) * 1e5 / fiducial_spec
-    ratio_lo = (obs_data[:,1] - obs_data_std) * 1e5 / fiducial_spec
-    ax_ratio.fill_between(
-        x=ell_namaster, y1=ratio_hi, y2=ratio_lo,
-        linewidth=0, alpha=0.3, color='k'
-    )
+    
+    if paper_ready and multi_sim:
+        ratio_act_obs = obs_data[:,1]*1e5 / fiducial_spec
+        ax_ratio.plot(
+            ell_namaster, ratio_act_obs,
+            marker='.', markersize=5,
+            color='k', linewidth=0,
+            alpha=0.9
+        )
+        # simple propagation assuming +/- is 1σ on the model only (reference treated fixed)
+        ratio_hi = (obs_data[:,1] + obs_data_std) * 1e5 / fiducial_spec
+        ratio_lo = (obs_data[:,1] - obs_data_std) * 1e5 / fiducial_spec
+        ax_ratio.fill_between(
+            x=ell_namaster, y1=ratio_hi, y2=ratio_lo,
+            linewidth=0, alpha=0.3, color='k'
+        )
     
     ax.plot(Planck_obs_data[:,0], Planck_obs_data[:,1]*1e5, 
             color='r', marker='.', markersize=5, linewidth=0, label='Planck x unWISE (Farren et al. 2023)')
     ax.fill_between(x=Planck_obs_data[:,0], 
                     y1=(Planck_obs_data[:,1]+Planck_obs_data_std)*1e5, y2=(Planck_obs_data[:,1]-Planck_obs_data_std)*1e5, 
                     color='r', linewidth=0, alpha=.3)
-    ratio_planck_obs = Planck_obs_data[:,1]*1e5 / fiducial_spec[:len(Planck_obs_data[:,0])]
-    ax_ratio.plot(
-        Planck_obs_data[:,0], ratio_planck_obs,
-        marker='.', markersize=5,
-        color='r', linewidth=0,
-        alpha=0.9
-    )
-    ratio_planck_hi = (Planck_obs_data[:,1] + Planck_obs_data_std) * 1e5 / fiducial_spec[:len(Planck_obs_data[:,0])]
-    ratio_planck_lo = (Planck_obs_data[:,1] - Planck_obs_data_std) * 1e5 / fiducial_spec[:len(Planck_obs_data[:,0])]
-    ax_ratio.fill_between(
-        x=Planck_obs_data[:,0], y1=ratio_planck_hi, y2=ratio_planck_lo,
-        linewidth=0, alpha=0.3, color='r'
-    )
+    
+    if paper_ready and multi_sim:
+        ratio_planck_obs = Planck_obs_data[:,1]*1e5 / fiducial_spec[:len(Planck_obs_data[:,0])]
+        ax_ratio.plot(
+            Planck_obs_data[:,0], ratio_planck_obs,
+            marker='.', markersize=5,
+            color='r', linewidth=0,
+            alpha=0.9
+        )
+        ratio_planck_hi = (Planck_obs_data[:,1] + Planck_obs_data_std) * 1e5 / fiducial_spec[:len(Planck_obs_data[:,0])]
+        ratio_planck_lo = (Planck_obs_data[:,1] - Planck_obs_data_std) * 1e5 / fiducial_spec[:len(Planck_obs_data[:,0])]
+        ax_ratio.fill_between(
+            x=Planck_obs_data[:,0], y1=ratio_planck_hi, y2=ratio_planck_lo,
+            linewidth=0, alpha=0.3, color='r'
+        )
 
     ax.set_ylabel('$C^{gg}_{\ell}x10^5$')
     ax.set_xscale("log")
     ax.set_yscale("log")
     ax.set_xlim(200, 4000)
 
-    ax_ratio.axhline(y=1.0, color='k', linestyle='dashed', alpha=0.7)
-    ax_ratio.set_xlabel('Multipole moment $\ell$')
-    ax_ratio.set_ylabel('Model / Fiducial')
-    ax_ratio.set_xscale("log")
-    ax_ratio.set_xlim(200, 4000)
-    ax_ratio.set_ylim(0.9, 1.1)
-    ax_ratio.grid(alpha=0.25)
+    if paper_ready and multi_sim:
+        ax_ratio.axhline(y=1.0, color='k', linestyle='dashed', alpha=0.7)
+        ax_ratio.set_xlabel('Multipole moment $\ell$')
+        ax_ratio.set_ylabel('Model / Fiducial')
+        ax_ratio.set_xscale("log")
+        ax_ratio.set_xlim(200, 4000)
+        ax_ratio.set_ylim(0.9, 1.1)
+        ax_ratio.grid(alpha=0.25)
 
     if single or multi_slope:
         if shot_noise:
             ax.set_title("\n".join(textwrap.wrap(
                 rf"Power Spectrum of the Galaxy Overdensity map (with shot-noise) "
-                rf"(sim={isim}, {iz} sample, log$M_*$={im}, "
-                rf"primary CMB={fits})",
+                rf"(box={box}, sim={isim}, {iz} sample, "
+                rf"log$M_*$={im}, primary CMB={fits})",
                 width=80)))
         else:
             ax.set_title("\n".join(textwrap.wrap(
                 rf"Power Spectrum of the Galaxy Overdensity map (shot-noise subtracted) "
-                rf"(sim={isim}, {iz} sample, log$M_*$={im}, "
-                rf"primary CMB={fits})",
+                rf"(box={box}, sim={isim}, {iz} sample, "
+                rf"log$M_*$={im}, primary CMB={fits})",
                 width=80)))
     elif multi_im:
         if shot_noise:
             ax.set_title("\n".join(textwrap.wrap(
                 rf"Power Spectrum of the Galaxy Overdensity map (with shot-noise) "
-                rf"(sim={isim}, {iz} sample, slope={slope}, "
-                rf"primary CMB={fits})",
+                rf"(box={box}, sim={isim}, {iz} sample, "
+                rf"slope={slope}, primary CMB={fits})",
                 width=80)))
         else:
             ax.set_title("\n".join(textwrap.wrap(
                 rf"Power Spectrum of the Galaxy Overdensity map (shot-noise subtracted) "
-                rf"(sim={isim}, {iz} sample, slope={slope}, "
-                rf"primary CMB={fits})",
+                rf"(box={box}, sim={isim}, {iz} sample, "
+                rf"slope={slope}, primary CMB={fits})",
                 width=80)))
     elif multi_sim:
         if shot_noise:
             ax.set_title("\n".join(textwrap.wrap(
                 rf"Power Spectrum of the Galaxy Overdensity map (with shot-noise) "
-                rf"({iz} sample, log$M_*$ and slope MLE optimised, "
+                rf"(box={box}, {iz} sample, log$M_*$ and slope MLE optimised, "
                 rf"primary CMB={fits})",
                 width=80)))
         else:
             ax.set_title("\n".join(textwrap.wrap(
                 rf"Power Spectrum of the Galaxy Overdensity map (shot-noise subtracted) "
-                rf"({iz} sample, log$M_*$ and slope MLE optimised, "
+                rf"(box={box}, {iz} sample, log$M_*$ and slope MLE optimised, "
                 rf"primary CMB={fits})",
                 width=80)))
 
@@ -459,6 +479,8 @@ def power_spectra_plot(isim, iz, im, slope, fits, single, paper_ready=False,
     # pb.clf()
     pb.close(fig)
 
+    # galaxy-galaxy auto-power spectra multiplied by ell
+
     pb.figure(figsize=(8,6))
     for i, var in enumerate(variable_list):
         print(var)
@@ -468,11 +490,11 @@ def power_spectra_plot(isim, iz, im, slope, fits, single, paper_ready=False,
             if multi_sim:
                 pb.plot(ell_namaster, auto_spectra_list[i] *ell_namaster, 
                             linestyle='dashed', alpha=0.8, 
-                            label=f'{var}, {ims[i]}, {slopes[i]}, {mean_mstar[i]:.5f}, {nhalos_list[i]}, {chi2[i]:.3f}' if data != None else f'{var}, {ims[i]}, {slopes[i]}, {nhalos_list[i]}, {mle_log_likelihood[i]:.3f}')
+                            label=f'{var}, {ims[i]}, {slopes[i]}, {mean_mstar[i]:.5f}, {nhalos_list[i]}, {chi2[i]:.3f}' if data != None else f'{var}, {ims[i]}, {slopes[i]}, {nhalos_list[i]}, {mle_log_likelihood[i]}')
             else:
                 pb.plot(ell_namaster, auto_spectra_list[i] *ell_namaster, 
                                 linestyle='dashed', alpha=0.8, 
-                                label=f'{var}, {mean_mstar[i]:.5f}, {nhalos_list[i]}, {chi2[i]:.3f}' if data != None else f'{var}, {nhalos_list[i]}, {mle_log_likelihood[i]:.3f}')
+                                label=f'{var}, {mean_mstar[i]:.5f}, {nhalos_list[i]}, {chi2[i]:.3f}' if data != None else f'{var}, {nhalos_list[i]}, {mle_log_likelihood[i]}')
             if covariance:
                 pb.fill_between(x=ell_namaster, 
                                 y1=(auto_spectra_list[i] + auto_spectra_covariance_list[i]) *ell_namaster, y2=(auto_spectra_list[i] - auto_spectra_covariance_list[i]) *ell_namaster, 
@@ -481,11 +503,11 @@ def power_spectra_plot(isim, iz, im, slope, fits, single, paper_ready=False,
             if multi_sim:
                 pb.plot(ell_namaster, auto_spectra_list[i] *ell_namaster, 
                             linestyle='solid', alpha=0.8, 
-                            label=f'{var}, {ims[i]}, {slopes[i]}, {mean_mstar[i]:.5f}, {nhalos_list[i]}, {chi2[i]:.3f}' if data != None else f'{var}, {ims[i]}, {slopes[i]}, {nhalos_list[i]}, {mle_log_likelihood[i]:.3f}')
+                            label=f'{var}, {ims[i]}, {slopes[i]}, {mean_mstar[i]:.5f}, {nhalos_list[i]}, {chi2[i]:.3f}' if data != None else f'{var}, {ims[i]}, {slopes[i]}, {nhalos_list[i]}, {mle_log_likelihood[i]}')
             else:
                 pb.plot(ell_namaster, auto_spectra_list[i] *ell_namaster, 
                                 linestyle='dotted' if var < 0 else 'solid', alpha=0.8, 
-                                label=f'{var}, {mean_mstar[i]:.5f}, {nhalos_list[i]}, {chi2[i]:.3f}' if data != None else f'{var}, {nhalos_list[i]}, {mle_log_likelihood[i]:.3f}')
+                                label=f'{var}, {mean_mstar[i]:.5f}, {nhalos_list[i]}, {chi2[i]:.3f}' if data != None else f'{var}, {nhalos_list[i]}, {mle_log_likelihood[i]}')
             if covariance:
                 pb.fill_between(x=ell_namaster, 
                                 y1=(auto_spectra_list[i] + auto_spectra_covariance_list[i]) *ell_namaster, y2=(auto_spectra_list[i] - auto_spectra_covariance_list[i]) *ell_namaster, 
@@ -506,19 +528,19 @@ def power_spectra_plot(isim, iz, im, slope, fits, single, paper_ready=False,
     if single or multi_slope:
         pb.title("\n".join(textwrap.wrap(
             rf"Power Spectrum of the Galaxy Overdensity map (shot-noise subtracted) "
-            rf"(sim={isim}, {iz} sample, log$M_*$={im}, "
-            rf"primary CMB={fits})",
+            rf"(box={box}, sim={isim}, {iz} sample, "
+            rf"log$M_*$={im}, primary CMB={fits})",
             width=80)))
     elif multi_im:
         pb.title("\n".join(textwrap.wrap(
             rf"Power Spectrum of the Galaxy Overdensity map (shot-noise subtracted) "
-            rf"(sim={isim}, {iz} sample, slope={slope}, "
-            rf"primary CMB={fits})",
+            rf"(box={box}, sim={isim}, {iz} sample, "
+            rf"slope={slope}, primary CMB={fits})",
             width=80)))
     elif multi_sim:
         pb.title("\n".join(textwrap.wrap(
             rf"Power Spectrum of the Galaxy Overdensity map (shot-noise subtracted) "
-            rf"({iz} sample, log$M_*$ and slope MLE optimised, "
+            rf"(box={box}, {iz} sample, log$M_*$ and slope MLE optimised, "
             rf"primary CMB={fits})",
             width=80)))
     pb.xscale("log")
@@ -535,13 +557,17 @@ def power_spectra_plot(isim, iz, im, slope, fits, single, paper_ready=False,
         pb.savefig(f'./Plots/halo_map_gg_power_spectrum_all_sims_{iz}_mle_amp_slope_{fits}_ntotal_shot_noise_subtracted{template_prefix}_ell.png', dpi=400)
     pb.clf()
 
-    fig, (ax, ax_ratio) = pb.subplots(
-        2, 1, figsize=(8, 7.2),
-        sharex=True,
-        gridspec_kw={"height_ratios": [3.0, 1.0], "hspace": 0.05},
-        )
+    # galaxy-CMB lensing cross-power spectra
 
-    # pb.figure(figsize=(8,6))
+    if paper_ready and multi_sim:
+        fig, (ax, ax_ratio) = pb.subplots(
+            2, 1, figsize=(8, 7.2),
+            sharex=True,
+            gridspec_kw={"height_ratios": [3.0, 1.0], "hspace": 0.05},
+            )
+    else:
+        fig, ax = pb.subplots(1, 1, figsize=(8,6))
+
     for i, var in enumerate(variable_list):
         print(var)
         if var == 0.0:
@@ -558,7 +584,7 @@ def power_spectra_plot(isim, iz, im, slope, fits, single, paper_ready=False,
                 else:
                     line, = ax.plot(ell_namaster, cross_spectra_list[i], 
                                     linestyle='dashed', color=FLAMINGO_colors_sorted[i], 
-                                    label=f'{var}, {ims[i]}, {slopes[i]}, {mean_mstar[i]:.5f}, {nhalos_list[i]}, {chi2[i]:.3f}' if data != None else f'{var}, {ims[i]}, {slopes[i]}, {nhalos_list[i]}, {mle_log_likelihood[i]:.3f}')
+                                    label=f'{var}, {ims[i]}, {slopes[i]}, {mean_mstar[i]:.5f}, {nhalos_list[i]}, {chi2[i]:.3f}' if data != None else f'{var}, {ims[i]}, {slopes[i]}, {nhalos_list[i]}, {mle_log_likelihood[i]}')
 
                 ratio = cross_spectra_list[i] / fiducial_spec
                 ax_ratio.plot(
@@ -571,7 +597,7 @@ def power_spectra_plot(isim, iz, im, slope, fits, single, paper_ready=False,
             else:
                 ax.plot(ell_namaster, cross_spectra_list[i], 
                         linestyle='dashed', 
-                        label=f'{var}, {mean_mstar[i]:.5f}, {nhalos_list[i]}, {chi2[i]:.3f}' if data != None else f'{var}, {nhalos_list[i]}, {mle_log_likelihood[i]:.3f}')
+                        label=f'{var}, {mean_mstar[i]:.5f}, {nhalos_list[i]}, {chi2[i]:.3f}' if data != None else f'{var}, {nhalos_list[i]}, {mle_log_likelihood[i]}')
             if covariance:
                 ax.fill_between(x=ell_namaster, 
                                 y1=(cross_spectra_list[i] + cross_spectra_covariance_list[i]), y2=(cross_spectra_list[i] - cross_spectra_covariance_list[i]), 
@@ -588,7 +614,7 @@ def power_spectra_plot(isim, iz, im, slope, fits, single, paper_ready=False,
                 else:
                     line, = ax.plot(ell_namaster, cross_spectra_list[i], 
                         linestyle='solid', color=FLAMINGO_colors_sorted[i], 
-                        label=f'{var}, {ims[i]}, {slopes[i]}, {mean_mstar[i]:.5f}, {nhalos_list[i]}, {chi2[i]:.3f}' if data != None else f'{var}, {ims[i]}, {slopes[i]}, {nhalos_list[i]}, {mle_log_likelihood[i]:.3f}')
+                        label=f'{var}, {ims[i]}, {slopes[i]}, {mean_mstar[i]:.5f}, {nhalos_list[i]}, {chi2[i]:.3f}' if data != None else f'{var}, {ims[i]}, {slopes[i]}, {nhalos_list[i]}, {mle_log_likelihood[i]}')
                     
                 ratio = cross_spectra_list[i] / fiducial_spec
                 ax_ratio.plot(
@@ -601,7 +627,7 @@ def power_spectra_plot(isim, iz, im, slope, fits, single, paper_ready=False,
             else:
                 ax.plot(ell_namaster, cross_spectra_list[i], 
                         linestyle='dotted' if var < 0 else 'solid', 
-                        label=f'{var}, {mean_mstar[i]:.5f}, {nhalos_list[i]}, {chi2[i]:.3f}' if data != None else f'{var}, {nhalos_list[i]}, {mle_log_likelihood[i]:.3f}')
+                        label=f'{var}, {mean_mstar[i]:.5f}, {nhalos_list[i]}, {chi2[i]:.3f}' if data != None else f'{var}, {nhalos_list[i]}, {mle_log_likelihood[i]}')
             if covariance:
                 ax.fill_between(x=ell_namaster, 
                                 y1=(cross_spectra_list[i] + cross_spectra_covariance_list[i]), y2=(cross_spectra_list[i] - cross_spectra_covariance_list[i]), 
@@ -612,70 +638,75 @@ def power_spectra_plot(isim, iz, im, slope, fits, single, paper_ready=False,
     ax.fill_between(x=obs_data[:,0], 
                     y1=(obs_data[:,3]+obs_data_std_cross)*1e5, y2=(obs_data[:,3]-obs_data_std_cross)*1e5, 
                     color='k', linewidth=0, alpha=0.3)
-    ratio_act_obs = obs_data[:,3]*1e5 / fiducial_spec
-    ax_ratio.plot(
-        ell_namaster, ratio_act_obs,
-        marker='.', markersize=5,
-        color='k', linewidth=0,
-        alpha=0.9
-    )
-    # simple propagation assuming +/- is 1σ on the model only (reference treated fixed)
-    ratio_hi = (obs_data[:,3] + obs_data_std_cross) * 1e5 / fiducial_spec
-    ratio_lo = (obs_data[:,3] - obs_data_std_cross) * 1e5 / fiducial_spec
-    ax_ratio.fill_between(
-        x=ell_namaster, y1=ratio_hi, y2=ratio_lo,
-        linewidth=0, alpha=0.3, color='k'
-    )
+    
+    if paper_ready and multi_sim:
+        ratio_act_obs = obs_data[:,3]*1e5 / fiducial_spec
+        ax_ratio.plot(
+            ell_namaster, ratio_act_obs,
+            marker='.', markersize=5,
+            color='k', linewidth=0,
+            alpha=0.9
+        )
+        # simple propagation assuming +/- is 1σ on the model only (reference treated fixed)
+        ratio_hi = (obs_data[:,3] + obs_data_std_cross) * 1e5 / fiducial_spec
+        ratio_lo = (obs_data[:,3] - obs_data_std_cross) * 1e5 / fiducial_spec
+        ax_ratio.fill_between(
+            x=ell_namaster, y1=ratio_hi, y2=ratio_lo,
+            linewidth=0, alpha=0.3, color='k'
+        )
     
     ax.plot(Planck_obs_data[:,0], Planck_obs_data[:,3]*1e5, 
             color='r', marker='.', markersize=5, linewidth=0, label='Planck x unWISE (Farren et al. 2023)')
     ax.fill_between(x=Planck_obs_data[:,0], 
                     y1=(Planck_obs_data[:,3]+Planck_obs_data_std_cross)*1e5, y2=(Planck_obs_data[:,3]-Planck_obs_data_std_cross)*1e5, 
                     color='r', linewidth=0, alpha=.3)
-    ratio_planck_obs = Planck_obs_data[:,3]*1e5 / fiducial_spec[:len(Planck_obs_data[:,0])]
-    ax_ratio.plot(
-        Planck_obs_data[:,0], ratio_planck_obs,
-        marker='.', markersize=5,
-        color='r', linewidth=0,
-        alpha=0.9
-    )
-    # simple propagation assuming +/- is 1σ on the model only (reference treated fixed)
-    ratio_hi = (Planck_obs_data[:,3] + Planck_obs_data_std_cross) * 1e5 / fiducial_spec[:len(Planck_obs_data[:,0])]
-    ratio_lo = (Planck_obs_data[:,3] - Planck_obs_data_std_cross) * 1e5 / fiducial_spec[:len(Planck_obs_data[:,0])]
-    ax_ratio.fill_between(
-        x=Planck_obs_data[:,0], y1=ratio_hi, y2=ratio_lo,
-        linewidth=0, alpha=0.3, color='r'
-    )
+    
+    if paper_ready and multi_sim:
+        ratio_planck_obs = Planck_obs_data[:,3]*1e5 / fiducial_spec[:len(Planck_obs_data[:,0])]
+        ax_ratio.plot(
+            Planck_obs_data[:,0], ratio_planck_obs,
+            marker='.', markersize=5,
+            color='r', linewidth=0,
+            alpha=0.9
+        )
+        # simple propagation assuming +/- is 1σ on the model only (reference treated fixed)
+        ratio_hi = (Planck_obs_data[:,3] + Planck_obs_data_std_cross) * 1e5 / fiducial_spec[:len(Planck_obs_data[:,0])]
+        ratio_lo = (Planck_obs_data[:,3] - Planck_obs_data_std_cross) * 1e5 / fiducial_spec[:len(Planck_obs_data[:,0])]
+        ax_ratio.fill_between(
+            x=Planck_obs_data[:,0], y1=ratio_hi, y2=ratio_lo,
+            linewidth=0, alpha=0.3, color='r'
+        )
     
     ax.set_ylabel('$C^{\kappa g}_{\ell}x10^5$')
     ax.set_xscale("log")
     ax.set_yscale("log")
     ax.set_xlim(200, 4000)
 
-    ax_ratio.axhline(y=1.0, color='k', linestyle='dashed', alpha=0.7)
-    ax_ratio.set_xlabel('Multipole moment $\ell$')
-    ax_ratio.set_ylabel('Model / Fiducial')
-    ax_ratio.set_xscale("log")
-    ax_ratio.set_xlim(200, 4000)
-    ax_ratio.set_ylim(0.5, 1.5)
-    ax_ratio.grid(alpha=0.25)
+    if paper_ready and multi_sim:
+        ax_ratio.axhline(y=1.0, color='k', linestyle='dashed', alpha=0.7)
+        ax_ratio.set_xlabel('Multipole moment $\ell$')
+        ax_ratio.set_ylabel('Model / Fiducial')
+        ax_ratio.set_xscale("log")
+        ax_ratio.set_xlim(200, 4000)
+        ax_ratio.set_ylim(0.5, 1.5)
+        ax_ratio.grid(alpha=0.25)
 
     if single or multi_slope:
         ax.set_title("\n".join(textwrap.wrap(
             rf"Cross-Spectra of the Galaxy Overdensity map and CMB lensing map "
-            rf"(sim={isim}, {iz} sample, log$M_*$={im}, "
-            rf"primary CMB={fits})",
+            rf"(box={box}, sim={isim}, {iz} sample, "
+            rf"log$M_*$={im}, primary CMB={fits})",
             width=80)))
     elif multi_im:
         ax.set_title("\n".join(textwrap.wrap(
             rf"Cross-Spectra of the Galaxy Overdensity map and CMB lensing map "
-            rf"(sim={isim}, {iz} sample, slope={slope}, "
-            rf"primary CMB={fits})",
+            rf"(box={box}, sim={isim}, {iz} sample, "
+            rf"slope={slope}, primary CMB={fits})",
             width=80)))
     elif multi_sim:
         ax.set_title("\n".join(textwrap.wrap(
             rf"Cross-Spectra of the Galaxy Overdensity map and CMB lensing map "
-            rf"({iz} sample, log$M_*$ and slope MLE optimised, "
+            rf"(box={box}, {iz} sample, log$M_*$ and slope MLE optimised, "
             rf"primary CMB={fits})",
             width=80)))
 
@@ -687,12 +718,14 @@ def power_spectra_plot(isim, iz, im, slope, fits, single, paper_ready=False,
         pb.savefig(f'./Plots/halo_map_kg_power_spectrum_{isim}_{iz}_{slope_name}_all_mass_cuts_{fits}_ntotal{template_prefix}.png', dpi=400)
     elif multi_sim:
         if paper_ready and data == None:
-            ax.legend(title="Simulation", fontsize=8, ncols=1, loc='upper right')
+            ax.legend(title="Simulation", fontsize=8, ncols=1, loc='lower left')
         else:
             ax.legend(title="Simulation, Amp, Slope, $N_{halo}$, $-\log \mathcal{L}(\\theta \mid x)$" if data == None else "Simulation, Amp, Slope, $log_{10}M_{*,mean}$, $N_{halo}$, $\chi^2$", fontsize=6, ncols=1, loc='upper right')
         pb.savefig(f'./Plots/halo_map_kg_power_spectrum_all_sims_{iz}_mle_amp_slope_{fits}_ntotal{template_prefix}.png', dpi=400)
     # pb.clf()
     pb.close(fig)
+
+    # galaxy-CMB lensing cross-power spectra multiplied by ell
 
     pb.figure(figsize=(8,6))
     for i, var in enumerate(variable_list):
@@ -703,11 +736,11 @@ def power_spectra_plot(isim, iz, im, slope, fits, single, paper_ready=False,
             if multi_sim:
                 pb.plot(ell_namaster, cross_spectra_list[i] *ell_namaster, 
                     linestyle='dashed', 
-                    label=f'{var}, {ims[i]}, {slopes[i]}, {mean_mstar[i]:.5f}, {nhalos_list[i]}, {chi2[i]:.3f}' if data != None else f'{var}, {ims[i]}, {slopes[i]}, {nhalos_list[i]}, {mle_log_likelihood[i]:.3f}')
+                    label=f'{var}, {ims[i]}, {slopes[i]}, {mean_mstar[i]:.5f}, {nhalos_list[i]}, {chi2[i]:.3f}' if data != None else f'{var}, {ims[i]}, {slopes[i]}, {nhalos_list[i]}, {mle_log_likelihood[i]}')
             else:
                 pb.plot(ell_namaster, cross_spectra_list[i] *ell_namaster, 
                         linestyle='dashed', 
-                        label=f'{var}, {mean_mstar[i]:.5f}, {nhalos_list[i]}, {chi2[i]:.3f}' if data != None else f'{var}, {nhalos_list[i]}, {mle_log_likelihood[i]:.3f}')
+                        label=f'{var}, {mean_mstar[i]:.5f}, {nhalos_list[i]}, {chi2[i]:.3f}' if data != None else f'{var}, {nhalos_list[i]}, {mle_log_likelihood[i]}')
             if covariance:
                 pb.fill_between(x=ell_namaster, 
                                 y1=(cross_spectra_list[i] + cross_spectra_covariance_list[i]) *ell_namaster, y2=(cross_spectra_list[i] - cross_spectra_covariance_list[i]) *ell_namaster, 
@@ -716,11 +749,11 @@ def power_spectra_plot(isim, iz, im, slope, fits, single, paper_ready=False,
             if multi_sim:
                 pb.plot(ell_namaster, cross_spectra_list[i] *ell_namaster, 
                     linestyle='solid', 
-                    label=f'{var}, {ims[i]}, {slopes[i]}, {mean_mstar[i]:.5f}, {nhalos_list[i]}, {chi2[i]:.3f}' if data != None else f'{var}, {ims[i]}, {slopes[i]}, {nhalos_list[i]}, {mle_log_likelihood[i]:.3f}')
+                    label=f'{var}, {ims[i]}, {slopes[i]}, {mean_mstar[i]:.5f}, {nhalos_list[i]}, {chi2[i]:.3f}' if data != None else f'{var}, {ims[i]}, {slopes[i]}, {nhalos_list[i]}, {mle_log_likelihood[i]}')
             else:
                 pb.plot(ell_namaster, cross_spectra_list[i] *ell_namaster, 
                         linestyle='dotted' if var < 0 else 'solid', 
-                        label=f'{var}, {mean_mstar[i]:.5f}, {nhalos_list[i]}, {chi2[i]:.3f}' if data != None else f'{var}, {nhalos_list[i]}, {mle_log_likelihood[i]:.3f}')
+                        label=f'{var}, {mean_mstar[i]:.5f}, {nhalos_list[i]}, {chi2[i]:.3f}' if data != None else f'{var}, {nhalos_list[i]}, {mle_log_likelihood[i]}')
             if covariance:
                 pb.fill_between(x=ell_namaster, 
                                 y1=(cross_spectra_list[i] + cross_spectra_covariance_list[i]) *ell_namaster, y2=(cross_spectra_list[i] - cross_spectra_covariance_list[i]) *ell_namaster, 
@@ -741,19 +774,19 @@ def power_spectra_plot(isim, iz, im, slope, fits, single, paper_ready=False,
     if single or multi_slope:
         pb.title("\n".join(textwrap.wrap(
             rf"Cross-Spectra of the Galaxy Overdensity map and CMB lensing map "
-            rf"(sim={isim}, {iz} sample, log$M_*$={im}, "
-            rf"primary CMB={fits})",
+            rf"(box={box}, sim={isim}, {iz} sample, "
+            rf"log$M_*$={im}, primary CMB={fits})",
             width=80)))
     elif multi_im:
         pb.title("\n".join(textwrap.wrap(
             rf"Cross-Spectra of the Galaxy Overdensity map and CMB lensing map "
-            rf"(sim={isim}, {iz} sample, slope={slope}, "
-            rf"primary CMB={fits})",
+            rf"(box={box}, sim={isim}, {iz} sample, "
+            rf"slope={slope}, primary CMB={fits})",
             width=80)))
     elif multi_sim:
         pb.title("\n".join(textwrap.wrap(
             rf"Cross-Spectra of the Galaxy Overdensity map and CMB lensing map "
-            rf"({iz} sample, log$M_*$ and slope MLE optimised, "
+            rf"(box={box}, sim={isim}, {iz} sample, log$M_*$ and slope MLE optimised, "
             rf"primary CMB={fits})",
             width=80)))
     pb.xscale("log")
@@ -775,12 +808,13 @@ def power_spectra_plot(isim, iz, im, slope, fits, single, paper_ready=False,
 
 if __name__ == "__main__":
 
-    isim = str(sys.argv[1])
-    iz = str(sys.argv[2])
-    im = float(sys.argv[3])
-    slope = float(sys.argv[4])
-    fits = str(sys.argv[5])
+    box = str(sys.argv[1])
+    isim = str(sys.argv[2])
+    iz = str(sys.argv[3])
+    im = float(sys.argv[4])
+    slope = float(sys.argv[5])
+    fits = str(sys.argv[6])
 
-    single = sys.argv[6].lower() in ("true", "1", "yes", "y")
+    single = sys.argv[7].lower() in ("true", "1", "yes", "y")
 
-    power_spectra_plot(isim, iz, im, slope, fits, single, paper_ready=True, template=False, multi_sim=True, shot_noise=False)
+    power_spectra_plot(box, isim, iz, im, slope, fits, single, paper_ready=True, template=False, multi_slope=True, shot_noise=False)

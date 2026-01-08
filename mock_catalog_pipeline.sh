@@ -1,8 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ISIM="${1:?usage: $0 ISIM IZ}"
-IZ="${2:?usage: $0 ISIM IZ}"
+BOX="${1:?usage: $0 BOX ISIM IZ}"
+ISIM="${2:?usage: $0 BOX ISIM IZ}"
+IZ="${3:?usage: $0 BOX ISIM IZ}"
+
+rm ./batch_files/pipeline_logs/job.${BOX}_${ISIM}_${IZ}_*.dump || true
+rm ./batch_files/pipeline_logs/job.${BOX}_${ISIM}_${IZ}_*.err || true
+rm ./batch_files/maximum_likelihood_logs/job.*${BOX}_${ISIM}_${IZ}_*.dump || true
+rm ./batch_files/maximum_likelihood_logs/job.*${BOX}_${ISIM}_${IZ}_*.err || true
 
 ARR_ID=$(sbatch --parsable \
                 --array=0-120%30 \
@@ -11,8 +17,8 @@ ARR_ID=$(sbatch --parsable \
                 -p cosma8 \
                 -A dp004 \
                 -t 12:00:00 \
-                -o ./batch_files/pipeline_logs/job.${ISIM}_${IZ}_%j.dump \
-                -e ./batch_files/pipeline_logs/job.${ISIM}_${IZ}_%j.err \
+                -o ./batch_files/pipeline_logs/job.${BOX}_${ISIM}_${IZ}_%j.dump \
+                -e ./batch_files/pipeline_logs/job.${BOX}_${ISIM}_${IZ}_%j.err \
                 <<EOF
 #!/usr/bin/env bash
 #SBATCH --mail-type=ALL
@@ -36,7 +42,7 @@ slope_name=\${slope//./p}
 
 echo "Task \$SLURM_ARRAY_TASK_ID -> amp=\$amp slope=\$slope"
 
-echo ">>> Launching pipeline with Sim='${ISIM}' Sample='${IZ}' M_cut(z_mean)='\$amp' n_cut='\$slope' nsamp='ntotal'"
+echo ">>> Launching pipeline with Box='${BOX}' Sim='${ISIM}' Sample='${IZ}' M_cut(z_mean)='\$amp' n_cut='\$slope' nsamp='ntotal'"
 
 module purge
 set +u
@@ -55,8 +61,8 @@ echo "=== Step 1 (Job ID \$SLURM_JOB_ID) starting"
 echo "    Received arguments: Sample='${IZ}', M_cut(z_mean)='\$amp', n_cut='\$slope'"
 echo "=============================="
 
-if [ -f "./data_files/z_dependant_stellar_cuts/z_stellar_cut_data_${IZ}_\${amp_name}_\${slope_name}.txt" ]; then
-    echo "Found ./data_files/z_dependant_stellar_cuts/z_stellar_cut_data_${IZ}_\${amp_name}_\${slope_name}.txt — skipping stellar_cut_z.py"
+if [ -f "./data_files/z_dependant_stellar_cuts/${IZ}/z_stellar_cut_data_\${amp_name}_\${slope_name}.txt" ]; then
+    echo "Found ./data_files/z_dependant_stellar_cuts/${IZ}/z_stellar_cut_data_\${amp_name}_\${slope_name}.txt — skipping stellar_cut_z.py"
 else
     python3 stellar_cut_z.py "${IZ}" "\$amp" "\$slope"
 fi
@@ -64,53 +70,53 @@ fi
 echo "Job 1: Compute z-dependant stellar cut values for ${IZ} sample with: M_cut(z_mean) = \$amp, n_cut = \$slope"
 
 echo "=== Step 2 (Job ID \$SLURM_JOB_ID) starting"
-echo "    Received arguments: ncpu='\$SLURM_CPUS_PER_TASK', Sim='${ISIM}', Sample='${IZ}', M_cut(z_mean)='\$amp', n_cut='\$slope'"
+echo "    Received arguments: ncpu='\$SLURM_CPUS_PER_TASK', Box='${BOX}', Sim='${ISIM}', Sample='${IZ}', M_cut(z_mean)='\$amp', n_cut='\$slope'"
 echo "=============================="
 
-if [ -f "./data_files/halo_totals/FLAMINGO_halo_totals_${ISIM}_${IZ}_\${amp_name}_\${slope_name}.txt" ]; then
-    echo "Found ./data_files/halo_totals/FLAMINGO_halo_totals_${ISIM}_${IZ}_\${amp_name}_\${slope_name}.txt — skipping FLAMINGO_halo_lightcones.py"
+if [ -f "./data_files/halo_totals/${BOX}/${ISIM}/${IZ}/FLAMINGO_halo_totals_\${amp_name}_\${slope_name}.txt" ]; then
+    echo "Found ./data_files/halo_totals/${BOX}/${ISIM}/${IZ}/FLAMINGO_halo_totals_\${amp_name}_\${slope_name}.txt — skipping FLAMINGO_halo_lightcones.py"
 else
-    python3 FLAMINGO_halo_lightcones.py "\$SLURM_CPUS_PER_TASK" "${ISIM}" "${IZ}" "\$amp" "\$slope"
+    python3 FLAMINGO_halo_lightcones.py "\$SLURM_CPUS_PER_TASK" "${BOX}" "${ISIM}" "${IZ}" "\$amp" "\$slope"
 fi
 
-echo "Job 2: Collate halos in lightcone shells for sim ${ISIM}, ${IZ} sample with: M_cut(z_mean) = \$amp, n_cut = \$slope."
+echo "Job 2: Collate halos in lightcone shells for sim ${BOX} ${ISIM}, ${IZ} sample with: M_cut(z_mean) = \$amp, n_cut = \$slope."
 
 echo "=== Step 3 (Job ID \$SLURM_JOB_ID) starting"
-echo "    Received arguments: Sim='${ISIM}', Sample='${IZ}', M_cut(z_mean)='\$amp', n_cut='\$slope', nsamp='ntotal'"
+echo "    Received arguments: Box='${BOX}', Sim='${ISIM}', Sample='${IZ}', M_cut(z_mean)='\$amp', n_cut='\$slope', nsamp='ntotal'"
 echo "=============================="
 
-if [ -f "./data_files/dndz_samples/dndz_galaxies_sampled_${ISIM}_${IZ}_\${amp_name}_\${slope_name}.txt" ]; then
-    echo "Found ./data_files/dndz_samples/dndz_galaxies_sampled_${ISIM}_${IZ}_\${amp_name}_\${slope_name}.txt — skipping unWISE_data_matching.py"
+if [ -f "./data_files/dndz_samples/${BOX}/${ISIM}/${IZ}/dndz_galaxies_sampled_\${amp_name}_\${slope_name}.txt" ]; then
+    echo "Found ./data_files/dndz_samples/${BOX}/${ISIM}/${IZ}/dndz_galaxies_sampled_\${amp_name}_\${slope_name}.txt — skipping unWISE_data_matching.py"
 else
-    python3 unWISE_data_matching.py "${ISIM}" "${IZ}" "\$amp" "\$slope" "ntotal"
+    python3 unWISE_data_matching.py "${BOX}" "${ISIM}" "${IZ}" "\$amp" "\$slope" "ntotal"
 fi
 
-echo "Job 3: Rescale unWISE dndz curve for sim ${ISIM}, ${IZ} sample and stellar cut with: M_cut(z_mean) = \$amp, n_cut = \$slope."
+echo "Job 3: Rescale unWISE dndz curve for box ${BOX}, sim ${ISIM}, ${IZ} sample and stellar cut with: M_cut(z_mean) = \$amp, n_cut = \$slope."
 
 echo "=== Step 4 (Job ID \$SLURM_JOB_ID) starting"
-echo "    Received arguments: ncpu='\$SLURM_CPUS_PER_TASK', Sim='${ISIM}', Sample='${IZ}', M_cut(z_mean)='\$amp', n_cut='\$slope'"
+echo "    Received arguments: ncpu='\$SLURM_CPUS_PER_TASK', Box='${BOX}', Sim='${ISIM}', Sample='${IZ}', M_cut(z_mean)='\$amp', n_cut='\$slope'"
 echo "=============================="
 
-if [ -f "./data_files/mock_halo_catalogs/sampled_halo_data_${ISIM}_${IZ}_\${amp_name}_\${slope_name}.parquet" ]; then
-    echo "Found ./data_files/mock_halo_catalogs/sampled_halo_data_${ISIM}_${IZ}_\${amp_name}_\${slope_name}.parquet — skipping FLAMINGO_halo_sampling.py"
+if [ -f "./data_files/mock_halo_catalogs/${BOX}/${ISIM}/${IZ}/sampled_halo_data_\${amp_name}_\${slope_name}.parquet" ]; then
+    echo "Found ./data_files/mock_halo_catalogs/${BOX}/${ISIM}/${IZ}/sampled_halo_data_\${amp_name}_\${slope_name}.parquet — skipping FLAMINGO_halo_sampling.py"
 else
-    python3 FLAMINGO_halo_sampling.py "\$SLURM_CPUS_PER_TASK" "${ISIM}" "${IZ}" "\$amp" "\$slope"
+    python3 FLAMINGO_halo_sampling.py "\$SLURM_CPUS_PER_TASK" "${BOX}" "${ISIM}" "${IZ}" "\$amp" "\$slope"
 fi
 
-echo "Job 4: Sampling FLAMINGO halo lightcones using rescaled unWISE dndz curve for sim ${ISIM}, ${IZ} sample and stellar cut with: M_cut(z_mean) = \$amp, n_cut = \$slope."
+echo "Job 4: Sampling FLAMINGO halo lightcones using rescaled unWISE dndz curve for box ${BOX}, sim ${ISIM}, ${IZ} sample and stellar cut with: M_cut(z_mean) = \$amp, n_cut = \$slope."
 
 echo "=== Step 5 (Job ID \$SLURM_JOB_ID) starting"
-echo "    Received arguments: ncpu='\$SLURM_CPUS_PER_TASK', Sim='${ISIM}', Sample='${IZ}', M_cut(z_mean)='\$amp', n_cut='\$slope'"
+echo "    Received arguments: ncpu='\$SLURM_CPUS_PER_TASK', Box='${BOX}', Sim='${ISIM}', Sample='${IZ}', M_cut(z_mean)='\$amp', n_cut='\$slope'"
 echo "=============================="
 
-if [ -f "./data_files/power_spectra/galaxy_galaxy/${ISIM}_${IZ}_\${amp_name}_\${slope_name}.txt" ] || \
-   [ -f "./data_files/power_spectra/kappa_galaxy/${ISIM}_${IZ}_\${amp_name}_\${slope_name}.txt" ]; then
+if [ -f "./data_files/power_spectra/galaxy_galaxy/${BOX}/${ISIM}/${IZ}/galaxy_galaxy_power_spectrum_\${amp_name}_\${slope_name}.txt" ] && \
+   [ -f "./data_files/power_spectra/kappa_galaxy/${BOX}/${ISIM}/${IZ}/kappa_galaxy_power_spectrum_\${amp_name}_\${slope_name}.txt" ]; then
     echo "Found existing galaxy-galaxy or kappa-galaxy spectra file — skipping unWISE_power_spectra.py"
 else
-    python3 unWISE_power_spectra.py "\$SLURM_CPUS_PER_TASK" "${ISIM}" "${IZ}" "\$amp" "\$slope" unlensed True False True True True False
+    python3 unWISE_power_spectra.py "\$SLURM_CPUS_PER_TASK" "${BOX}" "${ISIM}" "${IZ}" "\$amp" "\$slope" unlensed True False True True True False
 fi
 
-echo "Job 5: Computing the clustering and lensing cross-spectra of FLAMINGO unWISE mock catalogs for sim ${ISIM}, ${IZ} sample and stellar cut with: M_cut(z_mean) = \$amp, n_cut = \$slope."
+echo "Job 5: Computing the clustering and lensing cross-spectra of FLAMINGO unWISE mock catalogs for box ${BOX}, sim ${ISIM}, ${IZ} sample and stellar cut with: M_cut(z_mean) = \$amp, n_cut = \$slope."
 
 echo "Job done, info follows."
 sacct -j \$SLURM_JOB_ID --format=JobID,JobName,Partition,AveRSS,MaxRSS,AveVMSize,MaxVMSize,Elapsed,ExitCode
@@ -129,8 +135,8 @@ jid6=$(sbatch --parsable \
               -p cosma8 \
               -A dp004 \
               -t 00:30:00 \
-              -o ./batch_files/maximum_likelihood_logs/job.${ISIM}_${IZ}_%j.dump \
-              -e ./batch_files/maximum_likelihood_logs/job.${ISIM}_${IZ}_%j.err \
+              -o ./batch_files/maximum_likelihood_logs/job.${BOX}_${ISIM}_${IZ}_%j.dump \
+              -e ./batch_files/maximum_likelihood_logs/job.${BOX}_${ISIM}_${IZ}_%j.err \
               <<EOF
 #!/usr/bin/env bash
 #SBATCH --mail-type=ALL
@@ -152,21 +158,21 @@ mamba activate patchy_screening
 set -u
 
 echo "=== Step 6 (Job ID \$SLURM_JOB_ID) starting"
-echo "    Received arguments: ncpu="\$SLURM_CPUS_PER_TASK", Sim='${ISIM}', Sample='${IZ}'"
+echo "    Received arguments: ncpu="\$SLURM_CPUS_PER_TASK", Box='${BOX}', Sim='${ISIM}', Sample='${IZ}'"
 echo "=============================="
 
-python mock_catalog_likelihood_parallel.py "\$SLURM_CPUS_PER_TASK" "${ISIM}" "${IZ}"
+python mock_catalog_likelihood_parallel.py "\$SLURM_CPUS_PER_TASK" "${BOX}" "${ISIM}" "${IZ}"
 
 echo "Job done, info follows."
 sacct -j \$SLURM_JOB_ID --format=JobID,JobName,Partition,AveRSS,MaxRSS,AveVMSize,MaxVMSize,Elapsed,ExitCode
 
 EOF
 )
-       
-echo "Job 6: Computing the maximum likelihood estimates for the M_cut and n_cut values of the mock catalogs for sim ${ISIM}, ${IZ} sample."
+
+echo "Job 6: Computing the maximum likelihood estimates for the M_cut and n_cut values of the mock catalogs for box ${BOX}, sim ${ISIM}, ${IZ} sample."
 
 # variables you already know in this script
-MLE_FILE="./data_files/mle_values_${ISIM}_${IZ}.txt"
+MLE_FILE="./data_files/${BOX}/${ISIM}/${IZ}/mle_values.txt"
 
 # 7) Launch step 7 after job‐ID=$jid6 succeeds
 jid7=$(sbatch --parsable \
@@ -177,8 +183,8 @@ jid7=$(sbatch --parsable \
               -p cosma8 \
               -A dp004 \
               -t 01:30:00 \
-              -o ./batch_files/pipeline_logs/job.mle_${ISIM}_${IZ}_%j.dump \
-              -e ./batch_files/pipeline_logs/job.mle_${ISIM}_${IZ}_%j.err \
+              -o ./batch_files/pipeline_logs/job.mle_${BOX}_${ISIM}_${IZ}_%j.dump \
+              -e ./batch_files/pipeline_logs/job.mle_${BOX}_${ISIM}_${IZ}_%j.err \
               <<EOF
 #!/usr/bin/env bash
 #SBATCH --mail-type=ALL
@@ -191,7 +197,7 @@ amp=\$(grep -m1 '^AMP'   "${MLE_FILE}" | cut -d'=' -f2)
 slope=\$(grep -m1 '^SLOPE' "${MLE_FILE}" | cut -d'=' -f2)
 echo "Read MLEs: amp=\$amp, slope=\$slope"
 
-echo ">>> Launching pipeline with Sim='${ISIM}' Sample='${IZ}' M_cut(z_mean)='\$amp' n_cut='\$slope' nsamp='ntotal'"
+echo ">>> Launching pipeline with Box='${BOX}' Sim='${ISIM}' Sample='${IZ}' M_cut(z_mean)='\$amp' n_cut='\$slope' nsamp='ntotal'"
 
 module purge
 set +u
@@ -215,36 +221,36 @@ python3 stellar_cut_z.py "${IZ}" "\$amp" "\$slope"
 echo "Job 1: Compute z-dependant stellar cut values for ${IZ} sample with: M_cut(z_mean) = \$amp, n_cut = \$slope"
 
 echo "=== Step 2 (Job ID \$SLURM_JOB_ID) starting"
-echo "    Received arguments: ncpu='\$SLURM_CPUS_PER_TASK', Sim='${ISIM}', Sample='${IZ}', M_cut(z_mean)='\$amp', n_cut='\$slope'"
+echo "    Received arguments: ncpu='\$SLURM_CPUS_PER_TASK', Box='${BOX}', Sim='${ISIM}', Sample='${IZ}', M_cut(z_mean)='\$amp', n_cut='\$slope'"
 echo "=============================="
 
-python3 FLAMINGO_halo_lightcones.py "\$SLURM_CPUS_PER_TASK" "${ISIM}" "${IZ}" "\$amp" "\$slope"
+python3 FLAMINGO_halo_lightcones.py "\$SLURM_CPUS_PER_TASK" "${BOX}" "${ISIM}" "${IZ}" "\$amp" "\$slope"
 
-echo "Job 2: Collate halos in lightcone shells for sim ${ISIM}, ${IZ} sample with: M_cut(z_mean) = \$amp, n_cut = \$slope."
+echo "Job 2: Collate halos in lightcone shells for box ${BOX}, sim ${ISIM}, ${IZ} sample with: M_cut(z_mean) = \$amp, n_cut = \$slope."
 
 echo "=== Step 3 (Job ID \$SLURM_JOB_ID) starting"
-echo "    Received arguments: Sim='${ISIM}', Sample='${IZ}', M_cut(z_mean)='\$amp', n_cut='\$slope', nsamp='ntotal'"
+echo "    Received arguments: Box='${BOX}', Sim='${ISIM}', Sample='${IZ}', M_cut(z_mean)='\$amp', n_cut='\$slope', nsamp='ntotal'"
 echo "=============================="
 
-python3 unWISE_data_matching.py "${ISIM}" "${IZ}" "\$amp" "\$slope" "ntotal"
+python3 unWISE_data_matching.py "${BOX}" "${ISIM}" "${IZ}" "\$amp" "\$slope" "ntotal"
 
-echo "Job 3: Rescale unWISE dndz curve for sim ${ISIM}, ${IZ} sample and stellar cut with: M_cut(z_mean) = \$amp, n_cut = \$slope."
+echo "Job 3: Rescale unWISE dndz curve for box ${BOX}, sim ${ISIM}, ${IZ} sample and stellar cut with: M_cut(z_mean) = \$amp, n_cut = \$slope."
 
 echo "=== Step 4 (Job ID \$SLURM_JOB_ID) starting"
-echo "    Received arguments: ncpu='\$SLURM_CPUS_PER_TASK', Sim='${ISIM}', Sample='${IZ}', M_cut(z_mean)='\$amp', n_cut='\$slope'"
+echo "    Received arguments: ncpu='\$SLURM_CPUS_PER_TASK', Box='${BOX}', Sim='${ISIM}', Sample='${IZ}', M_cut(z_mean)='\$amp', n_cut='\$slope'"
 echo "=============================="
 
-python3 FLAMINGO_halo_sampling.py "\$SLURM_CPUS_PER_TASK" "${ISIM}" "${IZ}" "\$amp" "\$slope"
+python3 FLAMINGO_halo_sampling.py "\$SLURM_CPUS_PER_TASK" "${BOX}" "${ISIM}" "${IZ}" "\$amp" "\$slope"
 
-echo "Job 4: Sampling FLAMINGO halo lightcones using rescaled unWISE dndz curve for sim ${ISIM}, ${IZ} sample and stellar cut with: M_cut(z_mean) = \$amp, n_cut = \$slope."
+echo "Job 4: Sampling FLAMINGO halo lightcones using rescaled unWISE dndz curve for box ${BOX}, sim ${ISIM}, ${IZ} sample and stellar cut with: M_cut(z_mean) = \$amp, n_cut = \$slope."
 
 echo "=== Step 5 (Job ID \$SLURM_JOB_ID) starting"
-echo "    Received arguments: ncpu='\$SLURM_CPUS_PER_TASK', Sim='${ISIM}', Sample='${IZ}', M_cut(z_mean)='\$amp', n_cut='\$slope'"
+echo "    Received arguments: ncpu='\$SLURM_CPUS_PER_TASK', Box='${BOX}', Sim='${ISIM}', Sample='${IZ}', M_cut(z_mean)='\$amp', n_cut='\$slope'"
 echo "=============================="
 
-python3 unWISE_power_spectra.py "\$SLURM_CPUS_PER_TASK" "${ISIM}" "${IZ}" "\$amp" "\$slope" unlensed True False True True True False
+python3 unWISE_power_spectra.py "\$SLURM_CPUS_PER_TASK" "${BOX}" "${ISIM}" "${IZ}" "\$amp" "\$slope" unlensed True False True True True False
 
-echo "Job 5: Computing the clustering and lensing cross-spectra of FLAMINGO unWISE mock catalogs for sim ${ISIM}, ${IZ} sample and stellar cut with: M_cut(z_mean) = \$amp, n_cut = \$slope."
+echo "Job 5: Computing the clustering and lensing cross-spectra of FLAMINGO unWISE mock catalogs for box ${BOX}, sim ${ISIM}, ${IZ} sample and stellar cut with: M_cut(z_mean) = \$amp, n_cut = \$slope."
 
 echo "Job done, info follows."
 sacct -j \$SLURM_JOB_ID --format=JobID,JobName,Partition,AveRSS,MaxRSS,AveVMSize,MaxVMSize,Elapsed,ExitCode
@@ -252,6 +258,6 @@ sacct -j \$SLURM_JOB_ID --format=JobID,JobName,Partition,AveRSS,MaxRSS,AveVMSize
 EOF
 )
 
-echo "Job 7: Computing mock catalog and power spectra with MLE stellar cut for sim ${ISIM}, ${IZ} sample."
+echo "Job 7: Computing mock catalog and power spectra with MLE stellar cut for box ${BOX}, sim ${ISIM}, ${IZ} sample."
 
 echo "Chain: $ARR_ID (array) -> $jid6 (MLE) -> $jid7 (final catalog generation)"

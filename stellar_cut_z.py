@@ -1,13 +1,16 @@
 import numpy as np
+from pathlib import Path
 
 def stellar_cut_z(z_sample, mean_z_mass_cut, slope):
 
     z_sample = str(z_sample)
+
     im = float(mean_z_mass_cut)
     if round(im, 1) == im:
         im_name = f"{im:.1f}".replace('.', 'p')
     else:
         im_name = f"{im:.3f}".replace('.', 'p')
+    
     slope = float(slope)
     if round(slope, 1) == slope:
         slope_name = f"{float(slope):.1f}".replace('.', 'p')
@@ -15,9 +18,12 @@ def stellar_cut_z(z_sample, mean_z_mass_cut, slope):
         slope_name = f"{float(slope):.3f}".replace('.', 'p')
     if slope < 0.0:
         slope_name = f"{slope_name}".replace('-', 'minus')
+    
     mass_cut_list = []
     z_mean = {'Blue':0.6, 'Green':1.1, 'Red':1.5}
-    outfile_path = f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/z_dependant_stellar_cuts/z_stellar_cut_data_{z_sample}_{im_name}_{slope_name}.txt'
+    path = f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/z_dependant_stellar_cuts/{z_sample}/z_stellar_cut_data_{im_name}_{slope_name}.txt'
+    outfile_path = Path(path)
+    outfile_path.parent.mkdir(parents=True, exist_ok=True)
 
     halo_z_bins = np.genfromtxt(
         '/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/FLAMINGO_halo_redshift_values.txt',

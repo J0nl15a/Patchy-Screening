@@ -1,14 +1,14 @@
 import numpy as np
 
-def data_loader(isim, iz, low_halo_threshold=True, negative_power_threshold=False, shot_noise_included=False):
+def data_loader(box, isim, iz, low_halo_threshold=True, negative_power_threshold=False, shot_noise_included=False):
     
     cut_amplitude = np.repeat(np.arange(10.3, 11.4, 0.1).reshape(-1,1), 11, axis=0)
     cut_slope = np.tile(np.arange(0.0, 1.1, 0.1), 11).reshape(-1,1)
     x_train = np.column_stack((np.round(cut_amplitude, 1), np.round(cut_slope, 1))) #Amplitude and slope parameters
 
-    initial_cross_spectrum = np.loadtxt(f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/power_spectra/kappa_galaxy/{isim}_{iz}_10p8_0p5.txt', 
+    initial_cross_spectrum = np.loadtxt(f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/power_spectra/kappa_galaxy/{box}/{isim}/{iz}/kappa_galaxy_power_spectrum_10p8_0p5.txt', 
                                         delimiter=' ', skiprows=1, usecols=(0,1))
-    initial_auto_spectrum = np.loadtxt(f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/power_spectra/galaxy_galaxy/{isim}_{iz}_10p8_0p5.txt', 
+    initial_auto_spectrum = np.loadtxt(f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/power_spectra/galaxy_galaxy/{box}/{isim}/{iz}/galaxy_galaxy_power_spectrum_10p8_0p5.txt', 
                                         delimiter=' ', skiprows=1, usecols=(0,2) if not shot_noise_included else (0,1))
 
     negative_power = []
@@ -16,9 +16,9 @@ def data_loader(isim, iz, low_halo_threshold=True, negative_power_threshold=Fals
         amp_name = f"{float(a):.1f}".replace('.', 'p')
         slope_name = f"{float(s):.1f}".replace('.', 'p')
         if i == 0:
-            cross_spectrum = np.loadtxt(f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/power_spectra/kappa_galaxy/{isim}_{iz}_{amp_name}_{slope_name}.txt', 
+            cross_spectrum = np.loadtxt(f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/power_spectra/kappa_galaxy/{box}/{isim}/{iz}/kappa_galaxy_power_spectrum_{amp_name}_{slope_name}.txt', 
                                         delimiter=' ', skiprows=1, usecols=(0,1))
-            auto_spectrum = np.loadtxt(f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/power_spectra/galaxy_galaxy/{isim}_{iz}_{amp_name}_{slope_name}.txt', 
+            auto_spectrum = np.loadtxt(f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/power_spectra/galaxy_galaxy/{box}/{isim}/{iz}/galaxy_galaxy_power_spectrum_{amp_name}_{slope_name}.txt', 
                                         delimiter=' ', skiprows=1, usecols=(0,2) if not shot_noise_included else (0,1)) 
             y_train_cross = cross_spectrum[:,1].reshape(1, -1) #/ initial_cross_spectrum[:,1]
             y_train_auto = auto_spectrum[:,1].reshape(1, -1) #/ initial_auto_spectrum[:,1]
@@ -29,9 +29,9 @@ def data_loader(isim, iz, low_halo_threshold=True, negative_power_threshold=Fals
             #std = initial_spectrum[:,2].reshape(1, -1)
         else:
             print(a,s)
-            cross_spectrum = np.loadtxt(f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/power_spectra/kappa_galaxy/{isim}_{iz}_{amp_name}_{slope_name}.txt', 
+            cross_spectrum = np.loadtxt(f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/power_spectra/kappa_galaxy/{box}/{isim}/{iz}/kappa_galaxy_power_spectrum_{amp_name}_{slope_name}.txt', 
                                         delimiter=' ', skiprows=1, usecols=1) 
-            auto_spectrum = np.loadtxt(f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/power_spectra/galaxy_galaxy/{isim}_{iz}_{amp_name}_{slope_name}.txt', 
+            auto_spectrum = np.loadtxt(f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/power_spectra/galaxy_galaxy/{box}/{isim}/{iz}/galaxy_galaxy_power_spectrum_{amp_name}_{slope_name}.txt', 
                                         delimiter=' ', skiprows=1, usecols=2 if not shot_noise_included else 1) 
             y_train_cross = np.vstack((y_train_cross, cross_spectrum)) #/initial_cross_spectrum[:,1])) 
             y_train_auto = np.vstack((y_train_auto, auto_spectrum)) #/initial_auto_spectrum[:,1]))
@@ -61,7 +61,7 @@ def data_loader(isim, iz, low_halo_threshold=True, negative_power_threshold=Fals
         for i, (im, slope) in enumerate(x_train):
             im_name = f"{float(im):.1f}".replace('.', 'p')
             slope_name = f"{float(slope):.1f}".replace('.', 'p')
-            with open(f"./data_files/dndz_samples/dndz_galaxies_sampled_{isim}_{iz}_{im_name}_{slope_name}.txt", "r") as f:
+            with open(f"./data_files/dndz_samples/{box}/{isim}/{iz}/dndz_galaxies_sampled_{im_name}_{slope_name}.txt", "r") as f:
                 first_line = f.readline().strip()
                 number = int(first_line.split(":")[-1])
                 if number < nhalo_lower_bound:
@@ -136,25 +136,24 @@ def data_loader(isim, iz, low_halo_threshold=True, negative_power_threshold=Fals
 
 
     # np.save(f'./gpy_model/training/prior_limits_{isim}_{iz}.npy', np.array([plateau_point, m, c]))
-    np.save(f'./gpy_model/training/prior_limits_{isim}_{iz}.npy', np.array([plateau_point, c, vertical_limit]))
-    np.save(f'./gpy_model/training/X_training_data_{isim}_{iz}.npy', x_train)
-    np.save(f'./gpy_model/training/Y_training_data_cross_{isim}_{iz}.npy', y_train_cross)
-    np.save(f'./gpy_model/training/Y_training_data_auto_{isim}_{iz}.npy', y_train_auto)
-  
+    np.save(f'./gpy_model/training/prior_limits_{box}_{isim}_{iz}.npy', np.array([plateau_point, c, vertical_limit]))
+    np.save(f'./gpy_model/training/X_training_data_{box}_{isim}_{iz}.npy', x_train)
+    np.save(f'./gpy_model/training/Y_training_data_cross_{box}_{isim}_{iz}.npy', y_train_cross)
+    np.save(f'./gpy_model/training/Y_training_data_auto_{box}_{isim}_{iz}.npy', y_train_auto)
+
     return
 
 if __name__ == "__main__":
-    data_loader('HYDRO_FIDUCIAL', 'Blue', low_halo_threshold=True, negative_power_threshold=False, shot_noise_included=True)
+    data_loader('L1000N1800', 'HYDRO_FIDUCIAL', 'Blue', low_halo_threshold=True, negative_power_threshold=False, shot_noise_included=True)
 
-    x_train = np.load(f"./gpy_model/training/X_training_data_HYDRO_FIDUCIAL_Blue.npy")
-    y_train_auto = np.load(f"./gpy_model/training/Y_training_data_auto_HYDRO_FIDUCIAL_Blue.npy")
-    y_train_cross = np.load(f"./gpy_model/training/Y_training_data_cross_HYDRO_FIDUCIAL_Blue.npy")
-
+    x_train = np.load(f"./gpy_model/training/X_training_data_L1000N1800_HYDRO_FIDUCIAL_Blue.npy")
+    y_train_auto = np.load(f"./gpy_model/training/Y_training_data_auto_L1000N1800_HYDRO_FIDUCIAL_Blue.npy")
+    y_train_cross = np.load(f"./gpy_model/training/Y_training_data_cross_L1000N1800_HYDRO_FIDUCIAL_Blue.npy")
     x_train_min = (np.min(x_train[:,0]), np.min(x_train[:,1]))
     x_train_max = (np.max(x_train[:,0]), np.max(x_train[:,1]))
     x_train_normalised = np.column_stack(((x_train[:,0]-x_train_min[0])/(x_train_max[0]-x_train_min[0]), (x_train[:,1]-x_train_min[1])/(x_train_max[1]-x_train_min[1])))
 
-    initial_spectrum = np.loadtxt(f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/power_spectra/galaxy_galaxy/HYDRO_FIDUCIAL_Blue_10p8_0p5.txt', 
+    initial_spectrum = np.loadtxt(f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/power_spectra/galaxy_galaxy/L1000N1800/HYDRO_FIDUCIAL/Blue/galaxy_galaxy_power_spectrum_10p8_0p5.txt',
                                         delimiter=' ', skiprows=1, usecols=0)
 
     y_train_auto_normalised = y_train_auto.copy()

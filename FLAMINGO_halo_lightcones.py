@@ -1,9 +1,18 @@
 import numpy as np
 from joblib import Parallel, delayed
 from imp_patchy_screening import patchyScreening
+from pathlib import Path
 
-def halo_lightcones(simname, z_sample, mass_cut, n_cut, ncpu, max_z=3.0):
+def halo_lightcones(boxname, simname, z_sample, mass_cut, n_cut, ncpu, max_z=3.0):
+    box_list = ['L1000N1800', 'L2800N5040']
     sim_list = ['HYDRO_FIDUCIAL','HYDRO_PLANCK','HYDRO_PLANCK_LARGE_NU_FIXED','HYDRO_PLANCK_LARGE_NU_VARY','HYDRO_STRONG_AGN','HYDRO_WEAK_AGN','HYDRO_LOW_SIGMA8','HYDRO_STRONGER_AGN','HYDRO_JETS_published','HYDRO_STRONGEST_AGN','HYDRO_STRONG_SUPERNOVA','HYDRO_STRONGER_AGN_STRONG_SUPERNOVA','HYDRO_STRONG_JETS']
+
+    try:
+        box = int(boxname)
+        boxname = box_list[box]
+    except (ValueError, IndexError):
+        boxname = str(boxname)
+    print(boxname, type(boxname))
 
     try:
         isim = int(simname)
@@ -25,7 +34,10 @@ def halo_lightcones(simname, z_sample, mass_cut, n_cut, ncpu, max_z=3.0):
         slope_name = f"{float(n_cut):.3f}".replace('.', 'p')
     if slope < 0.0:
         slope_name = f"{slope_name}".replace('-', 'minus')
-    output_path = f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/halo_totals/FLAMINGO_halo_totals_{simname}_{z_sample}_{im_name}_{slope_name}.txt'
+        
+    path = f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/halo_totals/{boxname}/{simname}/{z_sample}/FLAMINGO_halo_totals_{im_name}_{slope_name}.txt'
+    output_path = Path(path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
 
     halo_z_bins = np.genfromtxt(
         '/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/FLAMINGO_halo_redshift_values.txt',
@@ -36,12 +48,12 @@ def halo_lightcones(simname, z_sample, mass_cut, n_cut, ncpu, max_z=3.0):
         delimiter=None
     )
 
-    z_stellar_cuts = np.loadtxt(f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/z_dependant_stellar_cuts/z_stellar_cut_data_{z_sample}_{im_name}_{slope_name}.txt')
+    z_stellar_cuts = np.loadtxt(f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/z_dependant_stellar_cuts/{z_sample}/z_stellar_cut_data_{im_name}_{slope_name}.txt')
 
     # dispatch in parallel
     results = Parallel(n_jobs=int(ncpu),   # adjust to your cores
                        backend='loky')(
-                           delayed(process_snapshot)(simname, int(i), z_stellar_cuts, halo_z_bins)
+                           delayed(process_snapshot)(boxname, simname, int(i), z_stellar_cuts, halo_z_bins)
                            for i in halo_z_bins['i']
                        )
 
@@ -61,14 +73,14 @@ def halo_lightcones(simname, z_sample, mass_cut, n_cut, ncpu, max_z=3.0):
             
     return
 
-def process_snapshot(sim, iz, stellar_cuts, halo_z_bins):
+def process_snapshot(box, sim, iz, stellar_cuts, halo_z_bins):
     if halo_z_bins['mid_z'][iz] > 3.0:
         return None
 
     im = stellar_cuts[int(iz)][1]
     print(f'im={im}')
 
-    ps = patchyScreening(sim, iz, im,  # or however you pass
+    ps = patchyScreening(box, sim, iz, im,  # or however you pass
                          0 ,0, 1,
                          lightcone_method=('FULL','shell'))
     ps.filter_stellar_mass()
@@ -83,15 +95,23 @@ if __name__ == '__main__':
     from io import StringIO
     import textwrap
 
-    halo_lightcones(sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[1])
+    halo_lightcones(sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6], sys.argv[1])
     quit()
+    box_list = ['L1000N1800', 'L2800N5040']
     sim_list = ['HYDRO_FIDUCIAL','HYDRO_PLANCK','HYDRO_PLANCK_LARGE_NU_FIXED','HYDRO_PLANCK_LARGE_NU_VARY','HYDRO_STRONG_AGN','HYDRO_WEAK_AGN','HYDRO_LOW_SIGMA8','HYDRO_STRONGER_AGN','HYDRO_JETS_published','HYDRO_STRONGEST_AGN','HYDRO_STRONG_SUPERNOVA','HYDRO_STRONGER_AGN_STRONG_SUPERNOVA','HYDRO_STRONG_JETS']
+
+    try:
+        box = int(sys.argv[1])
+        boxname = box_list[box]
+    except (ValueError, IndexError):
+        boxname = str(sys.argv[1])
 
     try:
         isim = int(sys.argv[2])
         simname = sim_list[isim]
     except (ValueError, IndexError):
         simname = str(sys.argv[2])
+
     z_sample = str(sys.argv[3])
     im = float(sys.argv[4])
     im_name = f"{float(sys.argv[4]):.1f}".replace('.', 'p')
@@ -118,7 +138,7 @@ if __name__ == '__main__':
             slope_name = f"{slope_name}".replace('-', 'minus')
         if s == 0.0:
             slope_name = "0p0"
-        with open(f"/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/halo_totals/FLAMINGO_halo_totals_{simname}_{z_sample}_{im_name}_{slope_name}.txt", "r") as f:
+        with open(f"/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/halo_totals/{boxname}/{simname}/{z_sample}/FLAMINGO_halo_totals_{im_name}_{slope_name}.txt", "r") as f:
             first_line = f.readline().strip()
             remaining_lines = f.readlines()
 
@@ -138,7 +158,7 @@ if __name__ == '__main__':
     pb.xlim(left=0, right=3)
     pb.xlabel('z')
     pb.ylabel('dn/dz')
-    pb.title("\n".join(textwrap.wrap(f'Galaxies in FLAMINGO (simname = {simname}, {z_sample} sample, stellar cut at mean z = {im}, slope of stellar cut = {slope}, total number of galaxies = {total_available_halos})', width=75)))
+    pb.title("\n".join(textwrap.wrap(f'Galaxies in FLAMINGO (boxname = {boxname}, simname = {simname}, {z_sample} sample, stellar cut at mean z = {im}, slope of stellar cut = {slope}, total number of galaxies = {total_available_halos})', width=75)))
     pb.legend(fontsize=4)
-    pb.savefig(f"./Plots/FLAMINGO_available_halos_{simname}_{z_sample}_{im_name}_{slope_name}.png", dpi=400)
+    pb.savefig(f"./Plots/FLAMINGO_available_halos_{boxname}_{simname}_{z_sample}_{im_name}_{slope_name}.png", dpi=400)
     pb.clf()

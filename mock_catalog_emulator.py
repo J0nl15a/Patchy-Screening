@@ -14,23 +14,26 @@ from emulator_data_loader import data_loader
 # sys.modules[module_name] = module
 # spec.loader.exec_module(module)
 
-def emulator(x, spectra, isim, iz, 
+def emulator(x, spectra, box, isim, iz, 
              save=False, load=False, log=True, retrain=False):
     
     try:
-        x_train = np.load(f"./gpy_model/training/X_training_data_{isim}_{iz}.npy")
-        y_train = np.load(f"./gpy_model/training/Y_training_data_{spectra}_{isim}_{iz}.npy")
+        x_train = np.load(f"./gpy_model/training/X_training_data_{box}_{isim}_{iz}.npy")
+        y_train = np.load(f"./gpy_model/training/Y_training_data_{spectra}_{box}_{isim}_{iz}.npy")
     except FileNotFoundError:
-        data_loader(isim, iz)
-        x_train = np.load(f"./gpy_model/training/X_training_data_{isim}_{iz}.npy")
-        y_train = np.load(f"./gpy_model/training/Y_training_data_{spectra}_{isim}_{iz}.npy")
-
+        data_loader(box, isim, iz)
+        x_train = np.load(f"./gpy_model/training/X_training_data_{box}_{isim}_{iz}.npy")
+        y_train = np.load(f"./gpy_model/training/Y_training_data_{spectra}_{box}_{isim}_{iz}.npy")
     if retrain:
-        data_loader(isim, iz, low_halo_threshold=True, negative_power_threshold=False, shot_noise_included=False)
-        x_train = np.load(f"./gpy_model/training/X_training_data_{isim}_{iz}.npy")
-        y_train = np.load(f"./gpy_model/training/Y_training_data_{spectra}_{isim}_{iz}.npy")
+        data_loader(box, isim, iz, low_halo_threshold=True, negative_power_threshold=False, shot_noise_included=False)
+        x_train = np.load(f"./gpy_model/training/X_training_data_{box}_{isim}_{iz}.npy")
+        y_train = np.load(f"./gpy_model/training/Y_training_data_{spectra}_{box}_{isim}_{iz}.npy")
         print(y_train)
-        initial_spectra = np.loadtxt(f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/power_spectra/{"galaxy_galaxy" if spectra=="auto" else "kappa_galaxy"}/{isim}_{iz}_10p8_0p5.txt', 
+        if spectra == 'auto':
+            dir_type = 'galaxy_galaxy'
+        elif spectra == 'cross':
+            dir_type = 'kappa_galaxy'
+        initial_spectra = np.loadtxt(f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/power_spectra/{dir_type}/{box}/{isim}/{iz}/{dir_type}_power_spectrum_10p8_0p5.txt', 
                                     delimiter=' ', skiprows=1, usecols=0)
                                     # delimiter=' ', skiprows=1, usecols=2 if spectra=='auto' else 1)
 
@@ -73,8 +76,8 @@ def emulator(x, spectra, isim, iz,
     
         if save:
             # normalisation_params = np.array((mean_y_train, std_y_train)).reshape(-1, 2)
-            np.savez(f'./gpy_model/normalisation_parameters_{spectra}_{isim}_{iz}.npz', mean=mean_y_train, std=std_y_train)
-            np.save(f'./gpy_model/gpy_model_{spectra}_{isim}_{iz}.npy', model.param_array)
+            np.savez(f'./gpy_model/normalisation_parameters_{spectra}_{box}_{isim}_{iz}.npz', mean=mean_y_train, std=std_y_train)
+            np.save(f'./gpy_model/gpy_model_{spectra}_{box}_{isim}_{iz}.npy', model.param_array)
 
     elif load: 
         model = GPy.models.GPRegression(X=x_train_normalised, Y=y_train_normalised, kernel=kernel, initialize=False)
@@ -82,17 +85,17 @@ def emulator(x, spectra, isim, iz,
         model.initialize_parameter() # Initialize the parameters (connect the parameters up)
         
         if spectra == 'auto':
-            model[:] = np.load(f'./gpy_model/gpy_model_auto_{isim}_{iz}.npy') # Load the parameters
+            model[:] = np.load(f'./gpy_model/gpy_model_auto_{box}_{isim}_{iz}.npy') # Load the parameters
         elif spectra == 'cross':
-            model[:] = np.load(f'./gpy_model/gpy_model_cross_{isim}_{iz}.npy')
-        
+            model[:] = np.load(f'./gpy_model/gpy_model_cross_{box}_{isim}_{iz}.npy')
+
         model.update_model(True) # Call the algebra only once
     
     x_test = np.array(((x[0] - x_train_min[0])/(x_train_max[0] - x_train_min[0]), (x[1] - x_train_min[1])/(x_train_max[1] - x_train_min[1]))).reshape(1,-1)
     model_output = model._raw_predict(x_test)
 
     if load:
-        normalisation_params = np.load(f'./gpy_model/normalisation_parameters_{spectra}_{isim}_{iz}.npz')
+        normalisation_params = np.load(f'./gpy_model/normalisation_parameters_{spectra}_{box}_{isim}_{iz}.npz')
 
         mean = np.asarray(normalisation_params['mean']).reshape(-1)
         std  = np.asarray(normalisation_params['std']).reshape(-1)
@@ -114,10 +117,11 @@ def emulator(x, spectra, isim, iz,
 if __name__ == '__main__':
     import sys
 
-    isim = str(sys.argv[1])
-    iz = str(sys.argv[2])
+    box = str(sys.argv[1])
+    isim = str(sys.argv[2])
+    iz = str(sys.argv[3])
 
-    spectra = str(sys.argv[3])
+    spectra = str(sys.argv[4])
     amp = 10.8
     slope = 0.483
     residual = 0.079
@@ -135,22 +139,22 @@ if __name__ == '__main__':
     elif spectra == 'cross':
         dir_type = 'kappa_galaxy'
 
-    true = np.loadtxt(f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/power_spectra/{dir_type}/{isim}_{iz}_{test_name[0]}_{test_name[1]}.txt', 
+    true = np.loadtxt(f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/power_spectra/{dir_type}/{box}/{isim}/{iz}/{dir_type}_power_spectrum_{test_name[0]}_{test_name[1]}.txt', 
                     # delimiter=' ', skiprows=1, usecols=(0,1) if spectra=='auto' else (0,1))
                     delimiter=' ', skiprows=1, usecols=(0,2) if spectra=='auto' else (0,1))
 
-    true_old = np.loadtxt(f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/power_spectra/{dir_type}/{isim}_{iz}_{test_name_base[0]}_{test_name_base[1]}.txt', 
+    true_old = np.loadtxt(f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/power_spectra/{dir_type}/{box}/{isim}/{iz}/{dir_type}_power_spectrum_{test_name_base[0]}_{test_name_base[1]}.txt', 
                     # delimiter=' ', skiprows=1, usecols=(0,1) if spectra=='auto' else (0,1))
                     delimiter=' ', skiprows=1, usecols=(0,2) if spectra=='auto' else (0,1))
     
     if amp+residual >= 11.3:
         pass
     else:
-        true_plus_1 = np.loadtxt(f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/power_spectra/{dir_type}/{isim}_{iz}_{test_name_plus_1[0]}_{test_name_plus_1[1]}.txt', 
+        true_plus_1 = np.loadtxt(f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/power_spectra/{dir_type}/{box}/{isim}/{iz}/{dir_type}_power_spectrum_{test_name_plus_1[0]}_{test_name_plus_1[1]}.txt', 
                                 # delimiter=' ', skiprows=1, usecols=(0,1) if spectra=='auto' else (0,1))
                                 delimiter=' ', skiprows=1, usecols=(0,2) if spectra=='auto' else (0,1))
 
-    pred = emulator(test, spectra, isim, iz, save=True, retrain=True)#, log=False)
+    pred = emulator(test, spectra, box, isim, iz, save=True, retrain=True)#, log=False)
     print(pred)
     #print(true[:, 1])
     #print(pred - true[:, 1])
@@ -190,13 +194,13 @@ if __name__ == '__main__':
     pb.savefig('./Plots/mock_catalog_emulator_error_test.png', dpi=400)
     pb.clf()
 
-    x_train = np.load(f"./gpy_model/training/X_training_data_{isim}_{iz}.npy")
+    x_train = np.load(f"./gpy_model/training/X_training_data_{box}_{isim}_{iz}.npy")
     # x_train = np.loadtxt('./data_files/mock_catalog_test_points.txt')
     pred_errors = []
     for i in range(x_train.shape[0]): 
         name_i = [f"{float(x_train[i,0]):.1f}".replace('.', 'p'), f"{float(x_train[i,1]):.1f}".replace('.', 'p')]
-        pred_i = emulator(x_train[i,:], spectra, isim, iz)
-        true_i = np.loadtxt(f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/power_spectra/{dir_type}/{isim}_{iz}_{name_i[0]}_{name_i[1]}.txt',
+        pred_i = emulator(x_train[i,:], spectra, box, isim, iz)
+        true_i = np.loadtxt(f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/power_spectra/{dir_type}/{box}/{isim}_{iz}_{name_i[0]}_{name_i[1]}.txt',
                         # delimiter=' ', skiprows=1, usecols=(0,1) if spectra=='auto' else (0,1))
                         delimiter=' ', skiprows=1, usecols=(0,2) if spectra=='auto' else (0,1))
         error_i = (pred_i)/true_i[:,1]
@@ -216,7 +220,7 @@ if __name__ == '__main__':
     pb.hlines(y=1.050, xmin=-1, xmax=np.max(true[:,0])*1.1, color='k', linestyles='dotted', alpha=0.5, label=None)
     pb.plot(true[:,0], mean_pred_errors, label='Mean error w.r.t. simulated clustering')
     pb.fill_between(true[:,0], mean_pred_errors - std_pred_errors, mean_pred_errors + std_pred_errors, color='gray', alpha=0.5, label='1$\sigma$ scatter')
-    pb.title(f'Mean emulator error test over training set ({spectra}, {isim}, {iz})', wrap=True)
+    pb.title(f'Mean emulator error test over training set ({spectra}, {box}, {isim}, {iz})', wrap=True)
     pb.xlabel('$\ell$')
     pb.ylabel('Residual')
     pb.xlim(100, 3000)

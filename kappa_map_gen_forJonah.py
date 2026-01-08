@@ -9,6 +9,7 @@ from astropy.cosmology import FlatLambdaCDM
 from astropy.cosmology import z_at_value
 import astropy.constants as const
 import sys
+from pathlib import Path
 
 def get_num(x):
     return int(x.split('/')[-2].lstrip().split('_')[-1])
@@ -65,15 +66,15 @@ def map_reading_kernel(file_dir, quantity, nside, ibox, nrot, theta, phi, dchi, 
     return map_stacked
 
 
-def kappa_map_gen_forJonah(my_task_input):
+def kappa_map_gen_forJonah(box_id, sim_id):
 
-    #box_id = my_task_input ## loop ober all resolution runs, default here: L1000N1800/
-    box_id = int(1)
+    #box_id = my_task_input[0] ## loop ober all resolution runs, default here: L1000N1800/
+    #box_id = int(1)
 
     #boxsize_id = my_task_input ##loop over all boxsize: 1000 or 2800, default here: 1000 Mpc
-    boxsize_id = int(0)
+    #boxsize_id = int(0)
 
-    sim_id = my_task_input ##loop over all sim_list, feel free to simplify the simplist if you only care about FIDUCIAL and LS8
+    #sim_id = my_task_input[1] ##loop over all sim_list, feel free to simplify the simplist if you only care about FIDUCIAL and LS8
     #sim_id = int(0)
 
     #lc_id = my_task_input ##loop over all lightcones, 2 for 1Gpc, 8 for 2.8 Gpc , default here: lightcone0_shells 
@@ -81,7 +82,10 @@ def kappa_map_gen_forJonah(my_task_input):
 
     base_dir = '/cosma8/data/dp004/flamingo/Runs/'
     box_list = ['L1000N0900', 'L1000N1800', 'L1000N3600', 'L2800N5040']
-    box = box_list[box_id]
+    if isinstance(box_id, int):
+        box = box_list[box_id]
+    elif isinstance(box_id, str):
+        box = box_id
     sim_total = ['HYDRO_FIDUCIAL', 'HYDRO_ADIABATIC', 'HYDRO_JETS_published', 'HYDRO_LOW_SIGMA8', 'HYDRO_STRONG_AGN', 'HYDRO_STRONGEST_AGN', 'HYDRO_STRONG_SUPERNOVA', 'HYDRO_WEAK_AGN', 'HYDRO_PLANCK', 'HYDRO_LOW_SIGMA8_STRONGEST_AGN', 'HYDRO_STRONG_JETS_published']
     if isinstance(sim_id, int):
         sim_list = sim_total[sim_id]
@@ -90,6 +94,10 @@ def kappa_map_gen_forJonah(my_task_input):
     parent_dir = f'{base_dir}{box}/{sim_list}/neutrino_corrected_maps_downsampled_4096/lightcone{str(lc_id)}_shells/'
     nside = 4096
     boxsize_list= [1000*u.Mpc, 2800*u.Mpc]
+    if box == 'L1000N0900' or box == 'L1000N1800' or box == 'L1000N3600':
+        boxsize_id = int(0)
+    elif box == 'L2800N5040':
+        boxsize_id = int(1)
     boxsize = boxsize_list[boxsize_id]
     zcmb = 1100
     cosmo_info_file = f'{base_dir}{box}/{sim_list}/snapshots/flamingo_0009/flamingo_0009.0.hdf5'
@@ -145,20 +153,25 @@ def kappa_map_gen_forJonah(my_task_input):
     print(theta_rot)
     print(phi_rot)
 
+    path = Path(f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/kappa_maps/{box}/{sim_list}/')
+    path.mkdir(parents=True, exist_ok=True)
+
     kappa_stacked = map_reading_kernel(lightcone_files, 'TotalMass', nside, box_index, 
                                        rot_times, theta_rot, phi_rot, 
                                        dchi, z_mid, chi_mid, chi_CMB, 
                                        [cosmo.Om0, cosmo.H0], matter_mean, rotate=False) ##change rotate to True if you want box rotation
     try:
-        kappa_map_write = healpy.write_map(f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/kappa_maps/{box}_{sim_list}_kappa_nonrot.fits', kappa_stacked, overwrite=True) ##feel free to add your own directory
+        kappa_map_write = healpy.write_map(f'{path}/kappa_nonrot.fits', kappa_stacked, overwrite=True) ##feel free to add your own directory
     except FileNotFoundError:
-        kappa_map_write = healpy.write_map(f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/kappa_maps/{box}_{sim_list}_kappa_nonrot.fits', kappa_stacked) ##feel free to add your own directory
+        kappa_map_write = healpy.write_map(f'{path}/kappa_nonrot.fits', kappa_stacked) ##feel free to add your own directory
     # del kappa_stacked
     return kappa_stacked
 
 if __name__ == "__main__":
 
-    my_task_input = int(sys.argv[1])
-    num_tasks_input = int(sys.argv[2])
-    
-    kappa_map_gen_forJonah(my_task_input)
+    #my_task_input = int(sys.argv[1])
+    #num_tasks_input = int(sys.argv[2])
+    box = str(sys.argv[1])
+    isim = str(sys.argv[2])
+
+    kappa_map_gen_forJonah(box, isim)

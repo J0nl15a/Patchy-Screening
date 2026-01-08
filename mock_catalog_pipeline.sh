@@ -5,10 +5,19 @@ BOX="${1:?usage: $0 BOX ISIM IZ}"
 ISIM="${2:?usage: $0 BOX ISIM IZ}"
 IZ="${3:?usage: $0 BOX ISIM IZ}"
 
-rm ./batch_files/pipeline_logs/job.${BOX}_${ISIM}_${IZ}_*.dump || true
-rm ./batch_files/pipeline_logs/job.${BOX}_${ISIM}_${IZ}_*.err || true
-rm ./batch_files/maximum_likelihood_logs/job.*${BOX}_${ISIM}_${IZ}_*.dump || true
-rm ./batch_files/maximum_likelihood_logs/job.*${BOX}_${ISIM}_${IZ}_*.err || true
+if [ -d "./batch_files/pipeline_logs/${BOX}/${ISIM}/${IZ}" ] && \
+   [ -d "./batch_files/maximum_likelihood_logs/${BOX}/${ISIM}/${IZ}" ]; then
+    echo "Directory exists."
+else
+    echo "Directory does not exist."
+    mkdir -p "./batch_files/pipeline_logs/${BOX}/${ISIM}/${IZ}"
+    mkdir -p "./batch_files/maximum_likelihood_logs/${BOX}/${ISIM}/${IZ}"
+fi
+
+rm ./batch_files/pipeline_logs/${BOX}/${ISIM}/${IZ}/job.*.dump || true
+rm ./batch_files/pipeline_logs/${BOX}/${ISIM}/${IZ}/job.*.err || true
+rm ./batch_files/maximum_likelihood_logs/${BOX}/${ISIM}/${IZ}/job.*.dump || true
+rm ./batch_files/maximum_likelihood_logs/${BOX}/${ISIM}/${IZ}/job.*.err || true
 
 ARR_ID=$(sbatch --parsable \
                 --array=0-120%30 \
@@ -17,8 +26,8 @@ ARR_ID=$(sbatch --parsable \
                 -p cosma8 \
                 -A dp004 \
                 -t 12:00:00 \
-                -o ./batch_files/pipeline_logs/job.${BOX}_${ISIM}_${IZ}_%j.dump \
-                -e ./batch_files/pipeline_logs/job.${BOX}_${ISIM}_${IZ}_%j.err \
+                -o ./batch_files/pipeline_logs/${BOX}/${ISIM}/${IZ}/job.%j.dump \
+                -e ./batch_files/pipeline_logs/${BOX}/${ISIM}/${IZ}/job.%j.err \
                 <<EOF
 #!/usr/bin/env bash
 #SBATCH --mail-type=ALL
@@ -135,8 +144,8 @@ jid6=$(sbatch --parsable \
               -p cosma8 \
               -A dp004 \
               -t 00:30:00 \
-              -o ./batch_files/maximum_likelihood_logs/job.${BOX}_${ISIM}_${IZ}_%j.dump \
-              -e ./batch_files/maximum_likelihood_logs/job.${BOX}_${ISIM}_${IZ}_%j.err \
+              -o ./batch_files/maximum_likelihood_logs/${BOX}/${ISIM}/${IZ}/job.%j.dump \
+              -e ./batch_files/maximum_likelihood_logs/${BOX}/${ISIM}/${IZ}/job.%j.err \
               <<EOF
 #!/usr/bin/env bash
 #SBATCH --mail-type=ALL
@@ -172,7 +181,7 @@ EOF
 echo "Job 6: Computing the maximum likelihood estimates for the M_cut and n_cut values of the mock catalogs for box ${BOX}, sim ${ISIM}, ${IZ} sample."
 
 # variables you already know in this script
-MLE_FILE="./data_files/${BOX}/${ISIM}/${IZ}/mle_values.txt"
+MLE_FILE="./data_files/mle_parameters/${BOX}/${ISIM}/${IZ}/mle_values.txt"
 
 # 7) Launch step 7 after job‐ID=$jid6 succeeds
 jid7=$(sbatch --parsable \
@@ -183,8 +192,8 @@ jid7=$(sbatch --parsable \
               -p cosma8 \
               -A dp004 \
               -t 01:30:00 \
-              -o ./batch_files/pipeline_logs/job.mle_${BOX}_${ISIM}_${IZ}_%j.dump \
-              -e ./batch_files/pipeline_logs/job.mle_${BOX}_${ISIM}_${IZ}_%j.err \
+              -o ./batch_files/pipeline_logs/${BOX}/${ISIM}/${IZ}/job.mle_%j.dump \
+              -e ./batch_files/pipeline_logs/${BOX}/${ISIM}/${IZ}/job.mle_%j.err \
               <<EOF
 #!/usr/bin/env bash
 #SBATCH --mail-type=ALL

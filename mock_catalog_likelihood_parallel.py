@@ -172,7 +172,7 @@ if __name__ == '__main__':
     print(f"[INFO] Log-Likelihood at MLE: {log_likelihood_mle}")
 
     # write to text file in a known place
-    path = f"./data_files/{box}/{isim}/{iz}/mle_values.txt"
+    path = f"./data_files/mle_parameters/{box}/{isim}/{iz}/mle_values.txt"
     outfile = Path(path)
     outfile.parent.mkdir(parents=True, exist_ok=True)
 

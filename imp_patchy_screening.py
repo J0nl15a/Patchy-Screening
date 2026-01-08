@@ -16,11 +16,21 @@ rank = comm.Get_rank()
 size = comm.Get_size()'''
 
 class patchyScreening:
-    def __init__(self, isim, iz, im, n_cut, ncpu, theta_d=np.arange(0.5, 11, 0.5), nside=8192, cmb_method='FITS', fits_file='unlensed', lightcone_method=('FULL','dndz'), signal=True, rotate=False, rect_size=20):
+    def __init__(self, box, isim, iz, im, n_cut, ncpu, theta_d=np.arange(0.5, 11, 0.5), nside=8192, cmb_method='FITS', fits_file='unlensed', lightcone_method=('FULL','dndz'), signal=True, rotate=False, rect_size=20):
 
         os.environ["POLARS_MAX_THREADS"] = str(ncpu)
         self.job_start_time = time.time()
+        box_list = ['L1000N1800', 'L2800N5040']
         sim_list = ['HYDRO_FIDUCIAL','HYDRO_PLANCK','HYDRO_PLANCK_LARGE_NU_FIXED','HYDRO_PLANCK_LARGE_NU_VARY','HYDRO_STRONG_AGN','HYDRO_WEAK_AGN','HYDRO_LOW_SIGMA8','HYDRO_STRONGER_AGN','HYDRO_JETS_published','HYDRO_STRONGEST_AGN','HYDRO_STRONG_SUPERNOVA','HYDRO_STRONGER_AGN_STRONG_SUPERNOVA','HYDRO_STRONG_JETS_published']
+
+        try:
+            box = int(box)
+            self.boxname = box_list[box]
+        except (ValueError, IndexError):
+            self.boxname = str(box)
+
+        if self.boxname not in box_list:
+            raise ValueError(f"‘{self.boxname}’ is not a valid box name; choose one of:\n  {box_list!r}")
 
         try:
             isim = int(isim)
@@ -41,7 +51,7 @@ class patchyScreening:
             self.z_sample_name = iz
             
         self.im = 10**np.array(float(im))
-        if round(self.im, 1) == self.im:
+        if round(im, 1) == im:
             self.im_name = f"{float(im):.1f}".replace('.', 'p')
         else:
             self.im_name = f"{float(im):.3f}".replace('.', 'p')
@@ -86,7 +96,7 @@ class patchyScreening:
             #self.mock_CMB_primary = hp.synfast(unlensed_scalar_CL[:,1], nside=self.nside)
             
         elif self.cmb_method == 'FITS':
-            lensed_dir = '/cosma8/data/dp004/dc-yang3/maps/L1000N1800/HYDRO_FIDUCIAL/lightcone0_shells/patchy_screening_folder'
+            lensed_dir = f'/cosma8/data/dp004/dc-yang3/maps/{self.boxname}/{self.simname}/lightcone0_shells/patchy_screening_folder'
             if self.fits_file == 'unlensed':
                 self.mock_CMB_primary = hp.read_map(f'{lensed_dir}/CMB_T_map_unl.fits', dtype=np.float64, verbose=False)
             elif self.fits_file == 'lensed_z2':
@@ -97,9 +107,9 @@ class patchyScreening:
             raise ValueError("Unknown CMB map generation method")
         print(self.mock_CMB_primary)
         if plot == True:
-            hp.mollview(self.mock_CMB_primary, title=f"Mock Primary CMB temperature map (sim={self.simname})", cmap="jet")#, min=-1.5e-4, max=1.5e-4)
+            hp.mollview(self.mock_CMB_primary, title=f"Mock Primary CMB temperature map (box={self.boxname}, sim={self.simname})", cmap="jet")#, min=-1.5e-4, max=1.5e-4)
             hp.graticule()
-            plt.savefig(f'./Plots/primary_CMB_map_{self.simname}.png', dpi=400)
+            plt.savefig(f'./Plots/primary_CMB_map_{self.boxname}_{self.simname}.png', dpi=400)
             plt.clf()
         print(f'Generating mock primary CMB: {time.time() - self.job_start_time}s')
 
@@ -110,7 +120,7 @@ class patchyScreening:
                 
         # Loading tau map from FLAMINGO lightcone shells
         if self.lightcone_method[0] == 'SHELL':
-            map_lightcone = f'/cosma8/data/dp004/flamingo/Runs/L1000N1800/{self.simname}/neutrino_corrected_maps/lightcone0_shells/shell_{self.z_sample}/lightcone0.shell_{self.z_sample}.0.hdf5'
+            map_lightcone = f'/cosma8/data/dp004/flamingo/Runs/{self.boxname}/{self.simname}/neutrino_corrected_maps/lightcone0_shells/shell_{self.z_sample}/lightcone0.shell_{self.z_sample}.0.hdf5'
             g = h5py.File(map_lightcone,'r')
             conversion_factor = g['DM'].attrs['Conversion factor to CGS (not including cosmological corrections)']
             DM = g['DM'][...]*conversion_factor*6.6524587321e-25 #6.65246e-25 = Thomson cross-section (in cgs)
@@ -122,19 +132,19 @@ class patchyScreening:
             print(f'Loading first lightcone shell: {time.time() - self.job_start_time}s')
 
             if plot == True:
-                hp.mollview(DM, title=f"DM map (sim={self.simname}, lightcone shell={self.z_sample})", cmap="jet", min=2e-5, max=2e-3)
+                hp.mollview(DM, title=f"DM map (box={self.boxname}, sim={self.simname}, lightcone shell={self.z_sample})", cmap="jet", min=2e-5, max=2e-3)
                 hp.graticule()
-                plt.savefig(f'./Plots/DM_map_{self.simname}_{self.z_sample_name}_shell_{self.z_sample}.png', dpi=400)
+                plt.savefig(f'./Plots/DM_map_{self.boxname}_{self.simname}_{self.z_sample_name}_shell_{self.z_sample}.png', dpi=400)
                 plt.clf()
 
-            map_lightcone_lower = f'/cosma8/data/dp004/flamingo/Runs/L1000N1800/{self.simname}/neutrino_corrected_maps/lightcone0_shells/shell_{self.z_sample-1}/lightcone0.shell_{self.z_sample-1}.0.hdf5'
+            map_lightcone_lower = f'/cosma8/data/dp004/flamingo/Runs/{self.boxname}/{self.simname}/neutrino_corrected_maps/lightcone0_shells/shell_{self.z_sample-1}/lightcone0.shell_{self.z_sample-1}.0.hdf5'
             g_low = h5py.File(map_lightcone_lower,'r')
             conversion_factor = g_low['DM'].attrs['Conversion factor to CGS (not including cosmological corrections)']
             DM += g_low['DM'][...]*conversion_factor*6.6524587321e-25
             redshift_low = g_low['DM'].attrs['Central redshift assumed for correction']
             DM *= (1+redshift_low)
 
-            map_lightcone_higher = f'/cosma8/data/dp004/flamingo/Runs/L1000N1800/{self.simname}/neutrino_corrected_maps/lightcone0_shells/shell_{self.z_sample+1}/lightcone0.shell_{self.z_sample+1}.0.hdf5'
+            map_lightcone_higher = f'/cosma8/data/dp004/flamingo/Runs/{self.boxname}/{self.simname}/neutrino_corrected_maps/lightcone0_shells/shell_{self.z_sample+1}/lightcone0.shell_{self.z_sample+1}.0.hdf5'
             g_high = h5py.File(map_lightcone_higher,'r')
             conversion_factor = g_high['DM'].attrs['Conversion factor to CGS (not including cosmological corrections)']
             DM += g_high['DM'][...]*conversion_factor*6.6524587321e-25
@@ -146,7 +156,11 @@ class patchyScreening:
             g_high.close()
 
         elif self.lightcone_method[0] == 'FULL':
-            DM = hp.read_map(f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/DM_maps/stacked_DM_map_z3p0.fits', dtype=np.float64, verbose=False)
+            try:
+                DM = hp.read_map(f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/DM_maps/{self.boxname}/{self.simname}/stacked_DM_map_z3p0.fits', dtype=np.float64, verbose=False)
+            except FileNotFoundError:
+                from stacked_DM_maps import stack_DM_maps_z3
+                DM = stack_DM_maps_z3(self.boxname, self.simname)
             DM_2 = hp.pixelfunc.ud_grade(DM,self.nside)
             alm = hp.map2alm(DM_2)
             #DM_2 = hp.alm2map(alm, nside=self.nside, lmax=5024)
@@ -162,13 +176,13 @@ class patchyScreening:
 
         if plot == True:
             if self.lightcone_method[0] == 'SHELL':
-                hp.mollview(self.DM_map, title=f"DM map (sim={self.simname}, lightcone shell={self.z_sample-1}+{self.z_sample}+{self.z_sample+1})", cmap="jet")#, min=2e-5, max=2e-3)
+                hp.mollview(self.DM_map, title=f"DM map (box={self.boxname}, sim={self.simname}, lightcone shell={self.z_sample-1}+{self.z_sample}+{self.z_sample+1})", cmap="jet")#, min=2e-5, max=2e-3)
                 hp.graticule()
-                plt.savefig(f'./Plots/DM_map_{self.simname}_{self.z_sample_name}_shell_{self.z_sample-1}-{self.z_sample+1}.png', dpi=400)
+                plt.savefig(f'./Plots/DM_map_{self.boxname}_{self.simname}_{self.z_sample_name}_shell_{self.z_sample-1}-{self.z_sample+1}.png', dpi=400)
             elif self.lightcone_method[0] == 'FULL':
-                hp.mollview(self.DM_map, title=f"Stacked DM map, integrated up to z=3 (sim={self.simname})", cmap="jet")#, min=2e-5, max=2e-3)
+                hp.mollview(self.DM_map, title=f"Stacked DM map, integrated up to z=3 (box={self.boxname}, sim={self.simname})", cmap="jet")#, min=2e-5, max=2e-3)
                 hp.graticule()
-                plt.savefig(f'./Plots/DM_map_{self.simname}_stacked_z3p0.png', dpi=400)
+                plt.savefig(f'./Plots/DM_map_{self.boxname}_{self.simname}_stacked_z3p0.png', dpi=400)
             plt.clf()
         print(f'Loading relevant lightcone shells: {time.time() - self.job_start_time}s')
 
@@ -179,7 +193,7 @@ class patchyScreening:
         
         # Load halo lightcone and SOAP data into DataFrames
         if lightcone_type == 'HBT':
-            halo_lightcone = f'/cosma8/data/dp004/flamingo/Runs/L1000N1800/{self.simname}/hbt_lightcone_halos/lightcone0/lightcone_halos_{77-self.z_sample:04d}.hdf5'
+            halo_lightcone = f'/cosma8/data/dp004/flamingo/Runs/{self.boxname}/{self.simname}/hbt_lightcone_halos/lightcone0/lightcone_halos_{77-self.z_sample:04d}.hdf5'
             f = h5py.File(halo_lightcone, 'r')
             halo_lc_data = pl.DataFrame({
                 'ID':          f['InputHalos/HaloCatalogueIndex'][...],
@@ -208,7 +222,7 @@ class patchyScreening:
         print(f'D_com = {self.Dcom}, Snap number = {snap}')
 
         if lightcone_type == 'HBT':
-            HBT_file = f'/cosma8/data/dp004/flamingo/Runs/L1000N1800/{self.simname}/SOAP-HBT/halo_properties_{snap:04d}.hdf5'
+            HBT_file = f'/cosma8/data/dp004/flamingo/Runs/{self.boxname}/{self.simname}/SOAP-HBT/halo_properties_{snap:04d}.hdf5'
             f = h5py.File(HBT_file, 'r')
             df_HBT = pl.DataFrame({
                 'ID':          f['InputHalos/HaloCatalogueIndex'][...],
@@ -221,7 +235,7 @@ class patchyScreening:
 
             return halo_lc_data, df_HBT
         elif lightcone_type == 'VR':
-            VR_file = f'/cosma8/data/dp004/flamingo/Runs/L1000N1800/{self.simname}/SOAP/halo_properties_{snap:04d}.hdf5'
+            VR_file = f'/cosma8/data/dp004/flamingo/Runs/{self.boxname}/{self.simname}/SOAP/halo_properties_{snap:04d}.hdf5'
             f = h5py.File(HBT_file, 'r')
             df_VR = pd.DataFrame()
             df_VR['ID'] = f['VR/ID'][...]
@@ -248,7 +262,7 @@ class patchyScreening:
                 self.merge = np.nan
         elif self.lightcone_method[1] == 'dndz':
             self.merge = pl.read_parquet(
-                f"/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/mock_halo_catalogs/sampled_halo_data_{self.simname}_{self.z_sample_name}_{self.im_name}_{self.slope_name}.parquet"
+                f"/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/mock_halo_catalogs/{self.boxname}/{self.simname}/{self.z_sample_name}/sampled_halo_data_{self.im_name}_{self.slope_name}.parquet"
             )
             mean_z = {'Blue':0.6, 'Green':1.1, 'Red':1.5} 
             Dcom = self.cosmology.comoving_distance(mean_z[self.z_sample_name])*0.681  # comoving distance to galaxy in Mpc/h
@@ -301,13 +315,13 @@ class patchyScreening:
         self.large_scale_map = hp.alm2map(lowpass_alm, nside=self.nside, lmax=3*self.nside-1)
         self.small_scale_map = hp.alm2map(highpass_alm, nside=self.nside, lmax=3*self.nside-1)
         if plot == True:
-            hp.mollview(self.large_scale_map.copy(), title=f"Large scale CMB temperature map (sim={self.simname})", cmap="jet")#, min=-1.5e-4, max=1.5e-4)
+            hp.mollview(self.large_scale_map.copy(), title=f"Large scale CMB temperature map (box={self.boxname}, sim={self.simname})", cmap="jet")#, min=-1.5e-4, max=1.5e-4)
             hp.graticule()
-            plt.savefig(f'./Plots/T_ps_map_large_scale_{self.simname}_{self.z_sample_name}_{self.im_name}_{self.slope_name}.png', dpi=400)
+            plt.savefig(f'./Plots/T_ps_map_large_scale_{self.boxname}_{self.simname}_{self.z_sample_name}_{self.im_name}_{self.slope_name}.png', dpi=400)
             plt.clf()
-            hp.mollview(self.small_scale_map.copy(), title=f"Small scale CMB temperature map (sim={self.simname})", cmap="jet")#, min=-1e-6, max=1e-6)
+            hp.mollview(self.small_scale_map.copy(), title=f"Small scale CMB temperature map (box={self.boxname}, sim={self.simname})", cmap="jet")#, min=-1e-6, max=1e-6)
             hp.graticule()
-            plt.savefig(f'./Plots/T_ps_map_small_scale_{self.simname}_{self.z_sample_name}_{self.im_name}_{self.slope_name}.png', dpi=400)
+            plt.savefig(f'./Plots/T_ps_map_small_scale_{self.boxname}_{self.simname}_{self.z_sample_name}_{self.im_name}_{self.slope_name}.png', dpi=400)
             plt.clf()
         self.mean_mod_T_large_scale = np.mean(np.abs(self.large_scale_map.copy()))
         print(self.mean_mod_T_large_scale)
@@ -355,7 +369,7 @@ class patchyScreening:
             plt.xlabel('X (arcmin)')
             plt.ylabel('Y (arcmin)')
             plt.title(f'Rectangular Cutout Around Halo = {i}', wrap=True)
-            plt.savefig(f'./Plots/random_cutout_T_ps_map_{self.simname}_{self.z_sample_name}.png', dpi=400)
+            plt.savefig(f'./Plots/random_cutout_T_ps_map_{self.boxname}_{self.simname}_{self.z_sample_name}.png', dpi=400)
             plt.clf()
             plt.close('all')
             grid_values_tau = np.histogram2d(theta_pix.copy()*60.0, phi_pix.copy()*60.0, bins=[grid_x, grid_y], weights=tau_2D)
@@ -365,7 +379,7 @@ class patchyScreening:
             plt.xlabel('X (arcmin)')
             plt.ylabel('Y (arcmin)')
             plt.title(f'Rectangular Cutout Around Halo = {i} w/ Patchy Screening', wrap=True)
-            plt.savefig(f'./Plots/random_cutout_T_filtered_map_{self.simname}_{self.z_sample_name}.png', dpi=400)
+            plt.savefig(f'./Plots/random_cutout_T_filtered_map_{self.boxname}_{self.simname}_{self.z_sample_name}.png', dpi=400)
             plt.clf()
             plt.close('all')
         tau_1D = np.zeros(len(self.theta_d))
@@ -427,7 +441,7 @@ class patchyScreening:
         fits_suffix = "" if self.cmb_method=='CAMB' else f"_{self.fits_file}"
         signal_suffix = "" if self.signal==True else "_no_ps"
         noise_suffix = "" if self.rotate==False else "_noise"
-        outfile = os.path.join('./L1000N1800', self.z_sample_name, f'{self.simname}_tau_Mstar_bin{self.im_name}_{self.slope_name}_nside{self.nside}_{self.cmb_method}{fits_suffix}{signal_suffix}{noise_suffix}_ell_limited.pickle')
+        outfile = os.path.join(f'./{self.boxname}', self.z_sample_name, f'{self.simname}_tau_Mstar_bin{self.im_name}_{self.slope_name}_nside{self.nside}_{self.cmb_method}{fits_suffix}{signal_suffix}{noise_suffix}_ell_limited.pickle')
         os.makedirs(os.path.dirname(outfile), exist_ok=True)
         with open(outfile, 'wb') as f:
             pickle.dump(data, f)
@@ -535,7 +549,7 @@ class patchyScreening:
         if plot == True:
             hp.mollview(self.T_cmb_ps, title="CMB temperature map w/ Patchy Screening", cmap="jet")#, min=-1.5e-4, max=1.5e-4)
             hp.graticule()
-            plt.savefig(f'./Plots/T_ps_map_{self.simname}_{self.z_sample_name}.png', dpi=400)
+            plt.savefig(f'./Plots/T_ps_map_{self.boxname}_{self.simname}_{self.z_sample_name}.png', dpi=400)
             plt.clf()
         print(f'Generating patchy screening map: {time.time() - self.job_start_time}s')
 
@@ -544,14 +558,15 @@ class patchyScreening:
 if __name__ == '__main__':
 
     ncpu = sys.argv[1]
-    isim = sys.argv[2]
-    iz = sys.argv[3]
-    im = sys.argv[4]
-    slope = sys.argv[5]
-    fits = sys.argv[6]
-    sig = sys.argv[7]
+    box = sys.argv[2]
+    isim = sys.argv[3]
+    iz = sys.argv[4]
+    im = sys.argv[5]
+    slope = sys.argv[6]
+    fits = sys.argv[7]
+    sig = sys.argv[8]
 
-    ps = patchyScreening(isim, iz, im, slope, ncpu, fits_file=fits, signal=sig)#, cmb_method='CAMB')#, lightcone_method=('SHELL','shell'))#, cmb_method='CAMB')
+    ps = patchyScreening(box, isim, iz, im, slope, ncpu, fits_file=fits, signal=sig)#, cmb_method='CAMB')#, lightcone_method=('SHELL','shell'))#, cmb_method='CAMB')
     ps.run_analysis(plot=False)
     quit()
     #ps.get_halo_coordinates()
@@ -563,7 +578,7 @@ if __name__ == '__main__':
     ell = np.arange(len(unlensed_total_CL))
     ell_2 = np.arange(len(unlensed_total_CL_2))
 
-    ps_fits = patchyScreening(isim, iz, im, slope, ncpu, fits_file=fits, signal=sig)
+    ps_fits = patchyScreening(box, isim, iz, im, slope, ncpu, fits_file=fits, signal=sig)
     ps_fits.get_patchy_screening_map(plot=True)
 
     unlensed_total_CL_fits = hp.anafast(ps_fits.T_cmb_ps)

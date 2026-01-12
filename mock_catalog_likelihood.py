@@ -19,14 +19,14 @@ import importlib.util
 # spec.loader.exec_module(module)
 
 
-def log_likelihood(theta, f_obs, f_obs_err, box, isim, iz):
+def log_likelihood(theta, f_obs, f_obs_err, box, isim, iz, lightcone=0):
     amp, slope = theta
     # print(theta)
     # print(amp, slope)
     x = np.array((amp, slope))
     # print(x)
-    f_sim_auto = emulator(x, 'auto', box, isim, iz, load=True) #module.emulator(x, 'auto', box, isim, iz, load=True)
-    f_sim_cross = emulator(x, 'cross', box, isim, iz, load=True) #module.emulator(x, 'cross', box, isim, iz, load=True)
+    f_sim_auto = emulator(x, 'auto', box, isim, iz, load=True, lightcone=lightcone) #module.emulator(x, 'auto', box, isim, iz, load=True)
+    f_sim_cross = emulator(x, 'cross', box, isim, iz, load=True, lightcone=lightcone) #module.emulator(x, 'cross', box, isim, iz, load=True)
     # print(f'f_sim_auto = {f_sim_auto}, f_sim_cross = {f_sim_cross}')
     # print(f"f_obs['auto'] = {f_obs['auto']}, f_obs['cross'] = {f_obs['cross']}")
     # print(f"f_sim_auto/f_obs['auto'] = {f_sim_auto/f_obs['auto']}, f_sim_cross/f_obs['cross'] = {f_sim_cross/f_obs['cross']}")
@@ -47,18 +47,18 @@ def log_prior(theta, plateau_point, c, vertical_limit):
     else:
         return -np.inf
 
-def log_probability(theta, f_obs, f_obs_err, box, isim, iz, plateau_point, m, c):
-    lp = log_prior(theta, plateau_point, m, c)
+def log_probability(theta, f_obs, f_obs_err, box, isim, iz, plateau_point, c, vertical_limit, lightcone=0):
+    lp = log_prior(theta, plateau_point, c, vertical_limit)
     if not np.isfinite(lp):
         return -np.inf
-    return lp + log_likelihood(theta, f_obs, f_obs_err, box, isim, iz)
+    return lp + log_likelihood(theta, f_obs, f_obs_err, box, isim, iz, lightcone=lightcone)
 
-def multiprocess(f_obs, f_obs_err, box, isim, iz, plateau_point, m, c): #, backend):
+def multiprocess(f_obs, f_obs_err, box, isim, iz, plateau_point, c, vertical_limit, lightcone=0): #, backend):
 
     with multiprocessing.get_context("spawn").Pool() as pool:
         start = time.time()
         sampler = emcee.EnsembleSampler(
-            nwalkers, ndim, log_probability, args=(f_obs, f_obs_err, box, isim, iz, plateau_point, m, c), pool=pool #, backend=backend
+            nwalkers, ndim, log_probability, args=(f_obs, f_obs_err, box, isim, iz, plateau_point, c, vertical_limit, lightcone), pool=pool #, backend=backend
         )
         sampler.run_mcmc(pos, steps, progress=True)
         end = time.time()
@@ -73,12 +73,13 @@ if __name__ == '__main__':
     box = sys.argv[2]
     isim = sys.argv[3]
     iz = sys.argv[4]
+    lightcone = sys.argv[5]
 
     farren_data = np.loadtxt(f'./unWISExLens_lklh/data/v1.0/bandpowers/unWISExACT-DR6_{str(iz).lower()}_baseline_Clgg+Clkk+Clkg.dat', usecols=(0,1,3)).reshape(-1,3)
     obs_data_covariance = np.loadtxt(f'./unWISExLens_lklh/data/v1.0/covariances/covmat_Clgg+Clkg_unWISExACT-DR6_{str(iz).lower()}_baseline.dat')
     ell_200_mask = np.where(farren_data[:,0] > 200)
 
-    prior_limits = np.load(f'./gpy_model/training/prior_limits_{box}_{isim}_{iz}.npy')
+    prior_limits = np.load(f'./gpy_model/{box}/{isim}/{iz}/lightcone{lightcone}/training/prior_limits.npy')
     plateau_point = prior_limits[0]
     # m = prior_limits[1]
     c = prior_limits[1]
@@ -127,14 +128,14 @@ if __name__ == '__main__':
     prec = 4  # <-- change this to the number of decimals you want
     fmt  = f"%.{prec}f"
 
-    f_sim_auto = emulator(np.array((10.65, 0.45)), 'auto', box, isim, iz, save=True, retrain=True) #module.emulator(x, 'auto', isim, iz, load=True)
-    f_sim_cross = emulator(np.array((10.65, 0.45)), 'cross', box, isim, iz, save=True, retrain=True) #module.emulator(x, 'cross', isim, iz, load=True)
+    f_sim_auto = emulator(np.array((10.65, 0.45)), 'auto', box, isim, iz, save=True, retrain=True, lightcone=lightcone) #module.emulator(x, 'auto', isim, iz, load=True)
+    f_sim_cross = emulator(np.array((10.65, 0.45)), 'cross', box, isim, iz, save=True, retrain=True, lightcone=lightcone) #module.emulator(x, 'cross', isim, iz, load=True)
 
     # filename = f"./data_files/mcmc_chains/chain_walkers{nwalkers}_steps{steps}.h5"
     # backend = emcee.backends.HDFBackend(filename)
     # backend.reset(nwalkers, ndim)
 
-    sampler = multiprocess(f_obs, f_obs_err, box, isim, iz, plateau_point, c, vertical_limit)#, backend)
+    sampler = multiprocess(f_obs, f_obs_err, box, isim, iz, plateau_point, c, vertical_limit, lightcone=lightcone) #, backend)
 
     tau = sampler.get_autocorr_time()
     print(tau)
@@ -181,7 +182,7 @@ if __name__ == '__main__':
     err_slope_upper = mle_err_upper[1]
     print(f"[INFO] MLE AMP: {mle_amp}, MLE SLOPE: {mle_slope}")
 
-    log_likelihood_mle = log_likelihood((mle_amp, mle_slope), f_obs, f_obs_err, box, isim, iz)
+    log_likelihood_mle = log_likelihood((mle_amp, mle_slope), f_obs, f_obs_err, box, isim, iz, lightcone=lightcone)
     print(f"[INFO] Log-Likelihood at MLE: {log_likelihood_mle}")
 
     # # write to text file in a known place
@@ -198,8 +199,8 @@ if __name__ == '__main__':
     # print(f"[INFO] Wrote MLEs to {outfile}")
 
     x = np.array((mle_amp, mle_slope))
-    f_sim_auto = emulator(x, 'auto', box, isim, iz, load=True) 
-    f_sim_cross = emulator(x, 'cross', box, isim, iz, load=True) 
+    f_sim_auto = emulator(x, 'auto', box, isim, iz, load=True, lightcone=lightcone) 
+    f_sim_cross = emulator(x, 'cross', box, isim, iz, load=True, lightcone=lightcone) 
     chi_sq_auto = np.sum(((f_obs['auto'] - f_sim_auto)**2)/f_obs_err['auto'])
     chi_sq_cross = np.sum(((f_obs['cross'] - f_sim_cross)**2)/f_obs_err['cross'])
     print(f"Auto chi^2 = {chi_sq_auto}")

@@ -70,6 +70,10 @@ def emulator(x, spectra, box, isim, iz,
 
     kernel = GPy.kern.RBF(x_train_normalised.shape[1], ARD=True)
 
+    path = f'./gpy_model/{box}/{isim}/{iz}/lightcone{lightcone}/'
+    normalisation_path = Path(path+f'normalisation_parameters_{spectra}.npz')
+    model_path = Path(path+f'gpy_model_{spectra}.npy')
+
     if not load:
 
         model = GPy.models.GPRegression(X=x_train_normalised, Y=y_train_normalised, kernel=kernel) 
@@ -77,24 +81,25 @@ def emulator(x, spectra, box, isim, iz,
     
         if save:
             # normalisation_params = np.array((mean_y_train, std_y_train)).reshape(-1, 2)
-            path = Path(f'./gpy_model/{box}/{isim}/{iz}/lightcone{lightcone}/')
-            path.mkdir(parents=True, exist_ok=True)
-            np.savez(path+f'normalisation_parameters_{spectra}.npz', mean=mean_y_train, std=std_y_train)
-            np.save(path+f'gpy_model_{spectra}.npy', model.param_array)
+            normalisation_path.parent.mkdir(parents=True, exist_ok=True)
+            model_path.parent.mkdir(parents=True, exist_ok=True)
+
+            np.savez(normalisation_path, mean=mean_y_train, std=std_y_train)
+            np.save(model_path, model.param_array)
 
     elif load: 
         model = GPy.models.GPRegression(X=x_train_normalised, Y=y_train_normalised, kernel=kernel, initialize=False)
         model.update_model(False) # do not call the underlying expensive algebra on load
         model.initialize_parameter() # Initialize the parameters (connect the parameters up)
         
-        model[:] = np.load(path+f'gpy_model_{spectra}.npy') # Load the parameters
+        model[:] = np.load(model_path) # Load the parameters
         model.update_model(True) # Call the algebra only once
     
     x_test = np.array(((x[0] - x_train_min[0])/(x_train_max[0] - x_train_min[0]), (x[1] - x_train_min[1])/(x_train_max[1] - x_train_min[1]))).reshape(1,-1)
     model_output = model._raw_predict(x_test)
 
     if load:
-        normalisation_params = np.load(path+f'normalisation_parameters_{spectra}.npz')
+        normalisation_params = np.load(normalisation_path)
 
         mean = np.asarray(normalisation_params['mean']).reshape(-1)
         std  = np.asarray(normalisation_params['std']).reshape(-1)

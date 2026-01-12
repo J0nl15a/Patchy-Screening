@@ -136,13 +136,21 @@ def data_loader(box, isim, iz, low_halo_threshold=True, negative_power_threshold
     #     negative_power_y.append(np.max(subset[:, 1]))
 
 
-    path = Path(f'./gpy_model/{box}/{isim}/{iz}/lightcone{lightcone}/training/')
-    path.mkdir(parents=True, exist_ok=True)
+    path = f'./gpy_model/{box}/{isim}/{iz}/lightcone{lightcone}/training/'
+    prior_path = Path(path+'prior_limits.npy')
+    x_train_path = Path(path+'X_training_data.npy')
+    y_train_cross_path = Path(path+'Y_training_data_cross.npy')
+    y_train_auto_path = Path(path+'Y_training_data_auto.npy')
+    prior_path.parent.mkdir(parents=True, exist_ok=True)
+    x_train_path.parent.mkdir(parents=True, exist_ok=True)
+    y_train_cross_path.parent.mkdir(parents=True, exist_ok=True)
+    y_train_auto_path.parent.mkdir(parents=True, exist_ok=True)
+
     # np.save(f'./gpy_model/training/prior_limits_{isim}_{iz}.npy', np.array([plateau_point, m, c]))
-    np.save(path+'prior_limits.npy', np.array([plateau_point, c, vertical_limit]))
-    np.save(path+'X_training_data.npy', x_train)
-    np.save(path+'Y_training_data_cross.npy', y_train_cross)
-    np.save(path+'Y_training_data_auto.npy', y_train_auto)
+    np.save(prior_path, np.array([plateau_point, c, vertical_limit]))
+    np.save(x_train_path, x_train)
+    np.save(y_train_cross_path, y_train_cross)
+    np.save(y_train_auto_path, y_train_auto)
 
     return
 

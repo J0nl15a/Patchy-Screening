@@ -1,7 +1,9 @@
+import os
 import numpy as np
 from pathlib import Path
+from FLAMINGO_halo_redshifts import multiprocess_z_bins
 
-def stellar_cut_z(z_sample, mean_z_mass_cut, slope):
+def stellar_cut_z(ncpu, boxname, simname, z_sample, mean_z_mass_cut, slope, lightcone=0):
 
     z_sample = str(z_sample)
 
@@ -18,15 +20,20 @@ def stellar_cut_z(z_sample, mean_z_mass_cut, slope):
         slope_name = f"{float(slope):.3f}".replace('.', 'p')
     if slope < 0.0:
         slope_name = f"{slope_name}".replace('-', 'minus')
+
+    lightcone = int(lightcone)
     
     mass_cut_list = []
     z_mean = {'Blue':0.6, 'Green':1.1, 'Red':1.5}
-    path = f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/z_dependant_stellar_cuts/{z_sample}/z_stellar_cut_data_{im_name}_{slope_name}.txt'
-    outfile_path = Path(path)
+    outfile_path = f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/z_dependant_stellar_cuts/{boxname}/{z_sample}/z_stellar_cut_data_{im_name}_{slope_name}.txt'
+    outfile_path = Path(outfile_path)
     outfile_path.parent.mkdir(parents=True, exist_ok=True)
 
+    if not os.path.isfile(f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/halo_redshifts/{boxname}/{simname}/lightcone{lightcone}/FLAMINGO_halo_redshift_values.txt'):
+        multiprocess_z_bins(ncpu, boxname, simname, lightcone=lightcone)
+
     halo_z_bins = np.genfromtxt(
-        '/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/FLAMINGO_halo_redshift_values.txt',
+        f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/halo_redshifts/{boxname}/{simname}/lightcone{lightcone}/FLAMINGO_halo_redshift_values.txt',
         dtype=[('i',   'i4'),
                ('z_min', 'f8'),
                ('mid_z', 'f8'),
@@ -56,4 +63,4 @@ if __name__ == "__main__":
         for j in slope_values:
             stellar_cut_z(i, j, z_sample)'''
 
-    stellar_cut_z(sys.argv[1], sys.argv[2], sys.argv[3])
+    stellar_cut_z(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6], lightcone=sys.argv[7])

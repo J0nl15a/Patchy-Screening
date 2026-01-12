@@ -54,7 +54,7 @@ def halo_sampling(boxname, simname, z_sample, mass_cut, n_cut, ncpu, lightcone=0
         delimiter=None
     )
 
-    z_stellar_cuts = np.loadtxt(f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/z_dependant_stellar_cuts/{z_sample}/z_stellar_cut_data_{im_name}_{slope_name}.txt')
+    z_stellar_cuts = np.loadtxt(f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/z_dependant_stellar_cuts/{boxname}/{z_sample}/z_stellar_cut_data_{im_name}_{slope_name}.txt')
 
     dndz_sample = np.loadtxt(f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/dndz_samples/{boxname}/{simname}/{z_sample}/lightcone{lightcone}/dndz_galaxies_sampled_{im_name}_{slope_name}.txt')
 

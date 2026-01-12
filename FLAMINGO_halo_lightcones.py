@@ -55,7 +55,7 @@ def halo_lightcones(boxname, simname, z_sample, mass_cut, n_cut, ncpu, max_z=3.0
         delimiter=None
     )
 
-    z_stellar_cuts = np.loadtxt(f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/z_dependant_stellar_cuts/{z_sample}/z_stellar_cut_data_{im_name}_{slope_name}.txt')
+    z_stellar_cuts = np.loadtxt(f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/z_dependant_stellar_cuts/{boxname}/{z_sample}/z_stellar_cut_data_{im_name}_{slope_name}.txt')
 
     # dispatch in parallel
     results = Parallel(n_jobs=int(ncpu),   # adjust to your cores

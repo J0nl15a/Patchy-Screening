@@ -1,6 +1,5 @@
-import numpy as np, healpy as hp
+import numpy as np, healpy as hp, pymaster as nmt
 from scipy.interpolate import CubicSpline
-import pymaster as nmt
 from imp_patchy_screening import patchyScreening
 import yaml, sys
 from scipy.signal import savgol_filter
@@ -28,6 +27,8 @@ single = sys.argv[11].lower() in ("true", "1", "yes", "y")
 save = sys.argv[12].lower() in ("true", "1", "yes", "y")
 plot = sys.argv[13].lower() in ("true", "1", "yes", "y")
 
+lightcone = int(sys.argv[14])
+
 if round(float(im), 1) == float(im):
     im_name = f"{float(im):.1f}".replace('.', 'p')
 else:
@@ -47,11 +48,11 @@ mean_mstar = []
 # ps = patchyScreening(isim, iz, im, slope, ncpu, theta_d, fits_file=fits, signal=sig)
 # ps.get_halo_coordinates()
 
-def compute_catalog(slope, box=box, isim=isim, iz=iz, im=im, ncpu=ncpu, theta_d=theta_d, fits=fits, sig=sig):
+def compute_catalog(slope, box=box, isim=isim, iz=iz, im=im, ncpu=ncpu, theta_d=theta_d, fits=fits, sig=sig, lightcone=lightcone):
     if slope == 0.0:
         slope = abs(slope)
         
-    ps = patchyScreening(box, isim, iz, im, slope, ncpu, theta_d, fits_file=fits, signal=sig)
+    ps = patchyScreening(box, isim, iz, im, slope, ncpu, theta_d, fits_file=fits, signal=sig, lightcone=lightcone)
     #ps_camb = patchyScreening(isim, iz, im, im_name, ncpu, theta_d, cmb_method='CAMB', signal=sig, rect_size=20)
     ps.get_halo_coordinates()
     return ps.source_vector, ps.nhalo, np.log10(np.mean(ps.merge['mstar'].to_numpy()))
@@ -115,8 +116,8 @@ print(ell_namaster)
 
 #print(ell_edges)
 
-auto_path = f'./data_files/power_spectra/galaxy_galaxy/{box}/{isim}/{iz}/galaxy_galaxy_power_spectrum_{im_name}'
-cross_path = f'./data_files/power_spectra/kappa_galaxy/{box}/{isim}/{iz}/kappa_galaxy_power_spectrum_{im_name}'
+auto_path = f'./data_files/power_spectra/galaxy_galaxy/{box}/{isim}/{iz}/lightcone{lightcone}/galaxy_galaxy_power_spectrum_{im_name}'
+cross_path = f'./data_files/power_spectra/kappa_galaxy/{box}/{isim}/{iz}/lightcone{lightcone}/kappa_galaxy_power_spectrum_{im_name}'
 
 
 obs_data = np.loadtxt(f'./unWISExLens_lklh/data/v1.0/bandpowers/unWISExACT-DR6_{str(iz).lower()}_baseline_Clgg+Clkk+Clkg.dat', usecols=(0,1,2,3))[ell_200_mask, :].reshape(-1,4)
@@ -144,7 +145,7 @@ nside_cl = 2048
 npix = hp.nside2npix(nside_cl)
 
 try:
-    kappa_map = hp.read_map(f'./data_files/kappa_maps/{box}/{isim}/kappa_nonrot.fits', dtype=np.float64, verbose=False)
+    kappa_map = hp.read_map(f'./data_files/kappa_maps/{box}/{isim}/lightcone{lightcone}/kappa_nonrot.fits', dtype=np.float64, verbose=False)
 except FileNotFoundError:
     # kappa_map = load_kappa_map(isim)
     kappa_map = kappa_map_gen_forJonah(box, isim)

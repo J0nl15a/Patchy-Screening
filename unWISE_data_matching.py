@@ -1,14 +1,11 @@
-import numpy as np
-import pylab as pb
+import numpy as np, pylab as pb
 from scipy.interpolate import interp1d
 from scipy.integrate import simpson
-import re
+import re, math, textwrap
 from io import StringIO
-import math
-import textwrap
 from pathlib import Path
 
-def unWISE_data_matching(boxname, simname, z_sample, mass_cut, n_cut, nsamp='ntotal', plot=False):
+def unWISE_data_matching(boxname, simname, z_sample, mass_cut, n_cut, nsamp='ntotal', plot=False, lightcone=0):
     box_list = ['L1000N1800', 'L2800N5040']
     sim_list = ['HYDRO_FIDUCIAL','HYDRO_PLANCK','HYDRO_PLANCK_LARGE_NU_FIXED','HYDRO_PLANCK_LARGE_NU_VARY','HYDRO_STRONG_AGN','HYDRO_WEAK_AGN','HYDRO_LOW_SIGMA8','HYDRO_STRONGER_AGN','HYDRO_JETS_published','HYDRO_STRONGEST_AGN','HYDRO_STRONG_SUPERNOVA','HYDRO_STRONGER_AGN_STRONG_SUPERNOVA','HYDRO_STRONG_JETS']
 
@@ -42,12 +39,14 @@ def unWISE_data_matching(boxname, simname, z_sample, mass_cut, n_cut, nsamp='nto
     except ValueError:
         nsamp = str(nsamp)
 
+    lightcone = int(lightcone)
+
     dndz_match = np.loadtxt(f"/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/unWISExLens_lklh/data/v1.0/aux_data/dndz/unWISE_{z_sample.lower()}_xmatch_dndz.txt", usecols=(0,1))
 
     print(min(dndz_match[:,0]), max(dndz_match[:,0]))
 
     halo_z_bins = np.genfromtxt(
-        '/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/FLAMINGO_halo_redshift_values.txt',
+        f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/halo_redshifts/{boxname}/{simname}/lightcone{lightcone}/FLAMINGO_halo_redshift_values.txt',
         dtype=[('i',   'i4'),
                ('z_min', 'f8'),
                ('mid_z', 'f8'),
@@ -62,7 +61,7 @@ def unWISE_data_matching(boxname, simname, z_sample, mass_cut, n_cut, nsamp='nto
     print(FLAMINGO_mid_point)
     print(FLAMINGO_z_bins)
 
-    with open(f"/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/halo_totals/{boxname}/{simname}/{z_sample}/FLAMINGO_halo_totals_{im_name}_{slope_name}.txt", "r") as f:
+    with open(f"/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/halo_totals/{boxname}/{simname}/{z_sample}/lightcone{lightcone}/FLAMINGO_halo_totals_{im_name}_{slope_name}.txt", "r") as f:
         first_line = f.readline().strip()
         remaining_lines = f.readlines()
 
@@ -100,8 +99,8 @@ def unWISE_data_matching(boxname, simname, z_sample, mass_cut, n_cut, nsamp='nto
         pb.savefig(f'./Plots/unWISE_dndz_match_curve_{z_sample}_test.png', dpi=400)
         pb.clf()
 
-    path = f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/dndz_samples/{boxname}/{simname}/{z_sample}/dndz_galaxies_sampled_{im_name}_{slope_name}.txt'
-    outfile_name = Path(path)
+    outfile_name = f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/dndz_samples/{boxname}/{simname}/{z_sample}/lightcone{lightcone}/dndz_galaxies_sampled_{im_name}_{slope_name}.txt'
+    outfile_name = Path(outfile_name)
     outfile_name.parent.mkdir(parents=True, exist_ok=True)
 
     if nsamp == 'ntotal':
@@ -247,9 +246,9 @@ if __name__ == '__main__':
 
     plot=False
     try:
-        unWISE_data_matching(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6], plot=plot)
+        unWISE_data_matching(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6], plot=plot, lightcone=sys.argv[7])
     except IndexError:
-        unWISE_data_matching(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], plot=plot)
+        unWISE_data_matching(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], plot=plot, lightcone=sys.argv[6])
 
     '''if plot==True:
         pb.plot(dndz_blue_match[:,0], dndz_blue_match[:,1], color='tab:blue', label='Blue sample')

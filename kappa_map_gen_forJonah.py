@@ -66,7 +66,7 @@ def map_reading_kernel(file_dir, quantity, nside, ibox, nrot, theta, phi, dchi, 
     return map_stacked
 
 
-def kappa_map_gen_forJonah(box_id, sim_id):
+def kappa_map_gen_forJonah(box_id, sim_id, lc_id=0):
 
     #box_id = my_task_input[0] ## loop ober all resolution runs, default here: L1000N1800/
     #box_id = int(1)
@@ -78,7 +78,7 @@ def kappa_map_gen_forJonah(box_id, sim_id):
     #sim_id = int(0)
 
     #lc_id = my_task_input ##loop over all lightcones, 2 for 1Gpc, 8 for 2.8 Gpc , default here: lightcone0_shells 
-    lc_id = int(0)
+    #lc_id = int(0)
 
     base_dir = '/cosma8/data/dp004/flamingo/Runs/'
     box_list = ['L1000N0900', 'L1000N1800', 'L1000N3600', 'L2800N5040']
@@ -153,7 +153,7 @@ def kappa_map_gen_forJonah(box_id, sim_id):
     print(theta_rot)
     print(phi_rot)
 
-    path = Path(f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/kappa_maps/{box}/{sim_list}/')
+    path = Path(f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/kappa_maps/{box}/{sim_list}/lightcone{lc_id}/')
     path.mkdir(parents=True, exist_ok=True)
 
     kappa_stacked = map_reading_kernel(lightcone_files, 'TotalMass', nside, box_index, 
@@ -173,5 +173,6 @@ if __name__ == "__main__":
     #num_tasks_input = int(sys.argv[2])
     box = str(sys.argv[1])
     isim = str(sys.argv[2])
+    lc = int(sys.argv[3])
 
-    kappa_map_gen_forJonah(box, isim)
+    kappa_map_gen_forJonah(box, isim, lc)

@@ -1,9 +1,11 @@
+import os
 import numpy as np
 from joblib import Parallel, delayed
 from imp_patchy_screening import patchyScreening
+from FLAMINGO_halo_redshifts import multiprocess_z_bins
 from pathlib import Path
 
-def halo_lightcones(boxname, simname, z_sample, mass_cut, n_cut, ncpu, max_z=3.0):
+def halo_lightcones(boxname, simname, z_sample, mass_cut, n_cut, ncpu, max_z=3.0, lightcone=0):
     box_list = ['L1000N1800', 'L2800N5040']
     sim_list = ['HYDRO_FIDUCIAL','HYDRO_PLANCK','HYDRO_PLANCK_LARGE_NU_FIXED','HYDRO_PLANCK_LARGE_NU_VARY','HYDRO_STRONG_AGN','HYDRO_WEAK_AGN','HYDRO_LOW_SIGMA8','HYDRO_STRONGER_AGN','HYDRO_JETS_published','HYDRO_STRONGEST_AGN','HYDRO_STRONG_SUPERNOVA','HYDRO_STRONGER_AGN_STRONG_SUPERNOVA','HYDRO_STRONG_JETS']
 
@@ -22,6 +24,8 @@ def halo_lightcones(boxname, simname, z_sample, mass_cut, n_cut, ncpu, max_z=3.0
     print(simname, type(simname))
 
     z_sample = str(z_sample)
+    lightcone = int(lightcone)
+
     im = float(mass_cut)
     if round(im, 1) == im:
         im_name = f"{float(mass_cut):.1f}".replace('.', 'p')
@@ -35,16 +39,19 @@ def halo_lightcones(boxname, simname, z_sample, mass_cut, n_cut, ncpu, max_z=3.0
     if slope < 0.0:
         slope_name = f"{slope_name}".replace('-', 'minus')
         
-    path = f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/halo_totals/{boxname}/{simname}/{z_sample}/FLAMINGO_halo_totals_{im_name}_{slope_name}.txt'
-    output_path = Path(path)
+    output_path = f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/halo_totals/{boxname}/{simname}/{z_sample}/lightcone{lightcone}/FLAMINGO_halo_totals_{im_name}_{slope_name}.txt'
+    output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
+    if not os.path.isfile(f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/halo_redshifts/{boxname}/{simname}/lightcone{lightcone}/FLAMINGO_halo_redshift_values.txt'):
+        multiprocess_z_bins(ncpu, boxname, simname, lightcone=lightcone)
+    
     halo_z_bins = np.genfromtxt(
-        '/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/FLAMINGO_halo_redshift_values.txt',
+        f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/halo_redshifts/{boxname}/{simname}/lightcone{lightcone}/FLAMINGO_halo_redshift_values.txt',
         dtype=[('i',   'i4'),
-               ('z_min', 'f8'),
-               ('mid_z', 'f8'),
-               ('z_max', 'f8')],
+            ('z_min', 'f8'),
+            ('mid_z', 'f8'),
+            ('z_max', 'f8')],
         delimiter=None
     )
 
@@ -53,7 +60,7 @@ def halo_lightcones(boxname, simname, z_sample, mass_cut, n_cut, ncpu, max_z=3.0
     # dispatch in parallel
     results = Parallel(n_jobs=int(ncpu),   # adjust to your cores
                        backend='loky')(
-                           delayed(process_snapshot)(boxname, simname, int(i), z_stellar_cuts, halo_z_bins)
+                           delayed(process_snapshot)(boxname, simname, int(i), z_stellar_cuts, halo_z_bins, lightcone)
                            for i in halo_z_bins['i']
                        )
 
@@ -73,7 +80,7 @@ def halo_lightcones(boxname, simname, z_sample, mass_cut, n_cut, ncpu, max_z=3.0
             
     return
 
-def process_snapshot(box, sim, iz, stellar_cuts, halo_z_bins):
+def process_snapshot(box, sim, iz, stellar_cuts, halo_z_bins, lightcone):
     if halo_z_bins['mid_z'][iz] > 3.0:
         return None
 
@@ -82,46 +89,45 @@ def process_snapshot(box, sim, iz, stellar_cuts, halo_z_bins):
 
     ps = patchyScreening(box, sim, iz, im,  # or however you pass
                          0 ,0, 1,
-                         lightcone_method=('FULL','shell'))
+                         lightcone_method=('FULL','shell'), lightcone=lightcone)
     ps.filter_stellar_mass()
     print(f'ps.im={ps.im}')
 
     return iz, ps.nhalo
 
 if __name__ == '__main__':
-    import sys
+    import sys, re, textwrap
     import pylab as pb
-    import re
     from io import StringIO
-    import textwrap
 
-    halo_lightcones(sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6], sys.argv[1])
+    halo_lightcones(sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6], sys.argv[1], lightcone=int(sys.argv[7]))
     quit()
     box_list = ['L1000N1800', 'L2800N5040']
     sim_list = ['HYDRO_FIDUCIAL','HYDRO_PLANCK','HYDRO_PLANCK_LARGE_NU_FIXED','HYDRO_PLANCK_LARGE_NU_VARY','HYDRO_STRONG_AGN','HYDRO_WEAK_AGN','HYDRO_LOW_SIGMA8','HYDRO_STRONGER_AGN','HYDRO_JETS_published','HYDRO_STRONGEST_AGN','HYDRO_STRONG_SUPERNOVA','HYDRO_STRONGER_AGN_STRONG_SUPERNOVA','HYDRO_STRONG_JETS']
 
     try:
-        box = int(sys.argv[1])
+        box = int(sys.argv[2])
         boxname = box_list[box]
     except (ValueError, IndexError):
-        boxname = str(sys.argv[1])
+        boxname = str(sys.argv[2])
 
     try:
-        isim = int(sys.argv[2])
+        isim = int(sys.argv[3])
         simname = sim_list[isim]
     except (ValueError, IndexError):
-        simname = str(sys.argv[2])
+        simname = str(sys.argv[3])
 
-    z_sample = str(sys.argv[3])
-    im = float(sys.argv[4])
-    im_name = f"{float(sys.argv[4]):.1f}".replace('.', 'p')
-    slope = float(sys.argv[5])
-    slope_name = f"{float(sys.argv[5]):.1f}".replace('.', 'p')
+    z_sample = str(sys.argv[4])
+    im = float(sys.argv[5])
+    im_name = f"{float(sys.argv[5]):.1f}".replace('.', 'p')
+    slope = float(sys.argv[6])
+    slope_name = f"{float(sys.argv[6]):.1f}".replace('.', 'p')
     if slope < 0.0:
         slope_name = f"{slope_name}".replace('-', 'minus')
+    lightcone = int(sys.argv[7])
 
     halo_z_bins = np.genfromtxt(
-        '/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/FLAMINGO_halo_redshift_values.txt',
+        f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/halo_redshift_values/{boxname}/{simname}/lightcone{lightcone}/FLAMINGO_halo_redshift_values.txt',
         dtype=[('i',   'i4'),
                ('z_min', 'f8'),
                ('mid_z', 'f8'),
@@ -138,7 +144,7 @@ if __name__ == '__main__':
             slope_name = f"{slope_name}".replace('-', 'minus')
         if s == 0.0:
             slope_name = "0p0"
-        with open(f"/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/halo_totals/{boxname}/{simname}/{z_sample}/FLAMINGO_halo_totals_{im_name}_{slope_name}.txt", "r") as f:
+        with open(f"/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/halo_totals/{boxname}/{simname}/{z_sample}/lightcone{lightcone}/FLAMINGO_halo_totals_{im_name}_{slope_name}.txt", "r") as f:
             first_line = f.readline().strip()
             remaining_lines = f.readlines()
 

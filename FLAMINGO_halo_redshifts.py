@@ -1,12 +1,20 @@
 import h5py
 import numpy as np
-import glob, os
+import glob, sys
 from joblib import Parallel, delayed
-import sys
+from pathlib import Path
 
-def z_bins(i):
+def z_bins(box, isim, i, lightcone=0):
 
-    halo_lightcone = f'/cosma8/data/dp004/flamingo/Runs/L1000N1800/HYDRO_FIDUCIAL/hbt_lightcone_halos/lightcone0/lightcone_halos_{77-i:04d}.hdf5'
+    if box == 'L1000N1800' and lightcone == 0:
+        map_dir = 'hbt_lightcone_halos'
+    elif box == 'L2800N5040' and isim == 'HYDRO_FIDUCIAL':
+        map_dir = 'hbt_lightcone_halos_downsampled_4096'
+    else:
+        print("Halo lightcone not available for this box/simulation combination.")
+        return None
+
+    halo_lightcone = f'/cosma8/data/dp004/flamingo/Runs/{box}/{isim}/{map_dir}/lightcone{lightcone}/lightcone_halos_{77-i:04d}.hdf5'
     f = h5py.File(halo_lightcone, 'r')
     z = f['Lightcone/Redshift'][...]
     
@@ -21,36 +29,52 @@ def z_bins(i):
     return i, min_z, midpoint, max_z
 
 
-output_path = '/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/FLAMINGO_halo_redshift_values.txt'
+def multiprocess_z_bins(ncpu, box, isim, lightcone=0):
 
-filelist = glob.glob('/cosma8/data/dp004/flamingo/Runs/L1000N1800/HYDRO_FIDUCIAL/hbt_lightcone_halos/lightcone0/lightcone_halos_*.hdf5')
-print(len(filelist))
+    output_path = f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/halo_redshifts/{box}/{isim}/lightcone{lightcone}/FLAMINGO_halo_redshift_values.txt'
+    outfile = Path(output_path)
+    outfile.parent.mkdir(parents=True, exist_ok=True)
 
-results = Parallel(n_jobs=int(sys.argv[1]),   # adjust to your cores
-                   backend='loky')(
-                       delayed(z_bins)(i)
-                       for i in range(len(filelist))
-                   )
+    if box == 'L1000N1800' and lightcone == 0:
+        map_dir = 'hbt_lightcone_halos'
+    elif box == 'L2800N5040' and isim == 'HYDRO_FIDUCIAL':
+        map_dir = 'hbt_lightcone_halos_downsampled_4096'
+    else:
+        print("Halo lightcone not available for this box/simulation combination.")
+        return None
 
-print(results)
-idx, min_vals, mid, max_vals = zip(*[r for r in results if r is not None])
-print(idx)
-print(min_vals)
-print(mid)
-print(max_vals)
+    filelist = glob.glob(f'/cosma8/data/dp004/flamingo/Runs/{box}/{isim}/{map_dir}/lightcone{lightcone}/lightcone_halos_*.hdf5')
+    print(len(filelist))
 
-idx = np.array(idx, dtype=int)
-min_vals = np.array(min_vals, dtype=float)
-mid = np.array(mid, dtype=float)
-max_vals = np.array(max_vals, dtype=float)
+    results = Parallel(n_jobs=int(ncpu),   # adjust to your cores
+                       backend='loky')(
+                           delayed(z_bins)(box, isim, i, lightcone=lightcone)
+                           for i in range(len(filelist))
+                       )
 
-print(idx)
-print(min_vals)
-print(mid)
-print(max_vals)
+    print(results)
+    idx, min_vals, mid, max_vals = zip(*[r for r in results if r is not None])
+    print(idx)
+    print(min_vals)
+    print(mid)
+    print(max_vals)
 
-out = np.column_stack((idx, min_vals, mid, max_vals))
-out = out[out[:, 0].argsort()]
-print(out)
-#quit()
-np.savetxt(output_path, out, fmt='%d %.18f %.18f %.18f', comments='')
+    idx = np.array(idx, dtype=int)
+    min_vals = np.array(min_vals, dtype=float)
+    mid = np.array(mid, dtype=float)
+    max_vals = np.array(max_vals, dtype=float)
+
+    print(idx)
+    print(min_vals)
+    print(mid)
+    print(max_vals)
+
+    out = np.column_stack((idx, min_vals, mid, max_vals))
+    out = out[out[:, 0].argsort()]
+    print(out)
+    #quit()
+    np.savetxt(output_path, out, fmt='%d %.18f %.18f %.18f', comments='')
+
+if __name__ == '__main__':
+
+    multiprocess_z_bins(sys.argv[1], sys.argv[2], sys.argv[3])

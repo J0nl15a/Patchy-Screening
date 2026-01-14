@@ -230,6 +230,9 @@ def rescale_dndz(difference, halo_lightcones, galaxies_required, nsamp, FLAMINGO
             print(halo_lightcones[max_diff_index, 1], galaxies_required[max_diff_index])
             print(len(halo_lightcones), len(galaxies_required))
             ratio_nsamp = halo_lightcones[max_diff_index, 1]/galaxies_required[max_diff_index]
+            if galaxies_required[max_diff_index] == 0:
+                galaxies_required[np.where(FLAMINGO_mid_point > FLAMINGO_mid_point[max_diff_index])] = halo_lightcones[np.where(FLAMINGO_mid_point > FLAMINGO_mid_point[max_diff_index]), 1]
+                return nsamp, galaxies_required, False, count
             print(ratio_nsamp)
             print(nsamp * ratio_nsamp, math.floor(nsamp*ratio_nsamp))
             rescaled_nsamp = math.floor(nsamp*ratio_nsamp)

@@ -121,7 +121,7 @@ echo "=============================="
 
 if [ -f "./data_files/power_spectra/galaxy_galaxy/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}/galaxy_galaxy_power_spectrum_\${amp_name}_\${slope_name}.txt" ] && \
    [ -f "./data_files/power_spectra/kappa_galaxy/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}/kappa_galaxy_power_spectrum_\${amp_name}_\${slope_name}.txt" ]; then
-    echo "Found existing galaxy-galaxy or kappa-galaxy spectra file — skipping unWISE_power_spectra.py"
+    echo "Found existing galaxy-galaxy and kappa-galaxy spectra file — skipping unWISE_power_spectra.py"
 else
     python3 unWISE_power_spectra.py "\$SLURM_CPUS_PER_TASK" "${BOX}" "${ISIM}" "${IZ}" "\$amp" "\$slope" unlensed True False True True True False "${LIGHTCONE}"
 fi

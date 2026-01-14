@@ -168,7 +168,7 @@ class patchyScreening:
 
         elif self.lightcone_method[0] == 'FULL':
             try:
-                DM = hp.read_map(f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/DM_maps/{self.boxname}/{self.simname}/stacked_DM_map_z3p0.fits', dtype=np.float64, verbose=False)
+                DM = hp.read_map(f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/DM_maps/{self.boxname}/{self.simname}/lightcone{self.lightcone}/stacked_DM_map_z3p0.fits', dtype=np.float64, verbose=False)
             except FileNotFoundError:
                 from stacked_DM_maps import stack_DM_maps_z3
                 DM = stack_DM_maps_z3(self.boxname, self.simname)
@@ -280,7 +280,7 @@ class patchyScreening:
                 self.merge = np.nan
         elif self.lightcone_method[1] == 'dndz':
             self.merge = pl.read_parquet(
-                f"/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/mock_halo_catalogs/{self.boxname}/{self.simname}/{self.z_sample_name}/sampled_halo_data_{self.im_name}_{self.slope_name}.parquet"
+                f"/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/mock_halo_catalogs/{self.boxname}/{self.simname}/{self.z_sample_name}/lightcone{self.lightcone}/sampled_halo_data_{self.im_name}_{self.slope_name}.parquet"
             )
             mean_z = {'Blue':0.6, 'Green':1.1, 'Red':1.5} 
             Dcom = self.cosmology.comoving_distance(mean_z[self.z_sample_name])*0.681  # comoving distance to galaxy in Mpc/h

@@ -83,7 +83,7 @@ if __name__ == '__main__':
 
     f_sim_auto = module.emulator(np.array((10.65, 0.45)), 'auto', box, isim, iz, save=True, retrain=True, lightcone=lightcone) #module.emulator(x, 'auto', box, isim, iz, load=True)
     f_sim_cross = module.emulator(np.array((10.65, 0.45)), 'cross', box, isim, iz, save=True, retrain=True, lightcone=lightcone) #module.emulator(x, 'cross', box, isim, iz, load=True)                
-    prior_limits = np.load(f'./gpy_model/{box}/{isim}/{iz}/lightcone{lightcone}/training/prior_limits_{box}_{isim}_{iz}.npy')
+    prior_limits = np.load(f'./gpy_model/{box}/{isim}/{iz}/lightcone{lightcone}/training/prior_limits.npy')
     plateau_point = prior_limits[0]
     # m = prior_limits[1]
     c = prior_limits[1]
@@ -120,11 +120,20 @@ if __name__ == '__main__':
     # backend = emcee.backends.HDFBackend(filename)
     # backend.reset(nwalkers, ndim)
 
-    sampler = multiprocess(f_obs, f_obs_err, box, isim, iz, plateau_point, c, vertical_limit, lightcone=lightcone) #, backend)
+    success = False
+    while not success:
+        try:
+            sampler = multiprocess(f_obs, f_obs_err, box, isim, iz, plateau_point, c, vertical_limit, lightcone=lightcone) #, backend)
+            tau = sampler.get_autocorr_time()
+            success = True
+        except emcee.autocorr.AutocorrError:
+            print("[WARNING] The chain is too short to estimate the autocorrelation time reliably.")
+            success = False
+            steps += 1000
+            continue
 
     print(np.mean(sampler.acceptance_fraction))
 
-    tau = sampler.get_autocorr_time()
     print(tau)
     burnin = int(2 * np.max(tau))
     thin = int(0.5 * np.min(tau))

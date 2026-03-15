@@ -7,14 +7,16 @@ from pathlib import Path
 def z_bins(box, isim, i, lightcone=0):
 
     if box == 'L1000N1800' and lightcone == 0:
+        snap_max = 77
         map_dir = 'hbt_lightcone_halos'
     elif box == 'L2800N5040' and isim == 'HYDRO_FIDUCIAL':
-        map_dir = 'hbt_lightcone_halos_downsampled_4096'
+        snap_max = 78
+        map_dir = 'sorted_hbt_lightcone_halos'
     else:
         print("Halo lightcone not available for this box/simulation combination.")
         return None
 
-    halo_lightcone = f'/cosma8/data/dp004/flamingo/Runs/{box}/{isim}/{map_dir}/lightcone{lightcone}/lightcone_halos_{77-i:04d}.hdf5'
+    halo_lightcone = f'/cosma8/data/dp004/flamingo/Runs/{box}/{isim}/{map_dir}/lightcone{lightcone}/lightcone_halos_{snap_max-i:04d}.hdf5'
     f = h5py.File(halo_lightcone, 'r')
     z = f['Lightcone/Redshift'][...]
     
@@ -38,7 +40,7 @@ def multiprocess_z_bins(ncpu, box, isim, lightcone=0):
     if box == 'L1000N1800' and lightcone == 0:
         map_dir = 'hbt_lightcone_halos'
     elif box == 'L2800N5040' and isim == 'HYDRO_FIDUCIAL':
-        map_dir = 'hbt_lightcone_halos_downsampled_4096'
+        map_dir = 'sorted_hbt_lightcone_halos'
     else:
         print("Halo lightcone not available for this box/simulation combination.")
         return None
@@ -77,4 +79,4 @@ def multiprocess_z_bins(ncpu, box, isim, lightcone=0):
 
 if __name__ == '__main__':
 
-    multiprocess_z_bins(sys.argv[1], sys.argv[2], sys.argv[3])
+    multiprocess_z_bins(sys.argv[1], sys.argv[2], sys.argv[3], lightcone=int(sys.argv[4]))

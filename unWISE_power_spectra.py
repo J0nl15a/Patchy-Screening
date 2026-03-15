@@ -1,7 +1,7 @@
 import numpy as np, healpy as hp, pymaster as nmt
 from scipy.interpolate import CubicSpline
 from imp_patchy_screening import patchyScreening
-import yaml, sys
+import yaml, sys, time
 from scipy.signal import savgol_filter
 from joblib import Parallel, delayed
 from unWISE_power_spectra_plot import power_spectra_plot
@@ -41,6 +41,7 @@ elif single == True:
 slopes_name = []
 print(im, slopes)
 
+job_start_time = time.time()
 
 source_vectors = []
 nhalos = []
@@ -78,6 +79,8 @@ elif single == True:
     nhalos.append(results[1])
     mean_mstar.append(results[2])
 print(round(mean_mstar[0], 5))
+
+print('Finished computing halo catalogs: {:.2f} seconds'.format(time.time() - job_start_time))
 
 print(mean_mstar)
 
@@ -151,6 +154,8 @@ except FileNotFoundError:
     kappa_map = kappa_map_gen_forJonah(box, isim)
 kappa_map = hp.pixelfunc.ud_grade(kappa_map, nside_cl)
 
+print('Finished loading kappa map: {:.2f} seconds'.format(time.time() - job_start_time))
+
 ## choose ell binning - here we include 10 modes per ell bin
 #b = nmt.NmtBin.from_nside_linear(nside_cl, 10)
 #ell_namaster = b.get_effective_ells()
@@ -182,6 +187,8 @@ anafast_list = []
 kappa_mask = kappa_map*0.0+1.0
 f_kappa = nmt.NmtField(kappa_mask, [kappa_map], lmax=lmax_bins, n_iter=0)
 # f_kappa_wide = nmt.NmtField(kappa_mask, [kappa_map], lmax=lmax_bins_wide, n_iter=0)
+
+print('Finished preparing kappa map and NmtField: {:.2f} seconds'.format(time.time() - job_start_time))
 
 for i in range(len(nhalos)):
     pixels = hp.pixelfunc.vec2pix(nside_cl, source_vectors[i][:,0], source_vectors[i][:,1], source_vectors[i][:,2])
@@ -238,6 +245,11 @@ for i in range(len(nhalos)):
     # h = CubicSpline(ell_namaster_wide, cl_cross_namaster_wide)
     # cl_cross_namaster = h(ells)[ell_200_mask]
 
+    print("Mean real-space correlation:", np.mean(kappa_map[kappa_mask>0] * [galaxy_overdensity[galaxy_mask>0]]))
+
+    print("After flipping kappa:", np.mean((-kappa_map)[kappa_mask>0] * [galaxy_overdensity[galaxy_mask>0]]))
+
+
     pcl_cross = nmt.compute_coupled_cell(f_kappa, f_galaxy)
 
     pcl_shape = (f_kappa.nmaps * f_galaxy.nmaps, f_galaxy.ainfo.lmax+1)
@@ -269,6 +281,7 @@ for i in range(len(nhalos)):
     #cross.append(savgol_filter(cl_cross_namaster, window_length=7, polyorder=5))
 
     auto_spectra_shot_noise_list.append((4*np.pi)/nhalos[i])
+    print((4*np.pi)/nhalos[i])
 
     chi2_list.append(np.sum(((((cl_auto_namaster-((4*np.pi)/nhalos[i]))+obs_shot_noise)-obs_data[:,1])/obs_data_std)**2))
     print(chi2_list[i])
@@ -293,6 +306,8 @@ for i in range(len(nhalos)):
             cross_out = np.column_stack((ell_namaster, cross_spectra_list[i]*1e5))
             np.savetxt(auto_output_path, auto_out, fmt='%f %.13f %.13f', header=f"Galaxy-galaxy power spectra for mock catalog with nhalos = {nhalos[i]}", comments='')
             np.savetxt(cross_output_path, cross_out, fmt='%f %.13f', header=f"Kappa-galaxy cross spectra for mock catalog with nhalos = {nhalos[i]}", comments='')
+
+print('Finished computing power spectra and saving results: {:.2f} seconds'.format(time.time() - job_start_time))
 
 
 if plot:

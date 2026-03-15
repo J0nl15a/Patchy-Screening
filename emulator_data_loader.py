@@ -3,8 +3,15 @@ from pathlib import Path
 
 def data_loader(box, isim, iz, low_halo_threshold=True, negative_power_threshold=False, shot_noise_included=False, lightcone=0):
     
-    cut_amplitude = np.repeat(np.arange(10.3, 11.4, 0.1).reshape(-1,1), 11, axis=0)
-    cut_slope = np.tile(np.arange(0.0, 1.1, 0.1), 11).reshape(-1,1)
+    min_amplitude = 10.3
+    max_amplitude = 11.3
+    amplitude_step = 0.1
+    min_slope = 0.0
+    max_slope = 1.0
+    slope_step = 0.1
+
+    cut_amplitude = np.repeat(np.arange(min_amplitude, max_amplitude + amplitude_step, amplitude_step).reshape(-1,1), int((max_slope - min_slope) / slope_step) + 1, axis=0)
+    cut_slope = np.tile(np.arange(min_slope, max_slope + slope_step, slope_step), int((max_amplitude - min_amplitude) / amplitude_step) + 1).reshape(-1,1)
     x_train = np.column_stack((np.round(cut_amplitude, 1), np.round(cut_slope, 1))) #Amplitude and slope parameters
 
     initial_cross_spectrum = np.loadtxt(f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/power_spectra/kappa_galaxy/{box}/{isim}/{iz}/lightcone{lightcone}/kappa_galaxy_power_spectrum_10p8_0p5.txt', 
@@ -111,7 +118,10 @@ def data_loader(box, isim, iz, low_halo_threshold=True, negative_power_threshold
 
         y, c = diagonal_limit()
 
-        slope_limit = np.where(y == 1.0)[0][-1]
+        try:
+            slope_limit = np.where(y == max_slope)[0][-1]
+        except IndexError:
+            slope_limit = 0
         plateau_point = low_nhalos_x[slope_limit]
 
         # plateau_point = min(np.where(low_nhalos_values[:,1] != max(low_nhalos_y))[0]-1)
@@ -147,6 +157,8 @@ def data_loader(box, isim, iz, low_halo_threshold=True, negative_power_threshold
     y_train_auto_path.parent.mkdir(parents=True, exist_ok=True)
 
     # np.save(f'./gpy_model/training/prior_limits_{isim}_{iz}.npy', np.array([plateau_point, m, c]))
+    print(plateau_point, c, vertical_limit)
+    # quit()
     np.save(prior_path, np.array([plateau_point, c, vertical_limit]))
     np.save(x_train_path, x_train)
     np.save(y_train_cross_path, y_train_cross)

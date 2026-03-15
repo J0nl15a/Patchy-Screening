@@ -6,27 +6,84 @@ ISIM="${2:?usage: $0 BOX ISIM IZ}"
 IZ="${3:?usage: $0 BOX ISIM IZ}"
 LIGHTCONE="${4:-0}"
 
-if [ -d "./batch_files/pipeline_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}" ] && \
+if [ -d "./batch_files/caching_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}" ] && \
+   [ -d "./batch_files/pipeline_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}" ] && \
    [ -d "./batch_files/maximum_likelihood_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}" ]; then
     echo "Directory exists."
 else
     echo "Directory does not exist."
+    mkdir -p "./batch_files/caching_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}"
     mkdir -p "./batch_files/pipeline_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}"
     mkdir -p "./batch_files/maximum_likelihood_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}"
 fi
 
+rm ./batch_files/caching_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}/job.*.dump || true
+rm ./batch_files/caching_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}/job.*.err || true
 rm ./batch_files/pipeline_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}/job.*.dump || true
 rm ./batch_files/pipeline_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}/job.*.err || true
 rm ./batch_files/maximum_likelihood_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}/job.*.dump || true
 rm ./batch_files/maximum_likelihood_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}/job.*.err || true
 
+jid0=$(sbatch --parsable \
+              --job-name=shell_caching \
+              -c 16 \
+              -p cosma8 \
+              -A dp004 \
+              -t 09:00:00 \
+              -o ./batch_files/caching_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}/job.%j.dump \
+              -e ./batch_files/caching_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}/job.%j.err \
+              <<EOF
+#!/usr/bin/env bash
+#SBATCH --mail-type=ALL
+#SBATCH --mail-user=ARIJCONL@ljmu.ac.uk
+
+set -euo pipefail
+
+echo ">>> Launching caching with Box='${BOX}' Sim='${ISIM}' Lightcone='${LIGHTCONE}'"
+
+module purge
+set +u
+if [ -f "$HOME/.bashrc" ]; then
+    . "$HOME/.bashrc"
+fi
+mamba activate patchy_screening
+set -u
+
+export OMP_NUM_THREADS=1
+export OPENBLAS_NUM_THREADS=1
+export MKL_NUM_THREADS=1
+export NUMEXPR_NUM_THREADS=1
+
+echo "=== Step 0 (Job ID \$SLURM_JOB_ID) starting"
+echo "    Received arguments: ncpu='\$SLURM_CPUS_PER_TASK', Box='${BOX}', Sim='${ISIM}', Lightcone='${LIGHTCONE}'"
+echo "=============================="
+
+if ls ./data_files/shell_caches/${BOX}/${ISIM}/lightcone${LIGHTCONE}/shell_{000..059}.parquet 1>/dev/null 2>&1; then
+    echo "Found all shell caches — skipping FLAMINGO_galaxies.py"
+else
+    python3 FLAMINGO_galaxies.py "\$SLURM_CPUS_PER_TASK" "${BOX}" "${ISIM}" "${LIGHTCONE}"
+fi
+
+echo "Job 0: Caching the galaxies from the FLAMINGO lightcone shells and catalogues with box ${BOX}, sim ${ISIM} & lightcone ${LIGHTCONE}."
+
+echo "Job done, info follows."
+sacct -j \$SLURM_JOB_ID --format=JobID,JobName,Partition,AveRSS,MaxRSS,AveVMSize,MaxVMSize,Elapsed,ExitCode
+
+EOF
+)
+
+echo "Job 0: Caching lightcone shells for box ${BOX}, sim ${ISIM}, lightcone ${LIGHTCONE}, ${IZ} sample."
+
+
 ARR_ID=$(sbatch --parsable \
+                --dependency=afterok:${jid0} \
+                --kill-on-invalid-dep=yes \
                 --array=0-120%30 \
                 --job-name=mle_pipeline_array \
-                -c 128 \
+                -c 16 \
                 -p cosma8 \
                 -A dp004 \
-                -t 12:00:00 \
+                -t 24:00:00 \
                 -o ./batch_files/pipeline_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}/job.%j.dump \
                 -e ./batch_files/pipeline_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}/job.%j.err \
                 <<EOF
@@ -171,7 +228,7 @@ echo "=== Step 6 (Job ID \$SLURM_JOB_ID) starting"
 echo "    Received arguments: ncpu="\$SLURM_CPUS_PER_TASK", Box='${BOX}', Sim='${ISIM}', Lightcone='${LIGHTCONE}', Sample='${IZ}'"
 echo "=============================="
 
-python mock_catalog_likelihood_parallel.py "\$SLURM_CPUS_PER_TASK" "${BOX}" "${ISIM}" "${IZ}" "${LIGHTCONE}"
+python3 mock_catalog_likelihood_parallel.py "\$SLURM_CPUS_PER_TASK" "${BOX}" "${ISIM}" "${IZ}" "${LIGHTCONE}"
 
 echo "Job done, info follows."
 sacct -j \$SLURM_JOB_ID --format=JobID,JobName,Partition,AveRSS,MaxRSS,AveVMSize,MaxVMSize,Elapsed,ExitCode
@@ -189,10 +246,10 @@ jid7=$(sbatch --parsable \
               --dependency=afterok:${jid6} \
               --kill-on-invalid-dep=yes \
               --job-name=mle_mock_catalog \
-              -c 128 \
+              -c 16 \
               -p cosma8 \
               -A dp004 \
-              -t 01:30:00 \
+              -t 12:00:00 \
               -o ./batch_files/pipeline_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}/job.mle_%j.dump \
               -e ./batch_files/pipeline_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}/job.mle_%j.err \
               <<EOF

@@ -205,13 +205,15 @@ class patchyScreening:
         # Load halo lightcone and SOAP data into DataFrames
         if lightcone_type == 'HBT':
             if self.boxname == 'L1000N1800' and self.lightcone == 0:
+                snap_max = 77
                 halo_lc_dir = 'hbt_lightcone_halos'
             elif self.boxname == 'L2800N5040' and self.simname == 'HYDRO_FIDUCIAL':
+                snap_max = 78
                 halo_lc_dir = 'sorted_hbt_lightcone_halos'
             else:
                 print("Halo lightcone not available for this box/simulation combination.")
                 sys.exit()
-            halo_lightcone = f'/cosma8/data/dp004/flamingo/Runs/{self.boxname}/{self.simname}/{halo_lc_dir}/lightcone{self.lightcone}/lightcone_halos_{77-self.z_sample:04d}.hdf5'
+            halo_lightcone = f'/cosma8/data/dp004/flamingo/Runs/{self.boxname}/{self.simname}/{halo_lc_dir}/lightcone{self.lightcone}/lightcone_halos_{snap_max-self.z_sample:04d}.hdf5'
             f = h5py.File(halo_lightcone, 'r')
             halo_lc_data = pl.DataFrame({
                 'ID':          f['InputHalos/HaloCatalogueIndex'][...],
@@ -240,15 +242,56 @@ class patchyScreening:
         print(f'D_com = {self.Dcom}, Snap number = {snap}')
 
         if lightcone_type == 'HBT':
+            # HBT_file = f'/cosma8/data/dp004/flamingo/Runs/{self.boxname}/{self.simname}/SOAP-HBT/halo_properties_{snap:04d}.hdf5'
+            # f = h5py.File(HBT_file, 'r')
+            # df_HBT = pl.DataFrame({
+            #     'ID':          f['InputHalos/HaloCatalogueIndex'][...],
+            #     'Structuretype': f['InputHalos/IsCentral'][...],
+            #     'mvir':       f['SO/500_crit/TotalMass'][...] * 1e10,
+            #     'mstar':       f['ExclusiveSphere/50kpc/StellarMass'][...] * 1e10,
+            #     'HaloID':      f['SOAP/HostHaloIndex'][...],
+            # })
+            # f.close()
+
+            # --- inside load_halo_data(), in the `if lightcone_type == 'HBT':` block ---
+
             HBT_file = f'/cosma8/data/dp004/flamingo/Runs/{self.boxname}/{self.simname}/SOAP-HBT/halo_properties_{snap:04d}.hdf5'
-            f = h5py.File(HBT_file, 'r')
-            df_HBT = pl.DataFrame({
-                'ID':          f['InputHalos/HaloCatalogueIndex'][...],
-                'Structuretype': f['InputHalos/IsCentral'][...],
-                'mvir':       f['SO/500_crit/TotalMass'][...] * 1e10,
-                'mstar':       f['ExclusiveSphere/50kpc/StellarMass'][...] * 1e10,
-            })
+            with h5py.File(HBT_file, 'r') as f:
+                ids    = f['InputHalos/HaloCatalogueIndex'][...]
+                struct = f['InputHalos/IsCentral'][...]                  # 1=central, 0=satellite (your convention)
+                mvir   = f['SO/500_crit/TotalMass'][...] * 1e10
+                mstar  = f['ExclusiveSphere/50kpc/StellarMass'][...] * 1e10
+                hid    = f['SOAP/HostHaloIndex'][...]                    # index into the FULL arrays above
             f.close()
+
+            # ---- apply host-mvir fix for satellites (from dndz_dndm_curve.py logic) ----
+            SATELLITE_FLAG = 0
+            CENTRAL_FLAG   = 1
+
+            sat_mask = (struct == SATELLITE_FLAG) & (hid >= 0)
+
+            mvir_fixed = mvir
+            if np.any(sat_mask):
+                host_ids    = hid[sat_mask].astype(np.int64)
+                host_struct = struct[host_ids]
+                host_mvir   = mvir[host_ids]
+
+                # only accept hosts that are centrals; otherwise leave original mvir
+                good_host = (host_struct == CENTRAL_FLAG)
+
+                mvir_fixed = mvir.copy()
+                mvir_fixed[sat_mask] = np.where(good_host, host_mvir, mvir[sat_mask])
+
+            # build dataframe (satellites now carry host mvir in the mvir column)
+            df_HBT = pl.DataFrame({
+                'ID':            ids,
+                'Structuretype': struct,
+                'mvir':          mvir_fixed,
+                'mstar':         mstar,
+                'HostHaloID':        hid,
+            })
+
+
             print(f'Loading halo lightcone data: {time.time() - self.job_start_time}s')
 
             return halo_lc_data, df_HBT

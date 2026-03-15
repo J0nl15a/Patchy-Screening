@@ -86,6 +86,10 @@ def kappa_map_gen_forJonah(box_id, sim_id, lc_id=0):
         box = box_list[box_id]
     elif isinstance(box_id, str):
         box = box_id
+    if box == 'L2800N5040':
+        snap_dir = 'snapshots_downsampled'
+    else:
+        snap_dir = 'snapshots'
     sim_total = ['HYDRO_FIDUCIAL', 'HYDRO_ADIABATIC', 'HYDRO_JETS_published', 'HYDRO_LOW_SIGMA8', 'HYDRO_STRONG_AGN', 'HYDRO_STRONGEST_AGN', 'HYDRO_STRONG_SUPERNOVA', 'HYDRO_WEAK_AGN', 'HYDRO_PLANCK', 'HYDRO_LOW_SIGMA8_STRONGEST_AGN', 'HYDRO_STRONG_JETS_published']
     if isinstance(sim_id, int):
         sim_list = sim_total[sim_id]
@@ -100,7 +104,8 @@ def kappa_map_gen_forJonah(box_id, sim_id, lc_id=0):
         boxsize_id = int(1)
     boxsize = boxsize_list[boxsize_id]
     zcmb = 1100
-    cosmo_info_file = f'{base_dir}{box}/{sim_list}/snapshots/flamingo_0009/flamingo_0009.0.hdf5'
+    z_max = 3.0
+    cosmo_info_file = f'{base_dir}{box}/{sim_list}/{snap_dir}/flamingo_0009/flamingo_0009.0.hdf5'
     cosmo_info=h5py.File(cosmo_info_file,'r')
     H0=cosmo_info['Cosmology'].attrs['h']*100.0
     Om0=cosmo_info['Cosmology'].attrs['Omega_m']
@@ -111,6 +116,7 @@ def kappa_map_gen_forJonah(box_id, sim_id, lc_id=0):
     T_cmb = T_nu*(4.0/11.0)**(-1.0/3.0)
     cosmo = FlatLambdaCDM(H0=H0[0], Om0=Om0[0], m_nu=m_nu[0], Ob0=Ob0[0], Tcmb0=T_cmb[0], Neff=1)
     chi_CMB =cosmo.comoving_distance(zcmb)
+    chi_z_max = cosmo.comoving_distance(z_max)
     print(cosmo)
     print(chi_CMB)
 
@@ -127,9 +133,25 @@ def kappa_map_gen_forJonah(box_id, sim_id, lc_id=0):
     for i in range(len(lightcone_files)):
 
         f = h5py.File(lightcone_files[i], 'r')
+        # chi_inner_shell=f['Shell'].attrs['comoving_inner_radius']
+        # z_min = z_at_value(cosmo.comoving_distance, chi_inner_shell*u.Mpc)
+        # print(i, z_min)
+
         chi_min[i]=f['Shell'].attrs['comoving_inner_radius']
         chi_max[i]=f['Shell'].attrs['comoving_outer_radius']
         chi_mid[i]=0.5*(chi_min[i]+chi_max[i])
+        print(i, chi_z_max, chi_mid[i]*u.Mpc)
+
+        if chi_mid[i]*u.Mpc > chi_z_max:
+            print(f"Shell {i} has z_mid > 3.0, skipping.")
+            lightcone_files = np.delete(lightcone_files, np.arange(i, len(lightcone_files)))
+            chi_min = chi_min[:i] 
+            chi_mid = chi_mid[:i] 
+            chi_max = chi_max[:i]
+            break
+
+    print(lightcone_files)
+    print(chi_mid[-1])
 
     chi_min*=u.Mpc
     chi_max*=u.Mpc

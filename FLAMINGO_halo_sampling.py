@@ -4,6 +4,7 @@ import numpy as np, polars as pl
 from imp_patchy_screening import patchyScreening
 from FLAMINGO_halo_redshifts import multiprocess_z_bins
 from pathlib import Path
+import time
 
 def halo_sampling(boxname, simname, z_sample, mass_cut, n_cut, ncpu, lightcone=0):
     box_list = ['L1000N1800', 'L2800N5040']
@@ -58,12 +59,20 @@ def halo_sampling(boxname, simname, z_sample, mass_cut, n_cut, ncpu, lightcone=0
 
     dndz_sample = np.loadtxt(f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/dndz_samples/{boxname}/{simname}/{z_sample}/lightcone{lightcone}/dndz_galaxies_sampled_{im_name}_{slope_name}.txt')
 
+    job_start_time = time.time()
+
     # dispatch in parallel
-    results = Parallel(n_jobs=int(ncpu),   # adjust to your cores
-                       backend='loky')(
-                           delayed(process_snapshot)(boxname, simname, int(i), z_stellar_cuts, halo_z_bins, dndz_sample, lightcone)
-                           for i in halo_z_bins['i']
-                       )
+    # results = Parallel(n_jobs=int(ncpu), prefer='processes', verbose=10,   # adjust to your cores
+    #                    backend='loky')(
+    #                        delayed(process_snapshot)(boxname, simname, int(i), z_stellar_cuts, halo_z_bins, dndz_sample, lightcone)
+    #                        for i in halo_z_bins['i']
+    #                    )
+
+    results = []
+    for iz in halo_z_bins['i']:
+        result = process_snapshot(boxname, simname, int(iz), z_stellar_cuts, halo_z_bins, dndz_sample, lightcone)
+        if result is not None:
+            results.append(result)
 
     print(results)
 
@@ -75,7 +84,9 @@ def halo_sampling(boxname, simname, z_sample, mass_cut, n_cut, ncpu, lightcone=0
     nhalo = mvir.size
     print(nhalo)
 
-    sampled_halo_data.write_parquet(output_path, compression='snappy')
+    print(f"Total job time: {time.time() - job_start_time:.2f} seconds")
+
+    sampled_halo_data.to_parquet(output_path, compression='snappy')
     return
 
 def process_snapshot(box, sim, iz, stellar_cuts, halo_z_bins, dndz_sample, lightcone):
@@ -86,18 +97,20 @@ def process_snapshot(box, sim, iz, stellar_cuts, halo_z_bins, dndz_sample, light
 
     im = stellar_cuts[iz][1]
 
-    ps = patchyScreening(box, sim, iz, im,  # or however you pass
-                         0, 0, 1,
-                         lightcone_method=('FULL','shell'), lightcone=lightcone)
-    ps.filter_stellar_mass()
+    # ps = patchyScreening(box, sim, iz, im,  # or however you pass
+    #                      0, 0, 1,
+    #                      lightcone_method=('FULL','shell'), lightcone=lightcone)
+    # ps.filter_stellar_mass()
+
+    df = pl.read_parquet(
+        f"/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/shell_caches/{box}/{sim}/lightcone{lightcone}/shell_{iz:03d}.parquet"
+    )
+    df = df.filter(pl.col("mstar") >= 10**(float(im)))
 
     nsamp = int(dndz_sample[iz][1])
     print(iz, nsamp)
 
-    try:
-        subdf = ps.merge.sample(n=nsamp, with_replacement=False, seed=1000)
-    except AttributeError:
-        return None    
+    subdf = df.sample(n=nsamp, replace=False, random_state=1000)
     print(iz, subdf)
 
     return subdf

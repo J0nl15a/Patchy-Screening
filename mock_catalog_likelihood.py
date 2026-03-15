@@ -1,3 +1,4 @@
+from pathlib import Path
 import numpy as np, pylab as pb
 from mock_catalog_emulator import emulator
 import emcee
@@ -73,12 +74,14 @@ if __name__ == '__main__':
     box = sys.argv[2]
     isim = sys.argv[3]
     iz = sys.argv[4]
-    lightcone = sys.argv[5]
+    lightcone = int(sys.argv[5])
 
     farren_data = np.loadtxt(f'./unWISExLens_lklh/data/v1.0/bandpowers/unWISExACT-DR6_{str(iz).lower()}_baseline_Clgg+Clkk+Clkg.dat', usecols=(0,1,3)).reshape(-1,3)
     obs_data_covariance = np.loadtxt(f'./unWISExLens_lklh/data/v1.0/covariances/covmat_Clgg+Clkg_unWISExACT-DR6_{str(iz).lower()}_baseline.dat')
     ell_200_mask = np.where(farren_data[:,0] > 200)
 
+    f_sim_auto = emulator(np.array((10.65, 0.45)), 'auto', box, isim, iz, save=True, retrain=True, lightcone=lightcone)
+    f_sim_cross = emulator(np.array((10.65, 0.45)), 'cross', box, isim, iz, save=True, retrain=True, lightcone=lightcone)
     prior_limits = np.load(f'./gpy_model/{box}/{isim}/{iz}/lightcone{lightcone}/training/prior_limits.npy')
     plateau_point = prior_limits[0]
     # m = prior_limits[1]
@@ -98,21 +101,21 @@ if __name__ == '__main__':
     #     test_cross = np.loadtxt(f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/power_spectra/kappa_galaxy/{box}/{str(isim)}/{str(iz)}/kappa_galaxy_power_spectrum_{test_name[0]}_{test_name[1]}.txt', 
     #                             delimiter=' ', skiprows=1, usecols=(1))
     
-    # f_obs = {'auto': farren_data[:,1][ell_200_mask] * 1e5, 'cross': farren_data[:,2][ell_200_mask] * 1e5}
-    # f_obs_err = {'auto': farren_data_var_auto * 1e5, 'cross': farren_data_var_cross * 1e5}
-    # print(np.sqrt(f_obs_err['auto'])*1e5, np.sqrt(f_obs_err['cross'])*1e5)
+    f_obs = {'auto': farren_data[:,1][ell_200_mask] * 1e5, 'cross': farren_data[:,2][ell_200_mask] * 1e5}
+    f_obs_err = {'auto': farren_data_var_auto * 1e5, 'cross': farren_data_var_cross * 1e5}
+    print(np.sqrt(f_obs_err['auto'])*1e5, np.sqrt(f_obs_err['cross'])*1e5)
 
-    test_auto = 10.8
-    test_cross = 0.5
-    f_obs = {'auto': test_auto, 'cross': test_cross}
-    f_obs_err = {'auto': (test_auto * .01)**2, 'cross': (test_cross * .01)**2}
+    # test_auto = 10.8
+    # test_cross = 0.5
+    # f_obs = {'auto': test_auto, 'cross': test_cross}
+    # f_obs_err = {'auto': (test_auto * .01)**2, 'cross': (test_cross * .01)**2}
 
     # if isim == 'HYDRO_FIDUCIAL':
         # print(log_probability((test_points[0], test_points[1]), f_obs, f_obs_err, box, isim, iz, plateau_point, c, vertical_limit))
     
     np.random.seed(1000)
     nll = lambda *args: -log_likelihood(*args)
-    initial = 10.85, 0.45 #test_points[0], test_points[1]
+    initial = 10.7, 0.4 #test_points[0], test_points[1]
     initial_name = f"{float(initial[0]):.3f}".replace('.', 'p'), f"{float(initial[1]):.3f}".replace('.', 'p')
     gaussian_offset = 0.05
     gaussian_offset_name = f"{float(gaussian_offset):.3f}".replace('.', 'p')
@@ -123,22 +126,40 @@ if __name__ == '__main__':
     pos = soln.x + 1e-4 * np.random.randn(walkers, 2)
     
     nwalkers, ndim = pos.shape
-    steps = 5000 * 20
+    steps = 5000
 
     prec = 4  # <-- change this to the number of decimals you want
     fmt  = f"%.{prec}f"
 
-    f_sim_auto = emulator(np.array((10.65, 0.45)), 'auto', box, isim, iz, save=True, retrain=True, lightcone=lightcone) #module.emulator(x, 'auto', isim, iz, load=True)
-    f_sim_cross = emulator(np.array((10.65, 0.45)), 'cross', box, isim, iz, save=True, retrain=True, lightcone=lightcone) #module.emulator(x, 'cross', isim, iz, load=True)
+    # f_sim_auto = emulator(np.array((10.65, 0.45)), 'auto', box, isim, iz, save=True, retrain=True, lightcone=lightcone) #module.emulator(x, 'auto', isim, iz, load=True)
+    # f_sim_cross = emulator(np.array((10.65, 0.45)), 'cross', box, isim, iz, save=True, retrain=True, lightcone=lightcone) #module.emulator(x, 'cross', isim, iz, load=True)
 
     # filename = f"./data_files/mcmc_chains/chain_walkers{nwalkers}_steps{steps}.h5"
     # backend = emcee.backends.HDFBackend(filename)
     # backend.reset(nwalkers, ndim)
 
-    sampler = multiprocess(f_obs, f_obs_err, box, isim, iz, plateau_point, c, vertical_limit, lightcone=lightcone) #, backend)
+    vals = np.array([log_probability(p, f_obs, f_obs_err, box, isim, iz, plateau_point, c, vertical_limit, lightcone=lightcone)
+                    for p in pos], dtype=float)
 
-    tau = sampler.get_autocorr_time()
-    print(tau)
+    print("finite:", np.isfinite(vals).sum(), "/", len(vals))
+    bad = np.where(~np.isfinite(vals))[0]
+    print("bad idx (first 10):", bad[:10])
+    for i in bad[:5]:
+        print("theta:", pos[i], "logp:", vals[i])
+
+    success = False
+    while not success:
+        try:
+            sampler = multiprocess(f_obs, f_obs_err, box, isim, iz, plateau_point, c, vertical_limit, lightcone=lightcone) #, backend)
+            tau = sampler.get_autocorr_time()
+            print(tau)
+            success = True
+        except emcee.autocorr.AutocorrError:
+            print("[WARNING] The chain is too short to estimate the autocorrelation time reliably.")
+            success = False
+            steps += 1000
+            continue
+
     burnin = int(2 * np.max(tau))
     thin = int(0.5 * np.min(tau))
 
@@ -185,18 +206,21 @@ if __name__ == '__main__':
     log_likelihood_mle = log_likelihood((mle_amp, mle_slope), f_obs, f_obs_err, box, isim, iz, lightcone=lightcone)
     print(f"[INFO] Log-Likelihood at MLE: {log_likelihood_mle}")
 
-    # # write to text file in a known place
-    # outfile = f"./data_files/mle_values_{box}_{isim}_{iz}.txt"
-    # with open(outfile, "w") as f:
-    #     f.write(f"LOG_LIKELIHOOD={log_likelihood_mle:.13f}\n")
-    #     f.write(f"AMP={mle_amp:.3f}\n")
-    #     f.write(f"SLOPE={mle_slope:.3f}\n")
-    #     f.write(f"AMP_ERR_LOWER={err_amp_lower:.4f}\n")
-    #     f.write(f"AMP_ERR_UPPER={err_amp_upper:.4f}\n")
-    #     f.write(f"SLOPE_ERR_LOWER={err_slope_lower:.4f}\n")
-    #     f.write(f"SLOPE_ERR_UPPER={err_slope_upper:.4f}\n")
+    # write to text file in a known place
+    path = f"./data_files/mle_parameters/{box}/{isim}/{iz}/lightcone{lightcone}/mle_values.txt"
+    outfile = Path(path)
+    outfile.parent.mkdir(parents=True, exist_ok=True)
 
-    # print(f"[INFO] Wrote MLEs to {outfile}")
+    with open(outfile, "w") as f:
+        f.write(f"LOG_LIKELIHOOD={log_likelihood_mle:.13f}\n")
+        f.write(f"AMP={mle_amp:.3f}\n")
+        f.write(f"SLOPE={mle_slope:.3f}\n")
+        f.write(f"AMP_ERR_LOWER={err_amp_lower:.4f}\n")
+        f.write(f"AMP_ERR_UPPER={err_amp_upper:.4f}\n")
+        f.write(f"SLOPE_ERR_LOWER={err_slope_lower:.4f}\n")
+        f.write(f"SLOPE_ERR_UPPER={err_slope_upper:.4f}\n")
+
+    print(f"[INFO] Wrote MLEs to {outfile}")
 
     x = np.array((mle_amp, mle_slope))
     f_sim_auto = emulator(x, 'auto', box, isim, iz, load=True, lightcone=lightcone) 

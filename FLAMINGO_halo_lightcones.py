@@ -1,9 +1,10 @@
 import os
-import numpy as np
+import numpy as np, polars as pl
 from joblib import Parallel, delayed
 from imp_patchy_screening import patchyScreening
 from FLAMINGO_halo_redshifts import multiprocess_z_bins
 from pathlib import Path
+import time
 
 def halo_lightcones(boxname, simname, z_sample, mass_cut, n_cut, ncpu, max_z=3.0, lightcone=0):
     box_list = ['L1000N1800', 'L2800N5040']
@@ -55,14 +56,26 @@ def halo_lightcones(boxname, simname, z_sample, mass_cut, n_cut, ncpu, max_z=3.0
         delimiter=None
     )
 
+    # only shells where midpoint z < 3.0 (halo_lightcones-style)
+    iz_list = sorted([iz for iz, z in zip(halo_z_bins['i'], halo_z_bins['mid_z']) if z < max_z])
+
     z_stellar_cuts = np.loadtxt(f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/z_dependant_stellar_cuts/{boxname}/{z_sample}/z_stellar_cut_data_{im_name}_{slope_name}.txt')
 
+    job_start_time = time.time()
+
+    # 3+ hours
     # dispatch in parallel
-    results = Parallel(n_jobs=int(ncpu),   # adjust to your cores
-                       backend='loky')(
-                           delayed(process_snapshot)(boxname, simname, int(i), z_stellar_cuts, halo_z_bins, lightcone)
-                           for i in halo_z_bins['i']
-                       )
+    # results = Parallel(n_jobs=int(ncpu), prefer='processes', verbose=10,   # adjust to your cores
+    #                    backend='loky')(
+    #                        delayed(process_snapshot)(boxname, simname, int(i), z_stellar_cuts, lightcone)
+    #                        for i in iz_list
+    #                    )
+
+    # 3827 seconds
+    results = []
+    for i in iz_list:
+        result = process_snapshot(boxname, simname, int(i), z_stellar_cuts, lightcone)
+        results.append(result)
 
     print(results)
     idx, data = zip(*[r for r in results if r is not None])
@@ -77,23 +90,34 @@ def halo_lightcones(boxname, simname, z_sample, mass_cut, n_cut, ncpu, max_z=3.0
     print(total_nhalo)
     
     np.savetxt(output_path, out, fmt='%d %d', header=f"Total number of suitable halos: {total_nhalo}", comments='')
+    
+    print(f'Finished processing halo lightcone data: {time.time() - job_start_time}s')
             
     return
 
-def process_snapshot(box, sim, iz, stellar_cuts, halo_z_bins, lightcone):
-    if halo_z_bins['mid_z'][iz] > 3.0:
-        return None
+def process_snapshot(box, sim, iz, stellar_cuts, lightcone):
+    # if halo_z_bins['mid_z'][iz] > 3.0:
+    #     return None
+    print(f'Processing snapshot {iz}...')
 
     im = stellar_cuts[int(iz)][1]
     print(f'im={im}')
 
-    ps = patchyScreening(box, sim, iz, im,  # or however you pass
-                         0 ,0, 1,
-                         lightcone_method=('FULL','shell'), lightcone=lightcone)
-    ps.filter_stellar_mass()
-    print(f'ps.im={ps.im}')
+    # ps = patchyScreening(box, sim, iz, im,  # or however you pass
+    #                      0, 1,
+    #                      lightcone_method=('FULL','shell'), lightcone=lightcone)
+    # ps.filter_stellar_mass()
+    # print(f'ps.im={ps.im}')
 
-    return iz, ps.nhalo
+    df = pl.read_parquet(
+        f"/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/shell_caches/{box}/{sim}/lightcone{lightcone}/shell_{iz:03d}.parquet"
+    )
+    df = df.filter(pl.col("mstar") >= 10**(float(im)))
+    nhalo = len(df)
+
+    print(f'Processed snapshot {iz}, number of halos after stellar mass cut: {nhalo}')
+
+    return iz, nhalo #ps.nhalo
 
 if __name__ == '__main__':
     import sys, re, textwrap
@@ -134,6 +158,7 @@ if __name__ == '__main__':
                ('z_max', 'f8')],
         delimiter=None
     )
+
     FLAMINGO_mid_point = halo_z_bins['mid_z'][np.where(halo_z_bins['mid_z'] <= 3.0)]
     print(FLAMINGO_mid_point)
     

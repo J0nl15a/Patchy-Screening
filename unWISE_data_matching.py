@@ -121,9 +121,7 @@ def unWISE_data_matching(boxname, simname, z_sample, mass_cut, n_cut, nsamp='nto
     conflict = True
     while conflict == True:
 
-        #rescaled_nsamp, count = rescale_dndz(difference, halo_lightcones, galaxies_required, nsamp, count)
         galaxies_required = compute_galaxies_required(FLAMINGO_mid_point, FLAMINGO_z_bins, m, nsamp, total_area, halo_lightcones[:,1])
-        #conflict, difference = validate_required_vs_available(galaxies_required, halo_lightcones[:,1])
         difference = validate_required_vs_available(galaxies_required, halo_lightcones[:,1])
         nsamp, galaxies_required, conflict, count = rescale_dndz(difference, halo_lightcones, galaxies_required, nsamp, FLAMINGO_mid_point, count, z_sample)
 
@@ -174,8 +172,6 @@ def compute_galaxies_required(FLAMINGO_mid_point, FLAMINGO_z_bins, dndz_func, ns
     for i in range(len(FLAMINGO_mid_point)):
         if halo_lightcones[i] == 0:
             galaxies_required.append(0)
-            '''elif FLAMINGO_mid_point[i] > z_limit:
-            galaxies_required.append(halo_lightcones[i])'''
         else:
             delta_z = FLAMINGO_z_bins[i+1] - FLAMINGO_z_bins[i]
             required = dndz_func(FLAMINGO_mid_point[i]) * (nsamp/total_area) * delta_z
@@ -185,8 +181,7 @@ def compute_galaxies_required(FLAMINGO_mid_point, FLAMINGO_z_bins, dndz_func, ns
 
 def validate_required_vs_available(galaxies_required, available_counts):
     diff = galaxies_required - available_counts
-    #excess = diff > 0.0
-    return diff #excess.any(), diff
+    return diff 
 
 def write_sampled_galaxies_file(outfile_name, FLAMINGO_mid_point, galaxies_required, nsamp):
     with open(outfile_name, 'w') as outfile:
@@ -201,9 +196,13 @@ def write_sampled_galaxies_file(outfile_name, FLAMINGO_mid_point, galaxies_requi
 def rescale_dndz(difference, halo_lightcones, galaxies_required, nsamp, FLAMINGO_mid_point, count, galaxy_sample):
     count+=1
     if galaxy_sample == 'Blue':
-        z_limit = 2.0
+        z_mean = 0.6
+        z_width = 0.3
+        z_limit = (7 * (z_width / 2)) + z_mean 
     elif galaxy_sample == 'Green':
-        z_limit = 2.5
+        z_mean = 1.1
+        z_width = 0.4
+        z_limit = (7 * (z_width / 2)) + z_mean
     print(difference)
     excess = difference > 0.0
     if excess.any() == False:
@@ -214,15 +213,16 @@ def rescale_dndz(difference, halo_lightcones, galaxies_required, nsamp, FLAMINGO
         print(diff_indicies)
         max_diff_index = np.argmax(difference[np.where(FLAMINGO_mid_point <= z_limit)])
         print(max_diff_index)
-        print(FLAMINGO_mid_point[np.argmin(diff_indicies)])
+        print(FLAMINGO_mid_point[min(diff_indicies)])
         print(np.argmax(np.where(FLAMINGO_mid_point <= z_limit)))
-        if FLAMINGO_mid_point[np.argmin(diff_indicies)] > z_limit or difference[max_diff_index] < 0.0: 
+        if FLAMINGO_mid_point[min(diff_indicies)] > z_limit: #or difference[max_diff_index] < 0.0: 
             print(f'Past z={z_limit}')
+            oversampled = np.where(galaxies_required[diff_indicies] > halo_lightcones[diff_indicies, 1])[0]
+            galaxies_required[diff_indicies[oversampled]] = halo_lightcones[diff_indicies[oversampled], 1]
             print(galaxies_required[np.where(FLAMINGO_mid_point > z_limit)], halo_lightcones[np.where(FLAMINGO_mid_point > z_limit), 1])
-            galaxies_required[np.where(FLAMINGO_mid_point > z_limit)] = halo_lightcones[np.where(FLAMINGO_mid_point > z_limit), 1]
             print(galaxies_required)
             return nsamp, galaxies_required, False, count
-        elif FLAMINGO_mid_point[np.argmin(diff_indicies)] <= z_limit: #and FLAMINGO_mid_point[max_diff_index] <= z_limit:
+        elif FLAMINGO_mid_point[np.argmin(diff_indicies)] <= z_limit:
             print('Rescaling required')
             print(FLAMINGO_mid_point[max_diff_index])
             print(difference[max_diff_index])

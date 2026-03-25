@@ -12,7 +12,7 @@ def build_shell_cache_one(
     iz: int,
     lightcone: int,
     outdir: str,
-    stellar_cut: float = 9.5,
+    stellar_cut: float = 8.0,
     overwrite: bool = False,
     seed_base: int = 10_000,
 ):
@@ -52,7 +52,7 @@ def build_shell_cache(
     lightcone: int,
     outdir: str,
     max_z: float = 3.0,
-    stellar_cut: float = 9.5,
+    stellar_cut: float = 8.0,
     ncpu: int = 8,
     prefer: str = "processes",
     verbose: int = 10,
@@ -106,7 +106,7 @@ if __name__ == "__main__":
         boxname, simname, lightcone,
         outdir,
         max_z=3.0,
-        stellar_cut=9.5,
+        stellar_cut=8.0,
         ncpu=ncpu,
         prefer="processes",
         overwrite=True

@@ -151,7 +151,7 @@ try:
     kappa_map = hp.read_map(f'./data_files/kappa_maps/{box}/{isim}/lightcone{lightcone}/kappa_nonrot.fits', dtype=np.float64, verbose=False)
 except FileNotFoundError:
     # kappa_map = load_kappa_map(isim)
-    kappa_map = kappa_map_gen_forJonah(box, isim)
+    kappa_map = kappa_map_gen_forJonah(box, isim, lightcone)
 kappa_map = hp.pixelfunc.ud_grade(kappa_map, nside_cl)
 
 print('Finished loading kappa map: {:.2f} seconds'.format(time.time() - job_start_time))
@@ -259,7 +259,10 @@ for i in range(len(nhalos)):
     w_cross = nmt.NmtWorkspace.from_fields(f_kappa, f_galaxy, b)
     cl_cross_namaster = w_cross.decouple_cell(pcl_cross - deproj_cross).squeeze()[ell_200_mask]
 
-    cross_spectra_list.append(savgol_filter(cl_cross_namaster, window_length=10, polyorder=5))
+    if smooth:
+        cross_spectra_list.append(savgol_filter(cl_cross_namaster, window_length=10, polyorder=5))
+    elif not smooth:
+        cross_spectra_list.append(cl_cross_namaster)
 
     if covariance:
         w_cross = nmt.NmtWorkspace.from_fields(f_kappa, f_galaxy, b)

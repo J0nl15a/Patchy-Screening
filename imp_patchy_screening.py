@@ -21,7 +21,7 @@ class patchyScreening:
         os.environ["POLARS_MAX_THREADS"] = str(ncpu)
         self.job_start_time = time.time()
         box_list = ['L1000N1800', 'L2800N5040']
-        sim_list = ['HYDRO_FIDUCIAL','HYDRO_PLANCK','HYDRO_PLANCK_LARGE_NU_FIXED','HYDRO_PLANCK_LARGE_NU_VARY','HYDRO_STRONG_AGN','HYDRO_WEAK_AGN','HYDRO_LOW_SIGMA8','HYDRO_STRONGER_AGN','HYDRO_JETS_published','HYDRO_STRONGEST_AGN','HYDRO_STRONG_SUPERNOVA','HYDRO_STRONGER_AGN_STRONG_SUPERNOVA','HYDRO_STRONG_JETS_published']
+        sim_list = ['HYDRO_FIDUCIAL','HYDRO_PLANCK','HYDRO_PLANCK_LARGE_NU_FIXED','HYDRO_PLANCK_LARGE_NU_VARY','HYDRO_STRONG_AGN','HYDRO_WEAK_AGN','HYDRO_LOW_SIGMA8','HYDRO_STRONGER_AGN','HYDRO_JETS_published','HYDRO_STRONGEST_AGN','HYDRO_STRONG_SUPERNOVA','HYDRO_STRONGER_AGN_STRONG_SUPERNOVA','HYDRO_STRONG_JETS_published','HYDRO_LOW_SIGMA8_STRONGEST_AGN']
 
         try:
             box = int(box)
@@ -322,6 +322,7 @@ class patchyScreening:
             if self.merge.is_empty():
                 self.merge = np.nan
         elif self.lightcone_method[1] == 'dndz':
+            print(f"/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/mock_halo_catalogs/{self.boxname}/{self.simname}/{self.z_sample_name}/lightcone{self.lightcone}/sampled_halo_data_{self.im_name}_{self.slope_name}.parquet")
             self.merge = pl.read_parquet(
                 f"/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/mock_halo_catalogs/{self.boxname}/{self.simname}/{self.z_sample_name}/lightcone{self.lightcone}/sampled_halo_data_{self.im_name}_{self.slope_name}.parquet"
             )

@@ -10,12 +10,27 @@ LIGHTCONE="${4:-0}"
 AMP_MIN="10.3"
 AMP_MAX="11.3"
 AMP_STEP="0.1"
+
 SLOPE_MIN="0.0"
-SLOPE_MAX="1.0"
 SLOPE_STEP="0.1"
+
+if [ "$IZ" = "Green" ]; then
+    SLOPE_MAX=1.0
+elif [ "$IZ" = "Blue" ]; then
+    SLOPE_MAX=2.0
+else
+    echo "ERROR: IZ must be 'Green' or 'Blue' (got '$IZ')" >&2
+    exit 1
+fi
+
+PRECISION="1"
+ABUNDANCE_CUT="0.02"
 
 # Fixed number of shell caches
 NSHELL=60
+NAMP=$(seq "$AMP_MIN" "$AMP_STEP" "$AMP_MAX" | wc -l)
+NSLOPE=$(seq "$SLOPE_MIN" "$SLOPE_STEP" "$SLOPE_MAX" | wc -l)
+NGRID=$(( NAMP * NSLOPE ))
 
 if [ -d "./batch_files/caching_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}" ] && \
    [ -d "./batch_files/pipeline_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}" ] && \
@@ -38,14 +53,13 @@ rm ./batch_files/maximum_likelihood_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCO
 # ============================================================
 # Step 0: shell caching
 # ============================================================
-# --export=ALL,BOX="${BOX}",ISIM="${ISIM}",IZ="${IZ}",LIGHTCONE="${LIGHTCONE}" \
 jid0=$(sbatch --parsable \
               --export=ALL,BOX="${BOX}",ISIM="${ISIM}",IZ="${IZ}",LIGHTCONE="${LIGHTCONE}",AMP_MIN="${AMP_MIN}",AMP_MAX="${AMP_MAX}",AMP_STEP="${AMP_STEP}",SLOPE_MIN="${SLOPE_MIN}",SLOPE_MAX="${SLOPE_MAX}",SLOPE_STEP="${SLOPE_STEP}",NSHELL="${NSHELL}" \
               --job-name=shell_caching_stellar_cuts \
               -c 16 \
               -p cosma8 \
               -A dp203 \
-              -t 02:30:00 \
+              -t 01:00:00 \
               -o "./batch_files/caching_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}/job.%j.dump" \
               -e "./batch_files/caching_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}/job.%j.err" \
               <<EOF
@@ -59,7 +73,7 @@ echo ">>> Launching caching with Box='${BOX}' Sim='${ISIM}' Lightcone='${LIGHTCO
 module purge
 set +u
 [ -f "$HOME/.bashrc" ] && . "$HOME/.bashrc"
-mamba activate patchy_screening
+conda activate patchy_screening
 set -u
 
 export OMP_NUM_THREADS=1
@@ -72,7 +86,7 @@ echo "    Received arguments: ncpu='\$SLURM_CPUS_PER_TASK', Box='${BOX}', Sim='$
 echo "=============================="
 
 all_found=true
-for i in \$(seq -w 0 $((NSHELL - 1))); do
+for i in \$(seq -f "%03g" 0 $((NSHELL - 1))); do
     [ -f "./data_files/shell_caches/${BOX}/${ISIM}/lightcone${LIGHTCONE}/shell_\${i}.parquet" ] || { all_found=false; break; }
 done
 
@@ -145,10 +159,10 @@ else
                   --dependency=afterok:${jid0} \
                   --kill-on-invalid-dep=yes \
                   --job-name=lightcones_shells \
-                  -c 16 \
+                  -c 4 \
                   -p cosma8 \
                   -A dp203 \
-                  -t 02:00:00 \
+                  -t 00:20:00 \
                   --array=0-$((NSHELL-1))%20 \
                   -o "./batch_files/pipeline_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}/job.%A_%a.dump" \
                   -e "./batch_files/pipeline_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}/job.%A_%a.err" \
@@ -161,7 +175,7 @@ set -euo pipefail
 module purge
 set +u
 [ -f "$HOME/.bashrc" ] && . "$HOME/.bashrc"
-mamba activate patchy_screening
+conda activate patchy_screening
 set -u
 
 export OMP_NUM_THREADS=1
@@ -219,14 +233,14 @@ if [ "$all_found_lightcones" = true ] &&
         echo "Found matched catalog for — skipping unWISE_data_matching.py"
 else
   jid3=$(sbatch --parsable \
-                --export=ALL,BOX="${BOX}",ISIM="${ISIM}",IZ="${IZ}",LIGHTCONE="${LIGHTCONE}",AMP_MIN="${AMP_MIN}",AMP_MAX="${AMP_MAX}",AMP_STEP="${AMP_STEP}",SLOPE_MIN="${SLOPE_MIN}",SLOPE_MAX="${SLOPE_MAX}",SLOPE_STEP="${SLOPE_STEP}",all_found_lightcones="${all_found_lightcones}",all_found_dndz="${all_found_dndz}" \
+                --export=ALL,BOX="${BOX}",ISIM="${ISIM}",IZ="${IZ}",LIGHTCONE="${LIGHTCONE}",AMP_MIN="${AMP_MIN}",AMP_MAX="${AMP_MAX}",AMP_STEP="${AMP_STEP}",SLOPE_MIN="${SLOPE_MIN}",SLOPE_MAX="${SLOPE_MAX}",SLOPE_STEP="${SLOPE_STEP}",NSHELL="${NSHELL}",PREV_ARRAY_ID="${jid2}",all_found_lightcones="${all_found_lightcones}",all_found_dndz="${all_found_dndz}" \
                 --dependency=afterok:${jid2} \
                 --kill-on-invalid-dep=yes \
                 --job-name=combine_lightcones_unWISE_matching \
                 -c 4 \
                 -p cosma8 \
                 -A dp203 \
-                -t 02:00:00 \
+                -t 01:00:00 \
                 -o "./batch_files/pipeline_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}/job.%j.dump" \
                 -e "./batch_files/pipeline_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}/job.%j.err" \
 <<EOF
@@ -238,7 +252,7 @@ set -euo pipefail
 module purge
 set +u
 [ -f "$HOME/.bashrc" ] && . "$HOME/.bashrc"
-mamba activate patchy_screening
+conda activate patchy_screening
 set -u
 
 export OMP_NUM_THREADS=1
@@ -261,6 +275,11 @@ else
 fi
 
 echo "Job 3: Combine halo lightcone shells for box ${BOX}, sim ${ISIM}, lightcone ${LIGHTCONE}, ${IZ} sample for all stellar cut parameters into single halo totals files."
+
+for ((i=0; i<=NSHELL-2; i++)); do
+    rm -f "./batch_files/pipeline_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}/job.\${PREV_ARRAY_ID}_\${i}."dump
+    rm -f "./batch_files/pipeline_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}/job.\${PREV_ARRAY_ID}_\${i}."err
+done
 
 echo "=== Step 3 (Job ID \$SLURM_JOB_ID) starting"
 echo "    Received arguments: Box='${BOX}', Sim='${ISIM}', Lightcone='${LIGHTCONE}', Sample='${IZ}', nsamp='ntotal'"
@@ -324,10 +343,10 @@ else
                   --dependency=afterok:${jid3} \
                   --kill-on-invalid-dep=yes \
                   --job-name=sampling_shells \
-                  -c 16 \
+                  -c 4 \
                   -p cosma8 \
                   -A dp203 \
-                  -t 02:00:00 \
+                  -t 01:00:00 \
                   --array=0-$((NSHELL-1))%20 \
                   -o "./batch_files/pipeline_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}/job.%A_%a.dump" \
                   -e "./batch_files/pipeline_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}/job.%A_%a.err" \
@@ -340,7 +359,7 @@ set -euo pipefail
 module purge
 set +u
 [ -f "$HOME/.bashrc" ] && . "$HOME/.bashrc"
-mamba activate patchy_screening
+conda activate patchy_screening
 set -u
 
 export OMP_NUM_THREADS=1
@@ -378,11 +397,11 @@ if [ "$all_found_sampling" = true ]; then
     echo "Found all sampled catalogs — skipping combine_halo_sampling.py"
 else
     jid6=$(sbatch --parsable \
-                  --export=ALL,BOX="${BOX}",ISIM="${ISIM}",IZ="${IZ}",LIGHTCONE="${LIGHTCONE}",AMP_MIN="${AMP_MIN}",AMP_MAX="${AMP_MAX}",AMP_STEP="${AMP_STEP}",SLOPE_MIN="${SLOPE_MIN}",SLOPE_MAX="${SLOPE_MAX}",SLOPE_STEP="${SLOPE_STEP}" \
+                  --export=ALL,BOX="${BOX}",ISIM="${ISIM}",IZ="${IZ}",LIGHTCONE="${LIGHTCONE}",AMP_MIN="${AMP_MIN}",AMP_MAX="${AMP_MAX}",AMP_STEP="${AMP_STEP}",SLOPE_MIN="${SLOPE_MIN}",SLOPE_MAX="${SLOPE_MAX}",SLOPE_STEP="${SLOPE_STEP}",NSHELL="${NSHELL}",PREV_ARRAY_ID="${jid5}" \
                   --dependency=afterok:${jid5} \
                   --kill-on-invalid-dep=yes \
                   --job-name=combine_sampling \
-                  -c 16 \
+                  -c 8 \
                   -p cosma8 \
                   -A dp203 \
                   -t 04:00:00 \
@@ -397,7 +416,7 @@ set -euo pipefail
 module purge
 set +u
 [ -f "$HOME/.bashrc" ] && . "$HOME/.bashrc"
-mamba activate patchy_screening
+conda activate patchy_screening
 set -u
 
 export OMP_NUM_THREADS=1
@@ -433,6 +452,11 @@ done
 
 echo "Job 6: Combine sampled halo lightcone shells into single mock galaxy catalogs for box ${BOX}, sim ${ISIM}, lightcone ${LIGHTCONE}, ${IZ} sample for all stellar cut parameters."
 
+for ((i=0; i<=NSHELL-2; i++)); do
+    rm -f "./batch_files/pipeline_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}/job.${PREV_ARRAY_ID}_${i}."dump
+    rm -f "./batch_files/pipeline_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}/job.${PREV_ARRAY_ID}_${i}."err
+done
+
 echo "Job done, info follows."
 sacct -j $SLURM_JOB_ID --format=JobID,JobName,Partition,AveRSS,MaxRSS,AveVMSize,MaxVMSize,Elapsed,ExitCode
 
@@ -459,7 +483,7 @@ for amp in $(seq "$AMP_MIN" "$AMP_STEP" "$AMP_MAX"); do
     file1="./data_files/power_spectra/galaxy_galaxy/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}/galaxy_galaxy_power_spectrum_${amp_name}_${slope_name}.txt"
     file2="./data_files/power_spectra/kappa_galaxy/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}/kappa_galaxy_power_spectrum_${amp_name}_${slope_name}.txt"
 
-    if [ ! -f "$file1" ] && [ ! -f "$file2" ]; then
+    if [ ! -f "$file1" ] || [ ! -f "$file2" ]; then
       all_found_spectra=false
       echo "Missing: $file1 or $file2"
       break 2
@@ -471,17 +495,18 @@ if [ "$all_found_spectra" = true ]; then
     echo "Found all spectra — skipping unWISE_power_spectra.py"
 else
     jid7=$(sbatch --parsable \
-                  --export=ALL,BOX="${BOX}",ISIM="${ISIM}",IZ="${IZ}",LIGHTCONE="${LIGHTCONE}",AMP_MIN="${AMP_MIN}",AMP_MAX="${AMP_MAX}",AMP_STEP="${AMP_STEP}",SLOPE_MIN="${SLOPE_MIN}",SLOPE_MAX="${SLOPE_MAX}",SLOPE_STEP="${SLOPE_STEP}" \
-                  --dependency=afterok:${jid6} --kill-on-invalid-dep=yes \
+                  --export=ALL,BOX="${BOX}",ISIM="${ISIM}",IZ="${IZ}",LIGHTCONE="${LIGHTCONE}",AMP_MIN="${AMP_MIN}",AMP_MAX="${AMP_MAX}",AMP_STEP="${AMP_STEP}",SLOPE_MIN="${SLOPE_MIN}",SLOPE_MAX="${SLOPE_MAX}",SLOPE_STEP="${SLOPE_STEP}",NAMP="${NAMP}",NSLOPE="${NSLOPE}" \
+                  --dependency=afterok:${jid6} \
+                  --kill-on-invalid-dep=yes \
                   --job-name=power_spectra \
                   -c 8 \
                   -p cosma8 \
                   -A dp203 \
                   -t 02:00:00 \
-                  --array=0-120%20 \
+                  --array=0-$((NGRID-1))%20 \
                   -o "./batch_files/pipeline_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}/job.%A_%a.dump" \
                   -e "./batch_files/pipeline_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}/job.%A_%a.err" \
-<<EOF
+<<'EOF'
 #!/usr/bin/env bash
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=ARIJCONL@ljmu.ac.uk
@@ -490,7 +515,7 @@ set -euo pipefail
 module purge
 set +u
 [ -f "$HOME/.bashrc" ] && . "$HOME/.bashrc"
-mamba activate patchy_screening
+conda activate patchy_screening
 set -u
 
 export OMP_NUM_THREADS=1
@@ -499,36 +524,36 @@ export MKL_NUM_THREADS=1
 export NUMEXPR_NUM_THREADS=1
 
 # grid sizes
-A_SIZE=11   # number of amp values: 10.3..11.3 step 0.1
-S_SIZE=11   # number of slope values: 0.0..1.0 step 0.1
+A_SIZE=${NAMP}    # number of amp values: 10.3..11.3 step 0.1
+S_SIZE=${NSLOPE}  # number of slope values: 0.0..1.0 step 0.1 
 
 # decode array index -> (amp, slope)
-A_IDX=\$(( SLURM_ARRAY_TASK_ID / S_SIZE ))
-S_IDX=\$(( SLURM_ARRAY_TASK_ID % S_SIZE ))
+A_IDX=$(( SLURM_ARRAY_TASK_ID / S_SIZE ))
+S_IDX=$(( SLURM_ARRAY_TASK_ID % S_SIZE ))
 
-amp=\$(awk -v i="\$A_IDX" 'BEGIN{printf "%.1f", 10.3 + 0.1*i}')
-slope=\$(awk -v i="\$S_IDX" 'BEGIN{printf "%.1f", 0.0 + 0.1*i}')
+amp=$(awk -v i="$A_IDX" -v amin="${AMP_MIN}" -v astep="${AMP_STEP}" 'BEGIN{printf "%.1f", amin + astep*i}')
+slope=$(awk -v i="$S_IDX" -v smin="${SLOPE_MIN}" -v sstep="${SLOPE_STEP}" 'BEGIN{printf "%.1f", smin + sstep*i}')
 
-amp_name=\${amp//./p}
-slope_name=\${slope//./p}
+amp_name=${amp//./p}
+slope_name=${slope//./p}
 
-echo "=== Step 7 (Job ID \$SLURM_JOB_ID) starting"
+echo "=== Step 7 (Job ID $SLURM_JOB_ID) starting"
 echo "    Received arguments: Box='${BOX}', Sim='${ISIM}', Lightcone='${LIGHTCONE}', Sample='${IZ}', nsamp='ntotal'"
 echo "=============================="
 
-if [ -f "./data_files/power_spectra/galaxy_galaxy/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}/galaxy_galaxy_power_spectrum_\${amp_name}_\${slope_name}.txt" ] && \
-   [ -f "./data_files/power_spectra/kappa_galaxy/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}/kappa_galaxy_power_spectrum_\${amp_name}_\${slope_name}.txt" ]; then
+if [ -f "./data_files/power_spectra/galaxy_galaxy/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}/galaxy_galaxy_power_spectrum_${amp_name}_${slope_name}.txt" ] && \
+   [ -f "./data_files/power_spectra/kappa_galaxy/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}/kappa_galaxy_power_spectrum_${amp_name}_${slope_name}.txt" ]; then
     echo "Found existing galaxy-galaxy and kappa-galaxy spectra file — skipping unWISE_power_spectra.py"
 else 
     python3 unWISE_power_spectra.py \
-      \$SLURM_CPUS_PER_TASK "${BOX}" "${ISIM}" "${IZ}" "\$amp" "\$slope" \
-      unlensed True False True True True False "${LIGHTCONE}"
+      "$SLURM_CPUS_PER_TASK" "${BOX}" "${ISIM}" "${IZ}" "$amp" "$slope" \
+      unlensed True False False True True False "${LIGHTCONE}"
 fi
 
 echo "Job 7: Compute power spectra for box ${BOX}, sim ${ISIM}, lightcone ${LIGHTCONE}, ${IZ} sample for all stellar cut parameters."
 
 echo "Job done, info follows."
-sacct -j \$SLURM_JOB_ID --format=JobID,JobName,Partition,AveRSS,MaxRSS,AveVMSize,MaxVMSize,Elapsed,ExitCode
+sacct -j $SLURM_JOB_ID --format=JobID,JobName,Partition,AveRSS,MaxRSS,AveVMSize,MaxVMSize,Elapsed,ExitCode
 
 EOF
     )
@@ -540,7 +565,7 @@ fi
 # Step 8: mock likelihood
 # ============================================================
 jid8=$(sbatch --parsable \
-            --export=ALL,BOX="${BOX}",ISIM="${ISIM}",IZ="${IZ}",LIGHTCONE="${LIGHTCONE}" \
+            --export=ALL,BOX="${BOX}",ISIM="${ISIM}",IZ="${IZ}",LIGHTCONE="${LIGHTCONE}",AMP_MIN="${AMP_MIN}",AMP_MAX="${AMP_MAX}",AMP_STEP="${AMP_STEP}",SLOPE_MIN="${SLOPE_MIN}",SLOPE_MAX="${SLOPE_MAX}",SLOPE_STEP="${SLOPE_STEP}",ABUNDANCE_CUT="${ABUNDANCE_CUT}",NGRID="${NGRID}",PREV_ARRAY_ID="${jid7}" \
             --dependency=afterok:${jid7} \
             --kill-on-invalid-dep=yes \
             --job-name=mock_catalog_maximum_likelihood_estimation \
@@ -564,16 +589,24 @@ export NUMEXPR_NUM_THREADS=1
 module purge
 set +u
 [ -f "$HOME/.bashrc" ] && . "$HOME/.bashrc"
-mamba activate patchy_screening
+conda activate patchy_screening
 set -u
 
 echo "=== Step 8 (Job ID \$SLURM_JOB_ID) starting"
 echo "    Received arguments: ncpu='\$SLURM_CPUS_PER_TASK', Box='${BOX}', Sim='${ISIM}', Lightcone='${LIGHTCONE}', Sample='${IZ}'"
 echo "=============================="
 
-python3 mock_catalog_likelihood_parallel.py "\$SLURM_CPUS_PER_TASK" "${BOX}" "${ISIM}" "${IZ}" "${LIGHTCONE}"
+python3 mock_catalog_likelihood_parallel.py \
+    "\$SLURM_CPUS_PER_TASK" "${BOX}" "${ISIM}" "${IZ}" "${LIGHTCONE}" "${ABUNDANCE_CUT}" \
+    "${AMP_MIN}" "${AMP_MAX}" "${AMP_STEP}" \
+    "${SLOPE_MIN}" "${SLOPE_MAX}" "${SLOPE_STEP}"
 
 echo "Job 8: Compute maximum likelihood estimates for box ${BOX}, sim ${ISIM}, lightcone ${LIGHTCONE}, ${IZ} sample."
+
+for ((i=0; i<=NGRID-2; i++)); do
+    rm -f "./batch_files/pipeline_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}/job.\${PREV_ARRAY_ID}_\${i}."dump
+    rm -f "./batch_files/pipeline_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}/job.\${PREV_ARRAY_ID}_\${i}."err
+done
 
 echo "Job done, info follows."
 sacct -j \$SLURM_JOB_ID --format=JobID,JobName,Partition,AveRSS,MaxRSS,AveVMSize,MaxVMSize,Elapsed,ExitCode
@@ -592,10 +625,10 @@ jid9=$(sbatch --parsable \
                 --dependency=afterok:${jid8} \
                 --kill-on-invalid-dep=yes \
                 --job-name=mle_stellar_cut \
-                -c 4 \
+                -c 1 \
                 -p cosma8 \
                 -A dp203 \
-                -t 00:20:00 \
+                -t 00:01:00 \
                 -o "./batch_files/pipeline_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}/job.mle_%j.dump" \
                 -e "./batch_files/pipeline_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}/job.mle_%j.err" \
 <<'EOF'
@@ -612,7 +645,7 @@ export NUMEXPR_NUM_THREADS=1
 module purge
 set +u
 [ -f "$HOME/.bashrc" ] && . "$HOME/.bashrc"
-mamba activate patchy_screening
+conda activate patchy_screening
 set -u
 
 mle_amp=$(grep -m1 '^AMP' "$MLE_FILE" | cut -d'=' -f2 | xargs)
@@ -623,7 +656,7 @@ echo "    Received arguments: Box='$BOX', Sim='$ISIM', Lightcone='$LIGHTCONE', S
 echo "=============================="
 
 if [ -f "./data_files/z_dependant_stellar_cuts/${BOX}/${IZ}/z_stellar_cut_data_${mle_amp//./p}_${mle_slope//./p}.txt" ]; then
-    echo "Found shell totals for MLE values — skipping FLAMINGO_halo_lightcones_shell.py"
+    echo "Found stellar cut data for MLE values — skipping FLAMINGO_halo_lightcones_shell.py"
 else
     python3 stellar_cut_z.py "$SLURM_CPUS_PER_TASK" "$BOX" "$ISIM" "$IZ" "$mle_amp" "$mle_slope" "$LIGHTCONE"
 fi
@@ -643,10 +676,10 @@ jid10=$(sbatch --parsable \
                 --export=ALL,BOX="${BOX}",ISIM="${ISIM}",IZ="${IZ}",LIGHTCONE="${LIGHTCONE}",MLE_FILE="${MLE_FILE}" \
                 --dependency=afterok:${jid9} --kill-on-invalid-dep=yes \
                 --job-name=mle_lightcones_shells \
-                -c 16 \
+                -c 4 \
                 -p cosma8 \
                 -A dp203 \
-                -t 02:00:00 \
+                -t 00:20:00 \
                 --array=0-$((NSHELL-1))%20 \
                 -o "./batch_files/pipeline_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}/job.mle_%A_%a.dump" \
                 -e "./batch_files/pipeline_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}/job.mle_%A_%a.err" \
@@ -664,7 +697,7 @@ export NUMEXPR_NUM_THREADS=1
 module purge
 set +u
 [ -f "$HOME/.bashrc" ] && . "$HOME/.bashrc"
-mamba activate patchy_screening
+conda activate patchy_screening
 set -u
 
 mle_amp=$(grep -m1 '^AMP' "$MLE_FILE" | cut -d'=' -f2 | xargs)
@@ -696,14 +729,14 @@ EOF
 # Step 11: Combine lightcones for MLE values only
 # ============================================================
 jid11=$(sbatch --parsable \
-                --export=ALL,BOX="${BOX}",ISIM="${ISIM}",IZ="${IZ}",LIGHTCONE="${LIGHTCONE}",MLE_FILE="${MLE_FILE}" \
+                --export=ALL,BOX="${BOX}",ISIM="${ISIM}",IZ="${IZ}",LIGHTCONE="${LIGHTCONE}",MLE_FILE="${MLE_FILE}",NSHELL="${NSHELL}",PREV_ARRAY_ID="${jid10}" \
                 --dependency=afterok:${jid10} \
                 --kill-on-invalid-dep=yes \
                 --job-name=mle_combine_lightcones_unWISE_matching \
                 -c 4 \
                 -p cosma8 \
                 -A dp203 \
-                -t 02:00:00 \
+                -t 01:00:00 \
                 -o "./batch_files/pipeline_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}/job.mle_%j.dump" \
                 -e "./batch_files/pipeline_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}/job.mle_%j.err" \
 <<'EOF'
@@ -720,13 +753,13 @@ export NUMEXPR_NUM_THREADS=1
 module purge
 set +u
 [ -f "$HOME/.bashrc" ] && . "$HOME/.bashrc"
-mamba activate patchy_screening
+conda activate patchy_screening
 set -u
 
 mle_amp=$(grep -m1 '^AMP' "$MLE_FILE" | cut -d'=' -f2 | xargs)
 mle_slope=$(grep -m1 '^SLOPE' "$MLE_FILE" | cut -d'=' -f2 | xargs)
 
-echo "=== Step 11 (Job ID "$SLURM_JOB_ID") starting"
+echo "=== Step 11 (Job ID $SLURM_JOB_ID) starting"
 echo "    Received arguments: Box='$BOX', Sim='$ISIM', Lightcone='$LIGHTCONE', Sample='$IZ'"
 echo "=============================="
 
@@ -742,7 +775,12 @@ fi
 
 echo "Job 11: Combine halo lightcone shells for box $BOX, sim $ISIM, lightcone $LIGHTCONE, $IZ sample for MLE values only into single halo totals files."
 
-echo "=== Step 12 (Job ID "$SLURM_JOB_ID") starting"
+for ((i=0; i<=NSHELL-2; i++)); do
+    rm -f "./batch_files/pipeline_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}/job.mle_${PREV_ARRAY_ID}_${i}."dump
+    rm -f "./batch_files/pipeline_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}/job.mle_${PREV_ARRAY_ID}_${i}."err
+done
+
+echo "=== Step 12 (Job ID $SLURM_JOB_ID) starting"
 echo "    Received arguments: Box='$BOX', Sim='$ISIM', Lightcone='$LIGHTCONE', Sample='$IZ', nsamp='ntotal'"
 echo "=============================="
 
@@ -764,14 +802,14 @@ EOF
 # Step 13: sampling for MLE values only
 # ============================================================
 jid13=$(sbatch --parsable \
-                --export=ALL,BOX="${BOX}",ISIM="${ISIM}",IZ="${IZ}",LIGHTCONE="${LIGHTCONE}",MLE_FILE="${MLE_FILE}" \
+                --export=ALL,BOX="${BOX}",ISIM="${ISIM}",IZ="${IZ}",LIGHTCONE="${LIGHTCONE}",MLE_FILE="${MLE_FILE}",NSHELL="${NSHELL}" \
                 --dependency=afterok:${jid11} \
                 --kill-on-invalid-dep=yes \
                 --job-name=mle_sampling_shells \
-                -c 16 \
+                -c 4 \
                 -p cosma8 \
                 -A dp203 \
-                -t 03:00:00 \
+                -t 01:00:00 \
                 --array=0-$((NSHELL-1))%20 \
                 -o "./batch_files/pipeline_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}/job.mle_%A_%a.dump" \
                 -e "./batch_files/pipeline_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}/job.mle_%A_%a.err" \
@@ -789,7 +827,7 @@ export NUMEXPR_NUM_THREADS=1
 module purge
 set +u
 [ -f "$HOME/.bashrc" ] && . "$HOME/.bashrc"
-mamba activate patchy_screening
+conda activate patchy_screening
 set -u
 
 mle_amp=$(grep -m1 '^AMP' "$MLE_FILE" | cut -d'=' -f2 | xargs)
@@ -799,7 +837,15 @@ echo "=== Step 13 (Job ID $SLURM_JOB_ID) starting"
 echo "    Received arguments: ncpu='$SLURM_CPUS_PER_TASK', Box='$BOX', Sim='$ISIM', Lightcone='$LIGHTCONE', Sample='$IZ'"
 echo "=============================="
 
-if [ -f "./data_files/mock_halo_catalogs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}/*/shell_{000..059}_mle.parquet" ]; then
+all_found_mle_sampling=true
+for i in $(seq -w 0 $((NSHELL - 1))); do
+    [ -f "./data_files/mock_halo_catalogs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}/mle/shell_${i}_mle.parquet" ] || {
+        all_found_mle_sampling=false
+        break
+    }
+done
+
+if [ "$all_found_mle_sampling" = true ]; then
     echo "Found sampled catalogs for MLE values — skipping FLAMINGO_halo_sampling_shell.py"
 else
     python3 FLAMINGO_halo_sampling_shell.py \
@@ -821,14 +867,14 @@ EOF
 # Step 14: combine sampling for MLE values only
 # ============================================================
 jid14=$(sbatch --parsable \
-                --export=ALL,BOX="${BOX}",ISIM="${ISIM}",IZ="${IZ}",LIGHTCONE="${LIGHTCONE}",MLE_FILE="${MLE_FILE}" \
+                --export=ALL,BOX="${BOX}",ISIM="${ISIM}",IZ="${IZ}",LIGHTCONE="${LIGHTCONE}",MLE_FILE="${MLE_FILE}",NSHELL="${NSHELL}",PREV_ARRAY_ID="${jid13}" \
                 --dependency=afterok:${jid13} \
                 --kill-on-invalid-dep=yes \
                 --job-name=mle_combine_sampling_power_spectra \
                 -c 16 \
                 -p cosma8 \
                 -A dp203 \
-                -t 05:00:00 \
+                -t 04:00:00 \
                 -o "./batch_files/pipeline_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}/job.mle_%j.dump" \
                 -e "./batch_files/pipeline_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}/job.mle_%j.err" \
 <<'EOF'
@@ -845,7 +891,7 @@ export NUMEXPR_NUM_THREADS=1
 module purge
 set +u
 [ -f "$HOME/.bashrc" ] && . "$HOME/.bashrc"
-mamba activate patchy_screening
+conda activate patchy_screening
 set -u
 
 mle_amp=$(grep -m1 '^AMP' "$MLE_FILE" | cut -d'=' -f2 | xargs)
@@ -871,6 +917,11 @@ fi
 
 echo "Job 14: Combine sampled halo lightcone shells into single mock galaxy catalogs for box $BOX, sim $ISIM, lightcone $LIGHTCONE, $IZ sample for MLE values only."
 
+for ((i=0; i<=NSHELL-2; i++)); do
+    rm -f "./batch_files/pipeline_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}/job.mle_${PREV_ARRAY_ID}_${i}."dump
+    rm -f "./batch_files/pipeline_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}/job.mle_${PREV_ARRAY_ID}_${i}."err
+done
+
 echo "=== Step 15 (Job ID $SLURM_JOB_ID) starting"
 echo "    Received arguments: Box='$BOX', Sim='$ISIM', Lightcone='$LIGHTCONE', Sample='$IZ', nsamp='ntotal'"
 echo "=============================="
@@ -881,7 +932,7 @@ if [ -f "./data_files/power_spectra/galaxy_galaxy/${BOX}/${ISIM}/${IZ}/lightcone
 else
     python3 unWISE_power_spectra.py \
       "$SLURM_CPUS_PER_TASK" "$BOX" "$ISIM" "$IZ" "$mle_amp" "$mle_slope" \
-      unlensed True False True True True False "$LIGHTCONE"
+      unlensed True False False True True False "$LIGHTCONE"
 fi
 
 echo "Job 15: Compute power spectra for box $BOX, sim $ISIM, lightcone $LIGHTCONE, $IZ sample for MLE values only."

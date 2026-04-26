@@ -24,7 +24,7 @@ else
 fi
 
 PRECISION="1"
-ABUNDANCE_CUT="0.02"
+ABUNDANCE_CUT="0.5"
 
 # Fixed number of shell caches
 NSHELL=60

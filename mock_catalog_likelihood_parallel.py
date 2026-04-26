@@ -123,8 +123,8 @@ if __name__ == '__main__':
     f_obs_err = {'auto': np.sqrt(farren_data_var_auto) * 1e5, 'cross': np.sqrt(farren_data_var_cross) * 1e5}
 
     num_points = 1
-    amp_positions = np.random.uniform(amp_min, amp_max+0.001, num_points)
-    slope_positions = np.random.uniform(slope_min, slope_max+0.001, num_points)
+    amp_positions = np.random.uniform(amp_min, amp_max+0.001, num_points)[0]
+    slope_positions = np.random.uniform(slope_min, slope_max+0.001, num_points)[0]
 
     allowed = False
     while not allowed:
@@ -235,8 +235,19 @@ if __name__ == '__main__':
     outfile = Path(path)
     outfile.parent.mkdir(parents=True, exist_ok=True)
 
+    x = np.array((mle_amp, mle_slope))
+    f_sim_auto = module.emulator(x, 'auto', box, isim, iz, load=True, lightcone=lightcone) 
+    f_sim_cross = module.emulator(x, 'cross', box, isim, iz, load=True, lightcone=lightcone) 
+    chi_sq_auto = np.sum(((f_obs['auto'] - f_sim_auto)**2)/(f_obs_err['auto']**2))
+    chi_sq_cross = np.sum(((f_obs['cross'] - f_sim_cross)**2)/(f_obs_err['cross']**2))
+
     with open(outfile, "w") as f:
         f.write(f"LOG_LIKELIHOOD={log_likelihood_mle:.13f}\n")
+        f.write(f"CHI2={(log_likelihood_mle * -2):.13f}\n")
+        f.write(f"LOG_LIKELIHOOD_AUTO={(chi_sq_auto * -0.5):.13f}\n")
+        f.write(f"CHI2_AUTO={chi_sq_auto:.13f}\n")
+        f.write(f"LOG_LIKELIHOOD_CROSS={(chi_sq_cross * -0.5):.13f}\n")
+        f.write(f"CHI2_CROSS={chi_sq_cross:.13f}\n")
         f.write(f"AMP={mle_amp:.3f}\n")
         f.write(f"SLOPE={mle_slope:.3f}\n")
         f.write(f"AMP_ERR_LOWER={err_amp_lower:.4f}\n")

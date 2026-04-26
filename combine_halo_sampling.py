@@ -18,8 +18,8 @@ def combine_shells(box, sim, z_sample, lightcone, mle=False, custom_amp=False, c
 
     if mle:
         cut_dirs = [shell_base / "mle"]  # Only one set of cuts for MLE, so we can just use the base directory
-        amp = np.loadtxt(f"./data_files/mle_parameters/{box}/{sim}/{z_sample}/lightcone{lightcone}/mle_values.txt", usecols=1, skiprows=1, max_rows=1, delimiter='=') 
-        slope = np.loadtxt(f"./data_files/mle_parameters/{box}/{sim}/{z_sample}/lightcone{lightcone}/mle_values.txt", usecols=1, skiprows=2, max_rows=1, delimiter='=')
+        amp = np.loadtxt(f"./data_files/mle_parameters/{box}/{sim}/{z_sample}/lightcone{lightcone}/mle_values.txt", usecols=1, skiprows=6, max_rows=1, delimiter='=') 
+        slope = np.loadtxt(f"./data_files/mle_parameters/{box}/{sim}/{z_sample}/lightcone{lightcone}/mle_values.txt", usecols=1, skiprows=7, max_rows=1, delimiter='=')
         amp_name = fmt_name(amp, mle)
         slope_name = fmt_name(slope, mle)
     elif not mle and custom_amp != False and custom_slope != False:

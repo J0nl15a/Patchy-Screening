@@ -115,6 +115,8 @@ if __name__ == '__main__':
     slope_max = float(sys.argv[11])
     slope_step = float(sys.argv[12])
 
+    plot = sys.argv[13].lower() in ("true", "1", "yes", "y")
+
     farren_data = np.loadtxt(f'./unWISExLens_lklh/data/v1.0/bandpowers/unWISExACT-DR6_{str(iz).lower()}_baseline_Clgg+Clkk+Clkg.dat', usecols=(0,1,3)).reshape(-1,3)
     obs_data_covariance = np.loadtxt(f'./unWISExLens_lklh/data/v1.0/covariances/covmat_Clgg+Clkg_unWISExACT-DR6_{str(iz).lower()}_baseline.dat')
     ell_200_mask = np.where(farren_data[:,0] > 200)
@@ -273,24 +275,23 @@ if __name__ == '__main__':
     for i in range(num_points):
         print(mle_amps[i], mle_slopes[i], mle_likelihoods[i])
     # quit()
-    
-    # np.save(f'./gpy_model/{box}/{isim}/{iz}/lightcone{lightcone}/training/prior_limits.npy', np.array([plateau_point, c, vertical_limit]))
 
-    fig, axes = pb.subplots(2, figsize=(10, 7), sharex=True)
-    samples = sampler.get_chain()
-    labels = ["amp", "slope"]
-    for i in range(ndim):
-        ax = axes[i]
-        ax.plot(samples[:, :, i], "k", alpha=0.3)
-        ax.set_xlim(0, len(samples))
-        ax.set_ylabel(labels[i])
-        ax.yaxis.set_label_coords(-0.1, 0.5)
-        ax.yaxis.set_major_formatter(FormatStrFormatter(fmt))
+    if plot:
+        fig, axes = pb.subplots(2, figsize=(10, 7), sharex=True)
+        samples = sampler.get_chain()
+        labels = ["amp", "slope"]
+        for i in range(ndim):
+            ax = axes[i]
+            ax.plot(samples[:, :, i], "k", alpha=0.3)
+            ax.set_xlim(0, len(samples))
+            ax.set_ylabel(labels[i])
+            ax.yaxis.set_label_coords(-0.1, 0.5)
+            ax.yaxis.set_major_formatter(FormatStrFormatter(fmt))
 
-    axes[-1].set_xlabel("step number")
-    # pb.savefig(f'./Plots/mcmc_chains_{test_name[0]}_{test_name[1]}_steps{steps}_walkers{nwalkers}_initialpos{initial_name[0]}_{initial_name[1]}_offset{gaussian_offset_name}.png', dpi=400)
-    pb.savefig(f'./Plots/mcmc_chains_optimal_value_{box}_{isim}_{iz}_steps{steps}_walkers{nwalkers}_initialpos{initial_name[0]}_{initial_name[1]}_offset{gaussian_offset_name}.png', dpi=400)
-    pb.clf()
+        axes[-1].set_xlabel("step number")
+        # pb.savefig(f'./Plots/mcmc_chains_{test_name[0]}_{test_name[1]}_steps{steps}_walkers{nwalkers}_initialpos{initial_name[0]}_{initial_name[1]}_offset{gaussian_offset_name}.png', dpi=400)
+        pb.savefig(f'./Plots/mcmc_chains_optimal_value_{box}_{isim}_{iz}_steps{steps}_walkers{nwalkers}_initialpos{initial_name[0]}_{initial_name[1]}_offset{gaussian_offset_name}.png', dpi=400)
+        pb.clf()
     
     import corner
 
@@ -310,49 +311,70 @@ if __name__ == '__main__':
     err_slope_lower = mle_err_lower[1]
     err_slope_upper = mle_err_upper[1]
 
-    fig = corner.corner(
-        flat_samples, 
-        labels=labels, 
-        quantiles=[.16, .5, .84],
-        show_titles=True,
-        title_fmt=f".{prec}f", 
-        title_kwargs={"fontsize": 12},
-        range=[(10.3, vertical_limit), (0.0, 1.0)])
-    for ax in fig.axes:
-        ax.xaxis.set_major_formatter(FormatStrFormatter(fmt))
-        ax.yaxis.set_major_formatter(FormatStrFormatter(fmt))
-    # pb.savefig(f'./Plots/mcmc_corner_{test_name[0]}_{test_name[1]}_steps{steps}_walkers{nwalkers}_initialpos{initial_name[0]}_{initial_name[1]}_offset{gaussian_offset_name}.png', dpi=400)
-    pb.savefig(f'./Plots/mcmc_corner_optimal_value_{box}_{isim}_{iz}_steps{steps}_walkers{nwalkers}_initialpos{initial_name[0]}_{initial_name[1]}_offset{gaussian_offset_name}.png', dpi=400)
-    pb.clf()
+    if plot:
+        fig = corner.corner(
+            flat_samples, 
+            labels=labels, 
+            quantiles=[.16, .5, .84],
+            show_titles=True,
+            title_fmt=f".{prec}f", 
+            title_kwargs={"fontsize": 12},
+            range=[(10.3, vertical_limit), (0.0, 1.0)])
+        for ax in fig.axes:
+            ax.xaxis.set_major_formatter(FormatStrFormatter(fmt))
+            ax.yaxis.set_major_formatter(FormatStrFormatter(fmt))
+        # pb.savefig(f'./Plots/mcmc_corner_{test_name[0]}_{test_name[1]}_steps{steps}_walkers{nwalkers}_initialpos{initial_name[0]}_{initial_name[1]}_offset{gaussian_offset_name}.png', dpi=400)
+        pb.savefig(f'./Plots/mcmc_corner_optimal_value_{box}_{isim}_{iz}_steps{steps}_walkers{nwalkers}_initialpos{initial_name[0]}_{initial_name[1]}_offset{gaussian_offset_name}.png', dpi=400)
+        pb.clf()
 
-    fig = corner.corner(
-        flat_samples, 
-        labels=labels, 
-        quantiles=[.16, .5, .84],
-        show_titles=True,
-        title_fmt=f".{prec}f", 
-        title_kwargs={"fontsize": 12})
-    for ax in fig.axes:
-        ax.xaxis.set_major_formatter(FormatStrFormatter(fmt))
-        ax.yaxis.set_major_formatter(FormatStrFormatter(fmt))
-    # pb.savefig(f'./Plots/mcmc_corner_zoom_{test_name[0]}_{test_name[1]}_steps{steps}_walkers{nwalkers}_initialpos{initial_name[0]}_{initial_name[1]}_offset{gaussian_offset_name}.png', dpi=400)
-    pb.savefig(f'./Plots/mcmc_corner_zoom_optimal_value_{box}_{isim}_{iz}_steps{steps}_walkers{nwalkers}_initialpos{initial_name[0]}_{initial_name[1]}_offset{gaussian_offset_name}.png', dpi=400)
-    pb.clf()
+        fig = corner.corner(
+            flat_samples, 
+            labels=labels, 
+            quantiles=[.16, .5, .84],
+            show_titles=True,
+            title_fmt=f".{prec}f", 
+            title_kwargs={"fontsize": 12})
+        for ax in fig.axes:
+            ax.xaxis.set_major_formatter(FormatStrFormatter(fmt))
+            ax.yaxis.set_major_formatter(FormatStrFormatter(fmt))
+        # pb.savefig(f'./Plots/mcmc_corner_zoom_{test_name[0]}_{test_name[1]}_steps{steps}_walkers{nwalkers}_initialpos{initial_name[0]}_{initial_name[1]}_offset{gaussian_offset_name}.png', dpi=400)
+        pb.savefig(f'./Plots/mcmc_corner_zoom_optimal_value_{box}_{isim}_{iz}_steps{steps}_walkers{nwalkers}_initialpos{initial_name[0]}_{initial_name[1]}_offset{gaussian_offset_name}.png', dpi=400)
+        pb.clf()
 
 
-    mle_amp = 10.808
-    mle_slope = 0.257
+    # write to text file in a known place
+    path = f"./data_files/mle_parameters/{box}/{isim}/{iz}/lightcone{lightcone}/mle_values.txt"
+    outfile = Path(path)
+    outfile.parent.mkdir(parents=True, exist_ok=True)
+
+    # Load the MLE parameters file
+    with open(path, "r") as f:
+        lines = f.readlines()
+
+    # Parse the existing values
+    mle_params = {}
+    for line in lines:
+        if '=' in line:
+            key, value = line.strip().split('=')
+            mle_params[key] = value
+
+    # Find the index of LOG_LIKELIHOOD and insert the new lines after it
+    insert_index = None
+    for i, line in enumerate(lines):
+        if line.startswith('LOG_LIKELIHOOD='):
+            insert_index = i + 1
+            break
+
+    # Overwrite mle_amp and mle_slope with values from the parameter file
+    mle_amp = float(mle_params['AMP']) # 10.808
+    mle_slope = float(mle_params['SLOPE']) # 0.259
     mle_amp_name = f"{float(mle_amp):.3f}".replace('.', 'p')
     mle_slope_name = f"{float(mle_slope):.3f}".replace('.', 'p')
     print(f"[INFO] MLE AMP: {mle_amp}, MLE SLOPE: {mle_slope}")
 
     log_likelihood_mle = log_likelihood((mle_amp, mle_slope), f_obs, f_obs_err, box, isim, iz, lightcone=lightcone)
     print(f"[INFO] Log-Likelihood at MLE (emulator comparison): {log_likelihood_mle}")
-
-    # write to text file in a known place
-    path = f"./data_files/mle_parameters/{box}/{isim}/{iz}/lightcone{lightcone}/mle_values.txt"
-    outfile = Path(path)
-    outfile.parent.mkdir(parents=True, exist_ok=True)
+    print(f"[INFO] chi^2 at MLE (emulator comparison): {(log_likelihood_mle * -2)}")
 
     # with open(outfile, "w") as f:
     #     f.write(f"LOG_LIKELIHOOD={log_likelihood_mle:.13f}\n")
@@ -396,5 +418,20 @@ if __name__ == '__main__':
     print(f"Cross likelihood (Mock Catalogue) = {-0.5 * chi_sq_mock_cross}")
     print(f"Cross reduced chi^2 (Mock Catalogue) (Using N-P as d.o.f.) = {chi_sq_mock_cross / (55-2)}")
     print(f"Cross reduced chi^2 (Mock Catalogue) (Using N-1 as d.o.f.) = {chi_sq_mock_cross / (55-1)}")
+
+
+    # if insert_index is not None:
+    #     lines.insert(insert_index, f"CHI2={(log_likelihood_mle * -2):.13f}\n")
+    #     lines.insert(insert_index + 1, f"LOG_LIKELIHOOD_AUTO={(chi_sq_auto * -0.5):.13f}\n")
+    #     lines.insert(insert_index + 2, f"CHI2_AUTO={chi_sq_auto:.13f}\n")
+    #     lines.insert(insert_index + 3, f"LOG_LIKELIHOOD_CROSS={(chi_sq_cross * -0.5):.13f}\n")
+    #     lines.insert(insert_index + 4, f"CHI2_CROSS={chi_sq_cross:.13f}\n")
+
+    # # Write back to the file
+    # with open(path, "w") as f:
+    #     f.writelines(lines)
+
+    # print(f"[INFO] Updated MLE file with auto and cross log likelihoods and chi2 values.")
+
 
 

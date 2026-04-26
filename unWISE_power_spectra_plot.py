@@ -6,7 +6,7 @@ from scipy.signal import savgol_filter
 pb.rcParams['font.family'] = 'serif'
 
 def power_spectra_plot(box, isim, iz, im, slope, fits, single, paper_ready=False, 
-                       template=False, multi_im = False, multi_slope = False, multi_sim=False, mle=True, covariance=False, shot_noise=False, 
+                       template=False, multi_im = False, multi_slope = False, multi_sim=False, plot_type=None, mle=True, covariance=False, shot_noise=False, 
                        data=None, lc=0, file='png'):
 
     if round(im, 1) == im:
@@ -65,6 +65,10 @@ def power_spectra_plot(box, isim, iz, im, slope, fits, single, paper_ready=False
             sim_lc_idx = []     # which lightcone index to use for that isim
             FLAMINGO_names = []
             FLAMINGO_colors_sorted = []
+            if plot_type == None:
+                plot_type_extension = ''
+            elif plot_type != None:
+                plot_type_extension = plot_type + '_'
 
             # Interpret `lc` argument as number of lightcones for L2800 when plotting
             # multiple L2800 lightcones. L1000 always uses lightcone 0.
@@ -77,9 +81,21 @@ def power_spectra_plot(box, isim, iz, im, slope, fits, single, paper_ready=False
                     FLAMINGO_colors_sorted = ['#117733', '#882255', '#44AA99', '#999933', '#AA4499', '#7EFF4B', '#55E18E', '#FF8C40', '#abd0e6', '#6aaed6', '#3787c0', '#105ba4']
                 
                 elif paper_ready:
-                    isim_dirs = ['HYDRO_FIDUCIAL', 'HYDRO_LOW_SIGMA8', 'HYDRO_LOW_SIGMA8_STRONGEST_AGN', 'HYDRO_PLANCK', 'HYDRO_PLANCK_LARGE_NU_FIXED', 'HYDRO_PLANCK_LARGE_NU_VARY']#, 'HYDRO_LOW_SIGMA8', 'HYDRO_LOW_SIGMA8_STRONGEST_AGN', 'HYDRO_PLANCK', 'HYDRO_PLANCK_LARGE_NU_FIXED', 'HYDRO_PLANCK_LARGE_NU_VARY' 'HYDRO_JETS_published', 'HYDRO_STRONG_JETS_published', 'HYDRO_STRONG_SUPERNOVA', 'HYDRO_WEAK_AGN', 'HYDRO_STRONG_AGN', 'HYDRO_STRONGER_AGN', 'HYDRO_STRONGEST_AGN']
-                    FLAMINGO_names = ['L1_m9', 'LS8', 'LS8_fgas-8$\sigma$', 'Planck', 'PlanckNu0p24Fix', 'PlanckNu0p24Var']# 'LS8', 'Planck', 'PlanckNu0p24Fix', 'PlanckNu0p24Var', 'Jet', 'Jet_fgas-4$\sigma$', '$M^*$-$\sigma$', 'fgas+2$\sigma$', 'fgas-2$\sigma$', 'fgas-4$\sigma$', 'fgas-8$\sigma$']
-                    FLAMINGO_colors_sorted = ['#117733', '#882255', '#7B68EE', '#44AA99', '#999933', '#AA4499']#, '#882255', '#44AA99', '#999933', '#AA4499', '#7EFF4B', '#55E18E', '#FF8C40', '#abd0e6', '#6aaed6', '#3787c0', '#105ba4']
+                    if plot_type == 'cosmology':
+                        isim_dirs = ['HYDRO_LOW_SIGMA8_STRONGEST_AGN', 'HYDRO_LOW_SIGMA8', 'HYDRO_PLANCK_LARGE_NU_FIXED', 'HYDRO_PLANCK_LARGE_NU_VARY', 'HYDRO_PLANCK']
+                        FLAMINGO_names = ['LS8_fgas-8$\sigma$', 'LS8', 'PlanckNu0p24Fix', 'PlanckNu0p24Var', 'Planck']
+                        FLAMINGO_colors_sorted = ['#7B68EE', '#882255', '#999933', '#AA4499', '#44AA99']
+                    elif plot_type == 'agn_feedback':
+                        isim_dirs = ['HYDRO_STRONGEST_AGN', 'HYDRO_STRONGER_AGN', 'HYDRO_STRONG_AGN', 'HYDRO_WEAK_AGN']
+                        FLAMINGO_names = ['fgas-8$\sigma$', 'fgas-4$\sigma$', 'fgas-2$\sigma$', 'fgas+2$\sigma$']
+                        FLAMINGO_colors_sorted = ['#105ba4', '#3787c0', '#6aaed6', '#abd0e6']
+                    elif plot_type == 'other_feedback':
+                        isim_dirs = ['HYDRO_STRONG_JETS_published', 'HYDRO_JETS_published', 'HYDRO_STRONG_SUPERNOVA']
+                        FLAMINGO_names = ['Jet_fgas-4$\sigma$', 'Jet', '$M^*$-$\sigma$']
+                        FLAMINGO_colors_sorted = ['#55E18E', '#7EFF4B', '#FF8C40']
+                    isim_dirs += ['HYDRO_FIDUCIAL']
+                    FLAMINGO_names += ['L1_m9']
+                    FLAMINGO_colors_sorted += ['#117733']
             
                 sim_lc_idx = [0] * len(isim_dirs)
                 isim_boxes = ['L1000N1800'] * len(isim_dirs)
@@ -107,8 +123,8 @@ def power_spectra_plot(box, isim, iz, im, slope, fits, single, paper_ready=False
                 sim_lc = sim_lc_idx[i_sim]
 
                 if mle:
-                    amp = np.loadtxt(f"./data_files/mle_parameters/{sim_box}/{sim_name}/{iz}/lightcone{sim_lc}/mle_values.txt", usecols=1, skiprows=1, max_rows=1, delimiter='=')
-                    slope = np.loadtxt(f"./data_files/mle_parameters/{sim_box}/{sim_name}/{iz}/lightcone{sim_lc}/mle_values.txt", usecols=1, skiprows=2, max_rows=1, delimiter='=')
+                    amp = np.loadtxt(f"./data_files/mle_parameters/{sim_box}/{sim_name}/{iz}/lightcone{sim_lc}/mle_values.txt", usecols=1, skiprows=6, max_rows=1, delimiter='=')
+                    slope = np.loadtxt(f"./data_files/mle_parameters/{sim_box}/{sim_name}/{iz}/lightcone{sim_lc}/mle_values.txt", usecols=1, skiprows=7, max_rows=1, delimiter='=')
                     ims_name.append(f"{amp:.3f}".replace('.', 'p'))
                     slopes_name.append(f"{slope:.3f}".replace('.', 'p'))
                 elif not mle:
@@ -320,13 +336,24 @@ def power_spectra_plot(box, isim, iz, im, slope, fits, single, paper_ready=False
             auto_spectra_shot_noise_list = data['auto_spectra_shot_noise_list']
 
     mle_log_likelihood = []
+    mle_chi2_auto = []
+    mle_chi2_cross = []
     if multi_sim:
         for i in range(len(isim_dirs)):
-            mle_value = np.loadtxt(f"./data_files/mle_parameters/{isim_boxes[i]}/{isim_dirs[i]}/{iz}/lightcone{sim_lc_idx[i]}/mle_values.txt", usecols=1, max_rows=1, delimiter='=')
-            mle_log_likelihood.append(f"{mle_value:.3f}")
+            mle_log_likelihood.append(f"{np.loadtxt(f"./data_files/mle_parameters/{isim_boxes[i]}/{isim_dirs[i]}/{iz}/lightcone{sim_lc_idx[i]}/mle_values.txt", 
+                                                    usecols=1, max_rows=1, delimiter='='):.3f}")
+            mle_chi2_auto.append(f"{np.loadtxt(f"./data_files/mle_parameters/{isim_boxes[i]}/{isim_dirs[i]}/{iz}/lightcone{sim_lc_idx[i]}/mle_values.txt", 
+                                                    usecols=1, skiprows=3, max_rows=1, delimiter='='):.3f}")
+            mle_chi2_cross.append(f"{np.loadtxt(f"./data_files/mle_parameters/{isim_boxes[i]}/{isim_dirs[i]}/{iz}/lightcone{sim_lc_idx[i]}/mle_values.txt", 
+                                                    usecols=1, skiprows=5, max_rows=1, delimiter='='):.3f}")
     elif single:
-        mle_value = np.loadtxt(f"./data_files/mle_parameters/{box}/{isim}/{iz}/lightcone{lc}/mle_values.txt", usecols=1, max_rows=1, delimiter='=')
-        mle_log_likelihood.append(f"{mle_value:.3f}")
+        mle_log_likelihood.append(f"{np.loadtxt(f"./data_files/mle_parameters/{box}/{isim}/{iz}/lightcone{lc}/mle_values.txt", 
+                                                usecols=1, max_rows=1, delimiter='='):.3f}")
+        mle_chi2_auto.append(f"{np.loadtxt(f"./data_files/mle_parameters/{box}/{isim}/{iz}/lightcone{lc}/mle_values.txt", 
+                                                usecols=1, skiprows=3, max_rows=1, delimiter='='):.3f}")
+        mle_chi2_cross.append(f"{np.loadtxt(f"./data_files/mle_parameters/{box}/{isim}/{iz}/lightcone{lc}/mle_values.txt", 
+                                                usecols=1, skiprows=5, max_rows=1, delimiter='='):.3f}")
+        
     else:
         mle_log_likelihood = ['' for i in range(len(variable_list))]
 
@@ -347,6 +374,8 @@ def power_spectra_plot(box, isim, iz, im, slope, fits, single, paper_ready=False
             ims = ims[::-1]
             slopes = slopes[::-1]
             mle_log_likelihood = mle_log_likelihood[::-1]
+            mle_chi2_auto = mle_chi2_auto[::-1]
+            mle_chi2_cross = mle_chi2_cross[::-1]
         variable_list = variable_list[::-1]
         variable_name_list = variable_name_list[::-1]
         auto_spectra_list = auto_spectra_list[::-1]
@@ -394,6 +423,7 @@ def power_spectra_plot(box, isim, iz, im, slope, fits, single, paper_ready=False
                     line, = ax.plot(ell_namaster, auto_spectra_list[i], 
                                 linestyle='dashed', alpha=0.8, color=FLAMINGO_colors_sorted[i], 
                                 label=f'{var}')
+                    
                 else:
                     line, = ax.plot(ell_namaster, auto_spectra_list[i], 
                                 linestyle='dashed', color=FLAMINGO_colors_sorted[i], alpha=0.8, 
@@ -430,6 +460,18 @@ def power_spectra_plot(box, isim, iz, im, slope, fits, single, paper_ready=False
                     line, = ax.plot(ell_namaster, auto_spectra_list[i], 
                                     linestyle='solid', alpha=0.8, color=FLAMINGO_colors_sorted[i], 
                                     label=f'{var}')
+                    
+                    ax.text(
+                        0.1,                      # x position in axes coords
+                        0.3 - 0.045*i,            # y position, spaced by loop index
+                        f'({float(mle_chi2_auto[i]) - float(mle_chi2_auto[0]):.1f})' if i != 0 else f'{float(mle_chi2_auto[i]):.1f}',
+                        transform=ax.transAxes,
+                        color=FLAMINGO_colors_sorted[i],
+                        fontsize=10,
+                        fontfamily='serif',
+                        ha='left',
+                        va='top'
+                    )
                 else:
                     line, = ax.plot(ell_namaster, auto_spectra_list[i], 
                                 linestyle='solid', alpha=0.8, color=FLAMINGO_colors_sorted[i], 
@@ -597,9 +639,9 @@ def power_spectra_plot(box, isim, iz, im, slope, fits, single, paper_ready=False
             ax.legend(title="Simulation, Amp, Slope, $N_{halo}$, $-\log \mathcal{L}(\\theta \mid x)$" if data == None else "Simulation, Amp, Slope, $log_{10}M_{*,mean}$, $N_{halo}$, $\chi^2$", 
                       fontsize=6, ncols=1, loc='upper right')
         if shot_noise:
-            pb.savefig(f'./Plots/halo_map_gg_power_spectrum_{box}_all_sims_cosmology_{iz}_mle_amp_slope_{fits}_ntotal{template_prefix}{file_extension}', dpi=400)
+            pb.savefig(f'./Plots/halo_map_gg_power_spectrum_{box}_all_sims_{plot_type_extension}{iz}_mle_amp_slope_{fits}_ntotal{template_prefix}{file_extension}', dpi=400)
         else:
-            pb.savefig(f'./Plots/halo_map_gg_power_spectrum_{box}_all_sims_cosmology_{iz}_mle_amp_slope_{fits}_ntotal_shot_noise_subtracted{template_prefix}{file_extension}', dpi=400)
+            pb.savefig(f'./Plots/halo_map_gg_power_spectrum_{box}_all_sims_{plot_type_extension}{iz}_mle_amp_slope_{fits}_ntotal_shot_noise_subtracted{template_prefix}{file_extension}', dpi=400)
     pb.close(fig)
 
     # galaxy-galaxy auto-power spectra multiplied by ell
@@ -683,7 +725,7 @@ def power_spectra_plot(box, isim, iz, im, slope, fits, single, paper_ready=False
     elif multi_sim:
         pb.legend(title="Simulation, Amp, Slope, $N_{halo}$, $-\log \mathcal{L}(\\theta \mid x)$" if data == None else "Simulation, Amp, Slope, $log_{10}M_{*,mean}$, $N_{halo}$, $\chi^2$", 
                   fontsize=6, ncols=1, loc='upper left')
-        pb.savefig(f'./Plots/halo_map_gg_power_spectrum_{box}_all_sims_cosmology_{iz}_mle_amp_slope_{fits}_ntotal_shot_noise_subtracted{template_prefix}_ell.png', dpi=400)
+        pb.savefig(f'./Plots/halo_map_gg_power_spectrum_{box}_all_sims_{plot_type_extension}{iz}_mle_amp_slope_{fits}_ntotal_shot_noise_subtracted{template_prefix}_ell.png', dpi=400)
     pb.clf()
 
     # galaxy-CMB lensing cross-power spectra
@@ -713,6 +755,7 @@ def power_spectra_plot(box, isim, iz, im, slope, fits, single, paper_ready=False
                     line, = ax.plot(ell_namaster, cross_spectra_list[i], 
                                     linestyle='dashed', color=FLAMINGO_colors_sorted[i], 
                                     label=f'{var}')
+
                 else:
                     line, = ax.plot(ell_namaster, cross_spectra_list[i], 
                                     linestyle='dashed', color=FLAMINGO_colors_sorted[i], 
@@ -746,6 +789,18 @@ def power_spectra_plot(box, isim, iz, im, slope, fits, single, paper_ready=False
                     line, = ax.plot(ell_namaster, cross_spectra_list[i], 
                                     linestyle='solid', color=FLAMINGO_colors_sorted[i], 
                                     label=f'{var}')
+                    
+                    ax.text(
+                        0.8,                      # x position in axes coords
+                        0.95 - 0.045*i,            # y position, spaced by loop index
+                        f'({float(mle_chi2_cross[i]) - float(mle_chi2_cross[0]):.1f})' if i != 0 else f'{float(mle_chi2_cross[i]):.1f}',
+                        transform=ax.transAxes,
+                        color=FLAMINGO_colors_sorted[i],
+                        fontsize=10,
+                        fontfamily='serif',
+                        ha='left',
+                        va='top'
+                    )
                 else:
                     line, = ax.plot(ell_namaster, cross_spectra_list[i], 
                         linestyle='solid', color=FLAMINGO_colors_sorted[i], 
@@ -878,7 +933,7 @@ def power_spectra_plot(box, isim, iz, im, slope, fits, single, paper_ready=False
         else:
             ax.legend(title="Simulation, Amp, Slope, $N_{halo}$, $-\log \mathcal{L}(\\theta \mid x)$" if data == None else "Simulation, Amp, Slope, $log_{10}M_{*,mean}$, $N_{halo}$, $\chi^2$", 
                       fontsize=6, ncols=1, loc='upper right')
-        pb.savefig(f'./Plots/halo_map_kg_power_spectrum_{box}_all_sims_cosmology_{iz}_mle_amp_slope_{fits}_ntotal{template_prefix}{file_extension}', dpi=400)
+        pb.savefig(f'./Plots/halo_map_kg_power_spectrum_{box}_all_sims_{plot_type_extension}{iz}_mle_amp_slope_{fits}_ntotal{template_prefix}{file_extension}', dpi=400)
     pb.close(fig)
 
     # galaxy-CMB lensing cross-power spectra multiplied by ell
@@ -963,7 +1018,7 @@ def power_spectra_plot(box, isim, iz, im, slope, fits, single, paper_ready=False
     elif multi_sim:
         pb.legend(title="Simulation, Amp, Slope, $N_{halo}$, $-\log \mathcal{L}(\\theta \mid x)$" if data == None else "Simulation, Amp, Slope, $log_{10}M_{*,mean}$, $N_{halo}$, $\chi^2$", 
                   fontsize=6, ncols=1, loc='lower left')
-        pb.savefig(f'./Plots/halo_map_kg_power_spectrum_{box}_all_sims_cosmology_{iz}_mle_amp_slope_{fits}_ntotal{template_prefix}_ell.png', dpi=400)
+        pb.savefig(f'./Plots/halo_map_kg_power_spectrum_{box}_all_sims_{plot_type_extension}{iz}_mle_amp_slope_{fits}_ntotal{template_prefix}_ell.png', dpi=400)
     pb.clf()
 
     return
@@ -982,4 +1037,4 @@ if __name__ == "__main__":
 
     lc = int(sys.argv[8])
 
-    power_spectra_plot(box, isim, iz, im, slope, fits, single, paper_ready=True, template=False, multi_im=True, mle=False, shot_noise=False, lc=lc, file='png')
+    power_spectra_plot(box, isim, iz, im, slope, fits, single, paper_ready=True, template=False, multi_sim=True, plot_type='other_feedback', mle=True, shot_noise=False, lc=lc, file='png')

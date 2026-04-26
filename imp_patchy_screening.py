@@ -20,7 +20,7 @@ class patchyScreening:
 
         os.environ["POLARS_MAX_THREADS"] = str(ncpu)
         self.job_start_time = time.time()
-        box_list = ['L1000N1800', 'L2800N5040']
+        box_list = ['L1000N0900', 'L1000N1800', 'L1000N3600', 'L2800N5040']
         sim_list = ['HYDRO_FIDUCIAL','HYDRO_PLANCK','HYDRO_PLANCK_LARGE_NU_FIXED','HYDRO_PLANCK_LARGE_NU_VARY','HYDRO_STRONG_AGN','HYDRO_WEAK_AGN','HYDRO_LOW_SIGMA8','HYDRO_STRONGER_AGN','HYDRO_JETS_published','HYDRO_STRONGEST_AGN','HYDRO_STRONG_SUPERNOVA','HYDRO_STRONGER_AGN_STRONG_SUPERNOVA','HYDRO_STRONG_JETS_published','HYDRO_LOW_SIGMA8_STRONGEST_AGN']
 
         try:
@@ -29,17 +29,11 @@ class patchyScreening:
         except (ValueError, IndexError):
             self.boxname = str(box)
 
-        if self.boxname not in box_list:
-            raise ValueError(f"‘{self.boxname}’ is not a valid box name; choose one of:\n  {box_list!r}")
-
         try:
             isim = int(isim)
             self.simname = sim_list[isim]                
         except (ValueError, IndexError):
             self.simname = str(isim)
-            
-        if self.simname not in sim_list:
-            raise ValueError(f"‘{self.simname}’ is not a valid simulation name; choose one of:\n  {sim_list!r}")
         
         survey = {'Blue':11, 'Green':22, 'Red':30}
         try:

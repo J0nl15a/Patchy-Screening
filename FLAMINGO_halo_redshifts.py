@@ -6,10 +6,10 @@ from pathlib import Path
 
 def z_bins(box, isim, i, lightcone=0):
 
-    if box == 'L1000N1800' and lightcone == 0:
+    if box == 'L1000N0900' or box == 'L1000N1800' or box == 'L1000N3600':
         snap_max = 77
         map_dir = 'hbt_lightcone_halos'
-    elif box == 'L2800N5040' and isim == 'HYDRO_FIDUCIAL':
+    elif box == 'L2800N5040':
         snap_max = 78
         map_dir = 'sorted_hbt_lightcone_halos'
     else:

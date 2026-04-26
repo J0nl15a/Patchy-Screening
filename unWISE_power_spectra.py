@@ -8,9 +8,6 @@ from unWISE_power_spectra_plot import power_spectra_plot
 from kappa_map_gen_forJonah import kappa_map_gen_forJonah
 from pathlib import Path
 
-box_list = ['L1000N1800', 'L2800N5040']
-sim_list = ['HYDRO_FIDUCIAL','HYDRO_PLANCK','HYDRO_PLANCK_LARGE_NU_FIXED','HYDRO_PLANCK_LARGE_NU_VARY','HYDRO_STRONG_AGN','HYDRO_WEAK_AGN','HYDRO_LOW_SIGMA8','HYDRO_STRONGER_AGN','HYDRO_JETS_published','HYDRO_STRONGEST_AGN','HYDRO_STRONG_SUPERNOVA','HYDRO_STRONGER_AGN_STRONG_SUPERNOVA','HYDRO_STRONG_JETS']
-
 theta_d = np.arange(0.5, 11, 0.5)
 ncpu = int(sys.argv[1])
 box = sys.argv[2]

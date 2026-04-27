@@ -198,10 +198,13 @@ class patchyScreening:
         
         # Load halo lightcone and SOAP data into DataFrames
         if lightcone_type == 'HBT':
-            if self.boxname == 'L1000N1800' and self.lightcone == 0:
+            if self.boxname == 'L1000N1800':
                 snap_max = 77
                 halo_lc_dir = 'hbt_lightcone_halos'
-            elif self.boxname == 'L2800N5040' and self.simname == 'HYDRO_FIDUCIAL':
+            elif self.boxname == 'L1000N3600':
+                snap_max = 78
+                halo_lc_dir = 'hbt_lightcone_halos'
+            elif self.boxname == 'L2800N5040':
                 snap_max = 78
                 halo_lc_dir = 'sorted_hbt_lightcone_halos'
             else:

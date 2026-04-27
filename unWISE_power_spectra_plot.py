@@ -103,12 +103,15 @@ def power_spectra_plot(box, isim, iz, im, slope, fits, single, paper_ready=False
             elif box == 'L2800N5040':
                 # Include the L1000 HYDRO_FIDUCIAL (lightcone 0) as a reference,
                 # then include all L2800 lightcones (L2p8_m9 (lc=0..lc_count-1)).
-                isim_dirs = ['HYDRO_FIDUCIAL'] + ['HYDRO_FIDUCIAL' for l in range(0, lc_count)]
-                isim_boxes = ['L1000N1800'] + ['L2800N5040'] * lc_count
-                sim_lc_idx = [0] + [l for l in range(0, lc_count)]
-                FLAMINGO_names = ['L1_m9'] + [f'L2p8_m9 (lc={l})' for l in range(0, lc_count)]
+                isim_dirs = ['HYDRO_FIDUCIAL' for l in range(0, lc_count)] + ['HYDRO_FIDUCIAL']
+                isim_boxes = (['L2800N5040'] * lc_count) + ['L1000N1800']
+                sim_lc_idx = [l for l in range(0, lc_count)] + [0]
+                if paper_ready:
+                    FLAMINGO_names = [f'L2p8_m9' for l in range(0, lc_count)] + ['L1_m9']
+                else:
+                    FLAMINGO_names = [f'L2p8_m9 (lc={l})' for l in range(0, lc_count)] + ['L1_m9']
                 # simple color palette: keep fiducial green and the L2800 lightcones a bluish tone
-                FLAMINGO_colors_sorted = ['#117733'] + ['#332288'] * lc_count
+                FLAMINGO_colors_sorted = (['#332288'] * lc_count) + ['#117733']
 
             ims = []
             slopes = []
@@ -405,97 +408,160 @@ def power_spectra_plot(box, isim, iz, im, slope, fits, single, paper_ready=False
     else:
         fig, ax = pb.subplots(1, 1, figsize=(8,6))
 
+    if multi_sim and box == 'L2800N5040':
+        FLAMINGO_names = FLAMINGO_names[::-1]
+        l1000_idx = [i for i, b in enumerate(isim_boxes) if b == 'L1000N1800']
+        l2800_idx = [i for i, b in enumerate(isim_boxes) if b == 'L2800N5040']
 
-    for i, var in enumerate(variable_list):
-        print(var)
-        if var == min_val:
-            var = abs(var)
-            
-            if multi_sim:
-                # determine fiducial (L1000 HYDRO_FIDUCIAL) index if present
-                try:
-                    fiducial_idx = next(i for i, (b, n) in enumerate(zip(isim_boxes, isim_dirs)) if b == 'L1000N1800' and n == 'HYDRO_FIDUCIAL')
-                except StopIteration:
-                    fiducial_idx = 0
-                fiducial_spec = np.asarray(auto_spectra_list[fiducial_idx], dtype=float)
+        # L1000 reference line
+        i_ref = l1000_idx[0]
+        fiducial_spec = np.asarray(auto_spectra_list[i_ref], dtype=float)
 
-                if paper_ready and data == None:
-                    line, = ax.plot(ell_namaster, auto_spectra_list[i], 
-                                linestyle='dashed', alpha=0.8, color=FLAMINGO_colors_sorted[i], 
-                                label=f'{var}')
-                    
-                else:
-                    line, = ax.plot(ell_namaster, auto_spectra_list[i], 
-                                linestyle='dashed', color=FLAMINGO_colors_sorted[i], alpha=0.8, 
-                                label=f'{var}, {ims[i]}, {slopes[i]}, {mean_mstar[i]:.5f}, {nhalos_list[i]}, {chi2[i]:.3f}' if data != None else f'{var}, {ims[i]}, {slopes[i]}, {nhalos_list[i]}, {mle_log_likelihood[i]}')
+        ax.plot(
+            ell_namaster,
+            fiducial_spec,
+            color=FLAMINGO_colors_sorted[i_ref],
+            linestyle='solid',
+            alpha=0.9,
+            label=FLAMINGO_names[i_ref]
+        )
 
-                ratio = auto_spectra_list[i] / fiducial_spec
-                ax_ratio.plot(
-                    ell_namaster, ratio,
-                    color=line.get_color(),
-                    linestyle=line.get_linestyle(),
-                    alpha=0.9
-                )
+        ax_ratio.axhline(1.0, color=FLAMINGO_colors_sorted[i_ref], linestyle='solid', alpha=0.8)
 
-            else:
-                line, = ax.plot(ell_namaster, auto_spectra_list[i], 
-                                linestyle='dashed', alpha=0.8, 
-                                label=f'{var}, {mean_mstar[i]:.5f}, {nhalos_list[i]}, {chi2[i]:.3f}' if data != None else f'{var}')
-            if covariance:
-                ax.fill_between(x=ell_namaster, 
-                                y1=(auto_spectra_list[i] + auto_spectra_covariance_list[i]), y2=(auto_spectra_list[i] - auto_spectra_covariance_list[i]), 
-                                linewidth=0, alpha=.3)
-            if shot_noise:
-                line_color = line.get_color()
-                ax.hlines(y=auto_spectra_shot_noise_list[i]*1e5, xmin=-1, xmax=ell_namaster[-1]+10, linestyle='dashed', color=line_color, alpha=0.3)
-        else:
-            if multi_sim:
-                try:
-                    fiducial_idx = next(i for i, (b, n) in enumerate(zip(isim_boxes, isim_dirs)) if b == 'L1000N1800' and n == 'HYDRO_FIDUCIAL')
-                except StopIteration:
-                    fiducial_idx = 0
-                fiducial_spec = np.asarray(auto_spectra_list[fiducial_idx], dtype=float)
+        # L2800 mean + min/max envelope
+        l2800_auto = np.asarray([auto_spectra_list[i] for i in l2800_idx], dtype=float)
 
-                if paper_ready and data == None:
-                    line, = ax.plot(ell_namaster, auto_spectra_list[i], 
-                                    linestyle='solid', alpha=0.8, color=FLAMINGO_colors_sorted[i], 
+        l2800_mean = np.mean(l2800_auto, axis=0)
+        l2800_min = np.min(l2800_auto, axis=0)
+        l2800_max = np.max(l2800_auto, axis=0)
+
+        ax.plot(
+            ell_namaster,
+            l2800_mean,
+            color=FLAMINGO_colors_sorted[l2800_idx[0]],
+            linestyle='solid',
+            alpha=0.9,
+            label=FLAMINGO_names[l2800_idx[0]]
+        )
+
+        ax.fill_between(
+            ell_namaster,
+            l2800_min,
+            l2800_max,
+            color=FLAMINGO_colors_sorted[l2800_idx[0]],
+            alpha=0.25,
+            linewidth=0,
+            # label='L2p8_m9 lightcone min/max'
+        )
+
+        # Ratio panel: mean and min/max relative to L1000 fiducial
+        ax_ratio.plot(
+            ell_namaster,
+            l2800_mean / fiducial_spec,
+            color=FLAMINGO_colors_sorted[l2800_idx[0]],
+            linestyle='solid',
+            alpha=0.9
+        )
+
+        ax_ratio.fill_between(
+            ell_namaster,
+            l2800_min / fiducial_spec,
+            l2800_max / fiducial_spec,
+            color=FLAMINGO_colors_sorted[l2800_idx[0]],
+            alpha=0.25,
+            linewidth=0
+        )
+    else:
+        for i, var in enumerate(variable_list):
+            print(var)
+            if var == min_val:
+                var = abs(var)
+                
+                if multi_sim:
+                    # determine fiducial (L1000 HYDRO_FIDUCIAL) index if present
+                    try:
+                        fiducial_idx = next(i for i, (b, n) in enumerate(zip(isim_boxes, isim_dirs)) if b == 'L1000N1800' and n == 'HYDRO_FIDUCIAL')
+                    except StopIteration:
+                        fiducial_idx = 0
+                    fiducial_spec = np.asarray(auto_spectra_list[fiducial_idx], dtype=float)
+
+                    if paper_ready and data == None:
+                        line, = ax.plot(ell_namaster, auto_spectra_list[i], 
+                                    linestyle='dashed', alpha=0.8, color=FLAMINGO_colors_sorted[i], 
                                     label=f'{var}')
-                    
-                    ax.text(
-                        0.1,                      # x position in axes coords
-                        0.3 - 0.045*i,            # y position, spaced by loop index
-                        f'({float(mle_chi2_auto[i]) - float(mle_chi2_auto[0]):.1f})' if i != 0 else f'{float(mle_chi2_auto[i]):.1f}',
-                        transform=ax.transAxes,
-                        color=FLAMINGO_colors_sorted[i],
-                        fontsize=10,
-                        fontfamily='serif',
-                        ha='left',
-                        va='top'
+                        
+                    else:
+                        line, = ax.plot(ell_namaster, auto_spectra_list[i], 
+                                    linestyle='dashed', color=FLAMINGO_colors_sorted[i], alpha=0.8, 
+                                    label=f'{var}, {ims[i]}, {slopes[i]}, {mean_mstar[i]:.5f}, {nhalos_list[i]}, {chi2[i]:.3f}' if data != None else f'{var}, {ims[i]}, {slopes[i]}, {nhalos_list[i]}, {mle_log_likelihood[i]}')
+
+                    ratio = auto_spectra_list[i] / fiducial_spec
+                    ax_ratio.plot(
+                        ell_namaster, ratio,
+                        color=line.get_color(),
+                        linestyle=line.get_linestyle(),
+                        alpha=0.9
                     )
+
                 else:
                     line, = ax.plot(ell_namaster, auto_spectra_list[i], 
-                                linestyle='solid', alpha=0.8, color=FLAMINGO_colors_sorted[i], 
-                                label=f'{var}, {ims[i]}, {slopes[i]}, {mean_mstar[i]:.5f}, {nhalos_list[i]}, {chi2[i]:.3f}' if data != None else f'{var}, {ims[i]}, {slopes[i]}, {nhalos_list[i]}, {mle_log_likelihood[i]}')
-                    
-                ratio = auto_spectra_list[i] / fiducial_spec
-                ax_ratio.plot(
-                    ell_namaster, ratio,
-                    color=line.get_color(),
-                    linestyle=line.get_linestyle(),
-                    alpha=0.9
-                )
-            
+                                    linestyle='dashed', alpha=0.8, 
+                                    label=f'{var}, {mean_mstar[i]:.5f}, {nhalos_list[i]}, {chi2[i]:.3f}' if data != None else f'{var}')
+                if covariance:
+                    ax.fill_between(x=ell_namaster, 
+                                    y1=(auto_spectra_list[i] + auto_spectra_covariance_list[i]), y2=(auto_spectra_list[i] - auto_spectra_covariance_list[i]), 
+                                    linewidth=0, alpha=.3)
+                if shot_noise:
+                    line_color = line.get_color()
+                    ax.hlines(y=auto_spectra_shot_noise_list[i]*1e5, xmin=-1, xmax=ell_namaster[-1]+10, linestyle='dashed', color=line_color, alpha=0.3)
             else:
-                line, = ax.plot(ell_namaster, auto_spectra_list[i], 
-                                linestyle= 'dashed' if var > max_val else 'solid', dash_capstyle='round' if var > max_val else 'projecting',  alpha=0.8, 
-                                label=f'{var}, {mean_mstar[i]:.5f}, {nhalos_list[i]}, {chi2[i]:.3f}' if data != None else f'{var}')
-            if covariance:
-                ax.fill_between(x=ell_namaster, 
-                                y1=(auto_spectra_list[i] + auto_spectra_covariance_list[i]), y2=(auto_spectra_list[i] - auto_spectra_covariance_list[i]), 
-                                linewidth=0, alpha=.3)
-            if shot_noise:
-                line_color = line.get_color()
-                ax.hlines(y=auto_spectra_shot_noise_list[i]*1e5, xmin=-1, xmax=ell_namaster[-1]+10, linestyle= 'dashed' if var > max_val else 'solid', dash_capstyle='round' if var > max_val else 'projecting',  color=line_color, alpha=0.3)
+                if multi_sim:
+                    try:
+                        fiducial_idx = next(i for i, (b, n) in enumerate(zip(isim_boxes, isim_dirs)) if b == 'L1000N1800' and n == 'HYDRO_FIDUCIAL')
+                    except StopIteration:
+                        fiducial_idx = 0
+                    fiducial_spec = np.asarray(auto_spectra_list[fiducial_idx], dtype=float)
+
+                    if paper_ready and data == None:
+                        line, = ax.plot(ell_namaster, auto_spectra_list[i], 
+                                        linestyle='solid', alpha=0.8, color=FLAMINGO_colors_sorted[i], 
+                                        label=f'{var}')
+                        
+                        ax.text(
+                            0.1,                      # x position in axes coords
+                            0.3 - 0.045*i,            # y position, spaced by loop index
+                            f'({float(mle_chi2_auto[i]) - float(mle_chi2_auto[0]):.1f})' if i != 0 else f'{float(mle_chi2_auto[i]):.1f}',
+                            transform=ax.transAxes,
+                            color=FLAMINGO_colors_sorted[i],
+                            fontsize=10,
+                            fontfamily='serif',
+                            ha='left',
+                            va='top'
+                        )
+                    else:
+                        line, = ax.plot(ell_namaster, auto_spectra_list[i], 
+                                    linestyle='solid', alpha=0.8, color=FLAMINGO_colors_sorted[i], 
+                                    label=f'{var}, {ims[i]}, {slopes[i]}, {mean_mstar[i]:.5f}, {nhalos_list[i]}, {chi2[i]:.3f}' if data != None else f'{var}, {ims[i]}, {slopes[i]}, {nhalos_list[i]}, {mle_log_likelihood[i]}')
+                        
+                    ratio = auto_spectra_list[i] / fiducial_spec
+                    ax_ratio.plot(
+                        ell_namaster, ratio,
+                        color=line.get_color(),
+                        linestyle=line.get_linestyle(),
+                        alpha=0.9
+                    )
+                
+                else:
+                    line, = ax.plot(ell_namaster, auto_spectra_list[i], 
+                                    linestyle= 'dashed' if var > max_val else 'solid', dash_capstyle='round' if var > max_val else 'projecting',  alpha=0.8, 
+                                    label=f'{var}, {mean_mstar[i]:.5f}, {nhalos_list[i]}, {chi2[i]:.3f}' if data != None else f'{var}')
+                if covariance:
+                    ax.fill_between(x=ell_namaster, 
+                                    y1=(auto_spectra_list[i] + auto_spectra_covariance_list[i]), y2=(auto_spectra_list[i] - auto_spectra_covariance_list[i]), 
+                                    linewidth=0, alpha=.3)
+                if shot_noise:
+                    line_color = line.get_color()
+                    ax.hlines(y=auto_spectra_shot_noise_list[i]*1e5, xmin=-1, xmax=ell_namaster[-1]+10, linestyle= 'dashed' if var > max_val else 'solid', dash_capstyle='round' if var > max_val else 'projecting',  color=line_color, alpha=0.3)
 
     ax.plot(obs_data[:,0], obs_data[:,1]*1e5, 
             color='k', marker='.', markersize=5, linewidth=0, label='ACT x unWISE')
@@ -739,89 +805,152 @@ def power_spectra_plot(box, isim, iz, im, slope, fits, single, paper_ready=False
     else:
         fig, ax = pb.subplots(1, 1, figsize=(8,6))
 
-    for i, var in enumerate(variable_list):
-        print(var)
-        if var == min_val:
-            var = abs(var)
+    if multi_sim and box == 'L2800N5040':
+        l1000_idx = [i for i, b in enumerate(isim_boxes) if b == 'L1000N1800']
+        l2800_idx = [i for i, b in enumerate(isim_boxes) if b == 'L2800N5040']
 
-            if multi_sim:
-                try:
-                    fiducial_idx = next(i for i, (b, n) in enumerate(zip(isim_boxes, isim_dirs)) if b == 'L1000N1800' and n == 'HYDRO_FIDUCIAL')
-                except StopIteration:
-                    fiducial_idx = 0
-                fiducial_spec = np.asarray(cross_spectra_list[fiducial_idx], dtype=float)
+        # L1000 reference line
+        i_ref = l1000_idx[0]
+        fiducial_spec = np.asarray(cross_spectra_list[i_ref], dtype=float)
 
-                if paper_ready and data == None:
-                    line, = ax.plot(ell_namaster, cross_spectra_list[i], 
-                                    linestyle='dashed', color=FLAMINGO_colors_sorted[i], 
-                                    label=f'{var}')
+        ax.plot(
+            ell_namaster,
+            fiducial_spec,
+            color=FLAMINGO_colors_sorted[i_ref],
+            linestyle='solid',
+            alpha=0.9,
+            label=FLAMINGO_names[i_ref]
+        )
 
-                else:
-                    line, = ax.plot(ell_namaster, cross_spectra_list[i], 
-                                    linestyle='dashed', color=FLAMINGO_colors_sorted[i], 
-                                    label=f'{var}, {ims[i]}, {slopes[i]}, {mean_mstar[i]:.5f}, {nhalos_list[i]}, {chi2[i]:.3f}' if data != None else f'{var}, {ims[i]}, {slopes[i]}, {nhalos_list[i]}, {mle_log_likelihood[i]}')
+        ax_ratio.axhline(1.0, color=FLAMINGO_colors_sorted[i_ref], linestyle='solid', alpha=0.8)
 
-                ratio = cross_spectra_list[i] / fiducial_spec
-                ax_ratio.plot(
-                    ell_namaster, ratio,
-                    color=line.get_color(),
-                    linestyle=line.get_linestyle(),
-                    alpha=0.9
-                )
-            
-            else:
-                ax.plot(ell_namaster, cross_spectra_list[i], 
-                        linestyle='dashed', 
-                        label=f'{var}, {mean_mstar[i]:.5f}, {nhalos_list[i]}, {chi2[i]:.3f}' if data != None else f'{var}')
-            if covariance:
-                ax.fill_between(x=ell_namaster, 
-                                y1=(cross_spectra_list[i] + cross_spectra_covariance_list[i]), y2=(cross_spectra_list[i] - cross_spectra_covariance_list[i]), 
-                                linewidth=0, alpha=.3)
-        else:
-            if multi_sim:
-                try:
-                    fiducial_idx = next(i for i, (b, n) in enumerate(zip(isim_boxes, isim_dirs)) if b == 'L1000N1800' and n == 'HYDRO_FIDUCIAL')
-                except StopIteration:
-                    fiducial_idx = 0
-                fiducial_spec = np.asarray(cross_spectra_list[fiducial_idx], dtype=float)
-                
-                if paper_ready and data == None:
-                    line, = ax.plot(ell_namaster, cross_spectra_list[i], 
-                                    linestyle='solid', color=FLAMINGO_colors_sorted[i], 
-                                    label=f'{var}')
-                    
-                    ax.text(
-                        0.8,                      # x position in axes coords
-                        0.95 - 0.045*i,            # y position, spaced by loop index
-                        f'({float(mle_chi2_cross[i]) - float(mle_chi2_cross[0]):.1f})' if i != 0 else f'{float(mle_chi2_cross[i]):.1f}',
-                        transform=ax.transAxes,
-                        color=FLAMINGO_colors_sorted[i],
-                        fontsize=10,
-                        fontfamily='serif',
-                        ha='left',
-                        va='top'
+        # L2800 mean + min/max envelope
+        l2800_cross = np.asarray([cross_spectra_list[i] for i in l2800_idx], dtype=float)
+
+        l2800_mean = np.mean(l2800_cross, axis=0)
+        l2800_min = np.min(l2800_cross, axis=0)
+        l2800_max = np.max(l2800_cross, axis=0)
+
+        ax.plot(
+            ell_namaster,
+            l2800_mean,
+            color=FLAMINGO_colors_sorted[l2800_idx[0]],
+            linestyle='solid',
+            alpha=0.9,
+            label=FLAMINGO_names[l2800_idx[0]]
+        )
+
+        ax.fill_between(
+            ell_namaster,
+            l2800_min,
+            l2800_max,
+            color=FLAMINGO_colors_sorted[l2800_idx[0]],
+            alpha=0.25,
+            linewidth=0,
+            # label='L2p8_m9 lightcone min/max'
+        )
+
+        # Ratio panel: mean and min/max relative to L1000 fiducial
+        ax_ratio.plot(
+            ell_namaster,
+            l2800_mean / fiducial_spec,
+            color=FLAMINGO_colors_sorted[l2800_idx[0]],
+            linestyle='solid',
+            alpha=0.9
+        )
+
+        ax_ratio.fill_between(
+            ell_namaster,
+            l2800_min / fiducial_spec,
+            l2800_max / fiducial_spec,
+            color=FLAMINGO_colors_sorted[l2800_idx[0]],
+            alpha=0.25,
+            linewidth=0
+        )
+    else:
+        for i, var in enumerate(variable_list):
+            print(var)
+            if var == min_val:
+                var = abs(var)
+
+                if multi_sim:
+                    try:
+                        fiducial_idx = next(i for i, (b, n) in enumerate(zip(isim_boxes, isim_dirs)) if b == 'L1000N1800' and n == 'HYDRO_FIDUCIAL')
+                    except StopIteration:
+                        fiducial_idx = 0
+                    fiducial_spec = np.asarray(cross_spectra_list[fiducial_idx], dtype=float)
+
+                    if paper_ready and data == None:
+                        line, = ax.plot(ell_namaster, cross_spectra_list[i], 
+                                        linestyle='dashed', color=FLAMINGO_colors_sorted[i], 
+                                        label=f'{var}')
+
+                    else:
+                        line, = ax.plot(ell_namaster, cross_spectra_list[i], 
+                                        linestyle='dashed', color=FLAMINGO_colors_sorted[i], 
+                                        label=f'{var}, {ims[i]}, {slopes[i]}, {mean_mstar[i]:.5f}, {nhalos_list[i]}, {chi2[i]:.3f}' if data != None else f'{var}, {ims[i]}, {slopes[i]}, {nhalos_list[i]}, {mle_log_likelihood[i]}')
+
+                    ratio = cross_spectra_list[i] / fiducial_spec
+                    ax_ratio.plot(
+                        ell_namaster, ratio,
+                        color=line.get_color(),
+                        linestyle=line.get_linestyle(),
+                        alpha=0.9
                     )
+                
                 else:
-                    line, = ax.plot(ell_namaster, cross_spectra_list[i], 
-                        linestyle='solid', color=FLAMINGO_colors_sorted[i], 
-                        label=f'{var}, {ims[i]}, {slopes[i]}, {mean_mstar[i]:.5f}, {nhalos_list[i]}, {chi2[i]:.3f}' if data != None else f'{var}, {ims[i]}, {slopes[i]}, {nhalos_list[i]}, {mle_log_likelihood[i]}')
-                    
-                ratio = cross_spectra_list[i] / fiducial_spec
-                ax_ratio.plot(
-                    ell_namaster, ratio,
-                    color=line.get_color(),
-                    linestyle=line.get_linestyle(),
-                    alpha=0.9
-                )
-            
+                    ax.plot(ell_namaster, cross_spectra_list[i], 
+                            linestyle='dashed', 
+                            label=f'{var}, {mean_mstar[i]:.5f}, {nhalos_list[i]}, {chi2[i]:.3f}' if data != None else f'{var}')
+                if covariance:
+                    ax.fill_between(x=ell_namaster, 
+                                    y1=(cross_spectra_list[i] + cross_spectra_covariance_list[i]), y2=(cross_spectra_list[i] - cross_spectra_covariance_list[i]), 
+                                    linewidth=0, alpha=.3)
             else:
-                ax.plot(ell_namaster, cross_spectra_list[i], 
-                        linestyle= 'dashed' if var > max_val else 'solid', dash_capstyle='round' if var > max_val else 'projecting',  
-                        label=f'{var}, {mean_mstar[i]:.5f}, {nhalos_list[i]}, {chi2[i]:.3f}' if data != None else f'{var}')
-            if covariance:
-                ax.fill_between(x=ell_namaster, 
-                                y1=(cross_spectra_list[i] + cross_spectra_covariance_list[i]), y2=(cross_spectra_list[i] - cross_spectra_covariance_list[i]), 
-                                linewidth=0, alpha=.3)
+                if multi_sim:
+                    try:
+                        fiducial_idx = next(i for i, (b, n) in enumerate(zip(isim_boxes, isim_dirs)) if b == 'L1000N1800' and n == 'HYDRO_FIDUCIAL')
+                    except StopIteration:
+                        fiducial_idx = 0
+                    fiducial_spec = np.asarray(cross_spectra_list[fiducial_idx], dtype=float)
+                    
+                    if paper_ready and data == None:
+                        line, = ax.plot(ell_namaster, cross_spectra_list[i], 
+                                        linestyle='solid', color=FLAMINGO_colors_sorted[i], 
+                                        label=f'{var}')
+                        
+                        ax.text(
+                            0.8,                      # x position in axes coords
+                            0.95 - 0.045*i,            # y position, spaced by loop index
+                            f'({float(mle_chi2_cross[i]) - float(mle_chi2_cross[0]):.1f})' if i != 0 else f'{float(mle_chi2_cross[i]):.1f}',
+                            transform=ax.transAxes,
+                            color=FLAMINGO_colors_sorted[i],
+                            fontsize=10,
+                            fontfamily='serif',
+                            ha='left',
+                            va='top'
+                        )
+                    else:
+                        line, = ax.plot(ell_namaster, cross_spectra_list[i], 
+                            linestyle='solid', color=FLAMINGO_colors_sorted[i], 
+                            label=f'{var}, {ims[i]}, {slopes[i]}, {mean_mstar[i]:.5f}, {nhalos_list[i]}, {chi2[i]:.3f}' if data != None else f'{var}, {ims[i]}, {slopes[i]}, {nhalos_list[i]}, {mle_log_likelihood[i]}')
+                        
+                    ratio = cross_spectra_list[i] / fiducial_spec
+                    ax_ratio.plot(
+                        ell_namaster, ratio,
+                        color=line.get_color(),
+                        linestyle=line.get_linestyle(),
+                        alpha=0.9
+                    )
+                
+                else:
+                    ax.plot(ell_namaster, cross_spectra_list[i], 
+                            linestyle= 'dashed' if var > max_val else 'solid', dash_capstyle='round' if var > max_val else 'projecting',  
+                            label=f'{var}, {mean_mstar[i]:.5f}, {nhalos_list[i]}, {chi2[i]:.3f}' if data != None else f'{var}')
+                if covariance:
+                    ax.fill_between(x=ell_namaster, 
+                                    y1=(cross_spectra_list[i] + cross_spectra_covariance_list[i]), y2=(cross_spectra_list[i] - cross_spectra_covariance_list[i]), 
+                                    linewidth=0, alpha=.3)
     
     ax.plot(obs_data[:,0], obs_data[:,3]*1e5, 
             color='k', marker='.', markersize=5, linewidth=0, label='ACT x unWISE')
@@ -1037,4 +1166,4 @@ if __name__ == "__main__":
 
     lc = int(sys.argv[8])
 
-    power_spectra_plot(box, isim, iz, im, slope, fits, single, paper_ready=True, template=False, multi_sim=True, plot_type='other_feedback', mle=True, shot_noise=False, lc=lc, file='png')
+    power_spectra_plot(box, isim, iz, im, slope, fits, single, paper_ready=True, template=False, multi_sim=True, plot_type=None, mle=True, shot_noise=False, lc=lc, file='png')

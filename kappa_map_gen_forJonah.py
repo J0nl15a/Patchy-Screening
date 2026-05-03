@@ -105,8 +105,12 @@ def kappa_map_gen_forJonah(box_id, sim_id, lc_id=0):
     boxsize = boxsize_list[boxsize_id]
     zcmb = 1100
     z_max = 3.0
-    cosmo_info_file = f'{base_dir}{box}/{sim_list}/{snap_dir}/flamingo_0009/flamingo_0009.0.hdf5'
-    cosmo_info=h5py.File(cosmo_info_file,'r')
+    try:
+        cosmo_info_file = f'{base_dir}{box}/{sim_list}/{snap_dir}/flamingo_0009/flamingo_0009.0.hdf5'
+        cosmo_info=h5py.File(cosmo_info_file,'r')
+    except FileNotFoundError:
+        cosmo_info_file = f'{base_dir}{box}/{sim_list}/{snap_dir}/flamingo_0010/flamingo_0010.0.hdf5'
+        cosmo_info=h5py.File(cosmo_info_file,'r')
     H0=cosmo_info['Cosmology'].attrs['h']*100.0
     Om0=cosmo_info['Cosmology'].attrs['Omega_m']
     Ob0=cosmo_info['Cosmology'].attrs['Omega_b']

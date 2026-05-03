@@ -59,7 +59,8 @@ jid0=$(sbatch --parsable \
               -c 16 \
               -p cosma8 \
               -A dp203 \
-              -t 01:00:00 \
+              -t 1:30:00 \
+              --array=0-$((NSHELL-1))%20 \
               -o "./batch_files/caching_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}/job.%j.dump" \
               -e "./batch_files/caching_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}/job.%j.err" \
               <<EOF
@@ -93,7 +94,7 @@ done
 if [ "\$all_found" = true ]; then
     echo "All shell cache files found — skipping build_cache.py"
 else
-    python3 FLAMINGO_galaxies.py "\$SLURM_CPUS_PER_TASK" "${BOX}" "${ISIM}" "${LIGHTCONE}"
+    python3 FLAMINGO_galaxies.py "\$SLURM_CPUS_PER_TASK" "${BOX}" "${ISIM}" "\$SLURM_ARRAY_TASK_ID" "${LIGHTCONE}"
 fi
 
 echo "Job 0: Caching the galaxies from the FLAMINGO lightcone shells and catalogues with box ${BOX}, sim ${ISIM} & lightcone ${LIGHTCONE}."

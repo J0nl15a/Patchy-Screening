@@ -86,7 +86,7 @@ def build_shell_cache(
 
     # 3+ hours
     # for iz in iz_list:
-    #     build_shell_cache_one( boxname, simname, iz, lightcone, outdir, stellar_cut=stellar_cut, overwrite=overwrite )
+    #     build_shell_cache_one(boxname, simname, iz, lightcone, outdir, stellar_cut=stellar_cut, overwrite=overwrite)
 
     print(f"Shell cache built in {time.time() - job_start_time:.1f} seconds")
 
@@ -98,8 +98,9 @@ if __name__ == "__main__":
 
     boxname  = sys.argv[2]  # <- fill in
     simname  = sys.argv[3]          # <- fill in
+    iz = int(sys.argv[4])
     ncpu     = int(sys.argv[1])     # <- fill in
-    lightcone = int(sys.argv[4])
+    lightcone = int(sys.argv[5])
     outdir   = f"/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/shell_caches/{boxname}/{simname}/lightcone{lightcone}"
 
     build_shell_cache(
@@ -111,3 +112,8 @@ if __name__ == "__main__":
         prefer="processes",
         overwrite=True
     )
+
+    # build_shell_cache_one(boxname, simname, iz, lightcone, outdir, stellar_cut=8.0, overwrite=True)
+
+
+

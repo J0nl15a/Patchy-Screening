@@ -55,7 +55,11 @@ def multiprocess_z_bins(ncpu: int, box: str, isim: str, lightcone: int = 0):
                        backend='loky')(
                            delayed(z_bins)(box, isim, i, lightcone=lightcone)
                            for i in range(len(filelist))
-                       )
+      
+    )
+    # results = []
+    # for i in range(len(filelist)):
+    #     results.append(z_bins(box, isim, i, lightcone=lightcone))
 
     print(results)
     idx, min_vals, mid, max_vals = zip(*[r for r in results if r is not None])

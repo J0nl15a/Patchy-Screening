@@ -8,7 +8,7 @@
 #SBATCH --exclusive
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=ARIJCONL@ljmu.ac.uk 
-#SBATCH -t 12:00:00
+#SBATCH -t 18:00:00
 
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1

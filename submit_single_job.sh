@@ -3,7 +3,7 @@
 # Define paths
 #PYTHON_FILE="imp_patchy_screening_COPY.py"
 PYTHON_FILE="imp_patchy_screening.py"
-JOB_SCRIPT="submit_script.sh"
+JOB_SCRIPT="submit_single_script.sh"
 
 # Generate a unique filename for this job
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")

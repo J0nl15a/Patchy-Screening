@@ -230,6 +230,9 @@ if __name__ == '__main__':
     log_likelihood_mle = log_likelihood((mle_amp, mle_slope), f_obs, f_obs_err, box, isim, iz, lightcone=lightcone)
     print(f"[INFO] Log-Likelihood at MLE: {log_likelihood_mle}")
 
+    # Save MCMC chain
+    np.save(f"./data_files/mcmc_chains/flat_samples_{box}_{isim}_{iz}_lightcone{lightcone}_{mle_amp}_{mle_slope}.npy", flat_samples)
+
     # write to text file in a known place
     path = f"./data_files/mle_parameters/{box}/{isim}/{iz}/lightcone{lightcone}/mle_values.txt"
     outfile = Path(path)

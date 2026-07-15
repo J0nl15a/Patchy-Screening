@@ -1,6 +1,6 @@
 import os
 from joblib import Parallel, delayed
-import numpy as np, polars as pl
+import numpy as np, pandas as pd
 from imp_patchy_screening import patchyScreening
 from FLAMINGO_halo_redshifts import multiprocess_z_bins
 from pathlib import Path
@@ -78,7 +78,7 @@ def halo_sampling(boxname, simname, z_sample, mass_cut, n_cut, ncpu, lightcone=0
 
     # concatenate once at the end
     dfs = [df for df in results if df is not None]
-    sampled_halo_data = pl.concat(dfs)
+    sampled_halo_data = pd.concat(dfs)
 
     mvir = sampled_halo_data['mvir'].to_numpy()
     nhalo = mvir.size
@@ -102,10 +102,10 @@ def process_snapshot(box, sim, iz, stellar_cuts, halo_z_bins, dndz_sample, light
     #                      lightcone_method=('FULL','shell'), lightcone=lightcone)
     # ps.filter_stellar_mass()
 
-    df = pl.read_parquet(
+    df = pd.read_parquet(
         f"/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/shell_caches/{box}/{sim}/lightcone{lightcone}/shell_{iz:03d}.parquet"
     )
-    df = df.filter(pl.col("mstar") >= 10**(float(im)))
+    df = df[df["mstar"] >= 10**(float(im))]
 
     nsamp = int(dndz_sample[iz][1])
     print(iz, nsamp)

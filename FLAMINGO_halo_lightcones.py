@@ -1,5 +1,5 @@
 import os
-import numpy as np, polars as pl
+import numpy as np, pandas as pd
 from joblib import Parallel, delayed
 from imp_patchy_screening import patchyScreening
 from FLAMINGO_halo_redshifts import multiprocess_z_bins
@@ -109,10 +109,10 @@ def process_snapshot(box, sim, iz, stellar_cuts, lightcone):
     # ps.filter_stellar_mass()
     # print(f'ps.im={ps.im}')
 
-    df = pl.read_parquet(
+    df = pd.read_parquet(
         f"/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/shell_caches/{box}/{sim}/lightcone{lightcone}/shell_{iz:03d}.parquet"
     )
-    df = df.filter(pl.col("mstar") >= 10**(float(im)))
+    df = df[df["mstar"] >= 10**(float(im))]
     nhalo = len(df)
 
     print(f'Processed snapshot {iz}, number of halos after stellar mass cut: {nhalo}')

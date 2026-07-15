@@ -58,7 +58,7 @@ jid0=$(sbatch --parsable \
               --job-name=shell_caching_stellar_cuts \
               -c 16 \
               -p cosma8 \
-              -A dp203 \
+              -A dp004 \
               -t 1:30:00 \
               --array=0-$((NSHELL-1))%20 \
               -o "./batch_files/caching_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}/job.%j.dump" \
@@ -162,7 +162,7 @@ else
                   --job-name=lightcones_shells \
                   -c 4 \
                   -p cosma8 \
-                  -A dp203 \
+                  -A dp004 \
                   -t 00:20:00 \
                   --array=0-$((NSHELL-1))%20 \
                   -o "./batch_files/pipeline_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}/job.%A_%a.dump" \
@@ -240,7 +240,7 @@ else
                 --job-name=combine_lightcones_unWISE_matching \
                 -c 4 \
                 -p cosma8 \
-                -A dp203 \
+                -A dp004 \
                 -t 01:00:00 \
                 -o "./batch_files/pipeline_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}/job.%j.dump" \
                 -e "./batch_files/pipeline_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}/job.%j.err" \
@@ -346,7 +346,7 @@ else
                   --job-name=sampling_shells \
                   -c 4 \
                   -p cosma8 \
-                  -A dp203 \
+                  -A dp004 \
                   -t 01:00:00 \
                   --array=0-$((NSHELL-1))%20 \
                   -o "./batch_files/pipeline_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}/job.%A_%a.dump" \
@@ -404,7 +404,7 @@ else
                   --job-name=combine_sampling \
                   -c 8 \
                   -p cosma8 \
-                  -A dp203 \
+                  -A dp004 \
                   -t 04:00:00 \
                   -o "./batch_files/pipeline_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}/job.%j.dump" \
                   -e "./batch_files/pipeline_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}/job.%j.err" \
@@ -502,7 +502,7 @@ else
                   --job-name=power_spectra \
                   -c 8 \
                   -p cosma8 \
-                  -A dp203 \
+                  -A dp004 \
                   -t 02:00:00 \
                   --array=0-$((NGRID-1))%20 \
                   -o "./batch_files/pipeline_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}/job.%A_%a.dump" \
@@ -548,7 +548,7 @@ if [ -f "./data_files/power_spectra/galaxy_galaxy/${BOX}/${ISIM}/${IZ}/lightcone
 else 
     python3 unWISE_power_spectra.py \
       "$SLURM_CPUS_PER_TASK" "${BOX}" "${ISIM}" "${IZ}" "$amp" "$slope" \
-      unlensed True False False True True False "${LIGHTCONE}"
+      unlensed True False False True True False False "${LIGHTCONE}" True
 fi
 
 echo "Job 7: Compute power spectra for box ${BOX}, sim ${ISIM}, lightcone ${LIGHTCONE}, ${IZ} sample for all stellar cut parameters."
@@ -572,7 +572,7 @@ jid8=$(sbatch --parsable \
             --job-name=mock_catalog_maximum_likelihood_estimation \
             -c 16 \
             -p cosma8 \
-            -A dp203 \
+            -A dp004 \
             -t 01:00:00 \
             -o "./batch_files/maximum_likelihood_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}/job.%j.dump" \
             -e "./batch_files/maximum_likelihood_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}/job.%j.err" \
@@ -628,7 +628,7 @@ jid9=$(sbatch --parsable \
                 --job-name=mle_stellar_cut \
                 -c 1 \
                 -p cosma8 \
-                -A dp203 \
+                -A dp004 \
                 -t 00:01:00 \
                 -o "./batch_files/pipeline_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}/job.mle_%j.dump" \
                 -e "./batch_files/pipeline_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}/job.mle_%j.err" \
@@ -679,7 +679,7 @@ jid10=$(sbatch --parsable \
                 --job-name=mle_lightcones_shells \
                 -c 4 \
                 -p cosma8 \
-                -A dp203 \
+                -A dp004 \
                 -t 00:20:00 \
                 --array=0-$((NSHELL-1))%20 \
                 -o "./batch_files/pipeline_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}/job.mle_%A_%a.dump" \
@@ -736,7 +736,7 @@ jid11=$(sbatch --parsable \
                 --job-name=mle_combine_lightcones_unWISE_matching \
                 -c 4 \
                 -p cosma8 \
-                -A dp203 \
+                -A dp004 \
                 -t 01:00:00 \
                 -o "./batch_files/pipeline_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}/job.mle_%j.dump" \
                 -e "./batch_files/pipeline_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}/job.mle_%j.err" \
@@ -809,7 +809,7 @@ jid13=$(sbatch --parsable \
                 --job-name=mle_sampling_shells \
                 -c 4 \
                 -p cosma8 \
-                -A dp203 \
+                -A dp004 \
                 -t 01:00:00 \
                 --array=0-$((NSHELL-1))%20 \
                 -o "./batch_files/pipeline_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}/job.mle_%A_%a.dump" \
@@ -874,7 +874,7 @@ jid14=$(sbatch --parsable \
                 --job-name=mle_combine_sampling_power_spectra \
                 -c 16 \
                 -p cosma8 \
-                -A dp203 \
+                -A dp004 \
                 -t 04:00:00 \
                 -o "./batch_files/pipeline_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}/job.mle_%j.dump" \
                 -e "./batch_files/pipeline_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}/job.mle_%j.err" \
@@ -933,7 +933,7 @@ if [ -f "./data_files/power_spectra/galaxy_galaxy/${BOX}/${ISIM}/${IZ}/lightcone
 else
     python3 unWISE_power_spectra.py \
       "$SLURM_CPUS_PER_TASK" "$BOX" "$ISIM" "$IZ" "$mle_amp" "$mle_slope" \
-      unlensed True False False True True False "$LIGHTCONE"
+      unlensed True False False True True False True "$LIGHTCONE" True
 fi
 
 echo "Job 15: Compute power spectra for box $BOX, sim $ISIM, lightcone $LIGHTCONE, $IZ sample for MLE values only."

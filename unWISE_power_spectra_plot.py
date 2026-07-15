@@ -93,6 +93,10 @@ def power_spectra_plot(box, isim, iz, im, slope, fits, single, paper_ready=False
                         isim_dirs = ['HYDRO_STRONG_JETS_published', 'HYDRO_JETS_published', 'HYDRO_STRONG_SUPERNOVA']
                         FLAMINGO_names = ['Jet_fgas-4$\sigma$', 'Jet', '$M^*$-$\sigma$']
                         FLAMINGO_colors_sorted = ['#55E18E', '#7EFF4B', '#FF8C40']
+                    elif plot_type == 'fixed_sample':
+                        isim_dirs = ['HYDRO_LOW_SIGMA8_STRONGEST_AGN', 'HYDRO_LOW_SIGMA8', 'HYDRO_PLANCK', 'HYDRO_STRONGEST_AGN', 'HYDRO_STRONG_SUPERNOVA']
+                        FLAMINGO_names = ['LS8_fgas-8$\sigma$', 'LS8', 'Planck', 'fgas-8$\sigma$', '$M^*$-$\sigma$']
+                        FLAMINGO_colors_sorted = ['#7B68EE', '#882255', '#44AA99', '#105ba4', '#FF8C40']
                     isim_dirs += ['HYDRO_FIDUCIAL']
                     FLAMINGO_names += ['L1_m9']
                     FLAMINGO_colors_sorted += ['#117733']
@@ -103,15 +107,15 @@ def power_spectra_plot(box, isim, iz, im, slope, fits, single, paper_ready=False
             elif box == 'L2800N5040':
                 # Include the L1000 HYDRO_FIDUCIAL (lightcone 0) as a reference,
                 # then include all L2800 lightcones (L2p8_m9 (lc=0..lc_count-1)).
-                isim_dirs = ['HYDRO_FIDUCIAL' for l in range(0, lc_count)] + ['HYDRO_FIDUCIAL']
-                isim_boxes = (['L2800N5040'] * lc_count) + ['L1000N1800']
-                sim_lc_idx = [l for l in range(0, lc_count)] + [0]
+                isim_dirs = ['HYDRO_FIDUCIAL' for l in range(0, lc_count)] + ['HYDRO_FIDUCIAL', 'HYDRO_FIDUCIAL']
+                isim_boxes = (['L2800N5040'] * lc_count) + ['L1000N3600', 'L1000N1800']
+                sim_lc_idx = [l for l in range(0, lc_count)] + [0, 0]
                 if paper_ready:
-                    FLAMINGO_names = [f'L2p8_m9' for l in range(0, lc_count)] + ['L1_m9']
+                    FLAMINGO_names = [f'L2p8_m9' for l in range(0, lc_count)] + ['L1_m8', 'L1_m9']
                 else:
-                    FLAMINGO_names = [f'L2p8_m9 (lc={l})' for l in range(0, lc_count)] + ['L1_m9']
+                    FLAMINGO_names = [f'L2p8_m9 (lc={l})' for l in range(0, lc_count)] + ['L1_m8', 'L1_m9']
                 # simple color palette: keep fiducial green and the L2800 lightcones a bluish tone
-                FLAMINGO_colors_sorted = (['#332288'] * lc_count) + ['#117733']
+                FLAMINGO_colors_sorted = (['#332288'] * lc_count) + ['#CC6677', '#117733']
 
             ims = []
             slopes = []
@@ -410,11 +414,12 @@ def power_spectra_plot(box, isim, iz, im, slope, fits, single, paper_ready=False
 
     if multi_sim and box == 'L2800N5040':
         FLAMINGO_names = FLAMINGO_names[::-1]
-        l1000_idx = [i for i, b in enumerate(isim_boxes) if b == 'L1000N1800']
+        l1000m9_idx = [i for i, b in enumerate(isim_boxes) if b == 'L1000N1800']
+        l1000m8_idx = [i for i, b in enumerate(isim_boxes) if b == 'L1000N3600']
         l2800_idx = [i for i, b in enumerate(isim_boxes) if b == 'L2800N5040']
 
-        # L1000 reference line
-        i_ref = l1000_idx[0]
+        # L1000N1800 reference line
+        i_ref = l1000m9_idx[0]
         fiducial_spec = np.asarray(auto_spectra_list[i_ref], dtype=float)
 
         ax.plot(
@@ -426,7 +431,52 @@ def power_spectra_plot(box, isim, iz, im, slope, fits, single, paper_ready=False
             label=FLAMINGO_names[i_ref]
         )
 
+        ax.text(
+            0.1,                      # x position in axes coords
+            0.3,            # y position, spaced by loop index
+            f'{float(mle_chi2_auto[i_ref]):.1f}',
+            transform=ax.transAxes,
+            color=FLAMINGO_colors_sorted[i_ref],
+            fontsize=10,
+            fontfamily='serif',
+            ha='left',
+            va='top'
+        )
+
         ax_ratio.axhline(1.0, color=FLAMINGO_colors_sorted[i_ref], linestyle='solid', alpha=0.8)
+
+        #L1000N3600 line
+        i_hires = l1000m8_idx[0]
+        hires_spec = np.asarray(auto_spectra_list[i_hires], dtype=float)
+
+        ax.plot(
+            ell_namaster,
+            hires_spec,
+            color=FLAMINGO_colors_sorted[i_hires],
+            linestyle='solid',
+            alpha=0.9,
+            label=FLAMINGO_names[i_hires]
+        )
+
+        ax.text(
+            0.1,                      # x position in axes coords
+            0.3 - 0.045*l1000m8_idx[0],            # y position, spaced by loop index
+            f'({float(mle_chi2_auto[i_hires])- float(mle_chi2_auto[i_ref]):.1f})',
+            transform=ax.transAxes,
+            color=FLAMINGO_colors_sorted[i_hires],
+            fontsize=10,
+            fontfamily='serif',
+            ha='left',
+            va='top'
+        )
+
+        ax_ratio.plot(
+            ell_namaster,
+            hires_spec / fiducial_spec,
+            color=FLAMINGO_colors_sorted[l1000m8_idx[0]],
+            linestyle='solid',
+            alpha=0.9
+        )
 
         # L2800 mean + min/max envelope
         l2800_auto = np.asarray([auto_spectra_list[i] for i in l2800_idx], dtype=float)
@@ -442,6 +492,20 @@ def power_spectra_plot(box, isim, iz, im, slope, fits, single, paper_ready=False
             linestyle='solid',
             alpha=0.9,
             label=FLAMINGO_names[l2800_idx[0]]
+        )
+
+        l2800_chi_sq_auto = np.sum((((obs_data[:,1]*1e5) - l2800_mean)**2)/((obs_data_std*1e5)**2))
+
+        ax.text(
+            0.1,                      # x position in axes coords
+            0.3 - 0.045*l2800_idx[0],            # y position, spaced by loop index
+            f'({float(l2800_chi_sq_auto) - float(mle_chi2_auto[i_ref]):.1f})',
+            transform=ax.transAxes,
+            color=FLAMINGO_colors_sorted[l2800_idx[0]],
+            fontsize=10,
+            fontfamily='serif',
+            ha='left',
+            va='top'
         )
 
         ax.fill_between(
@@ -522,7 +586,7 @@ def power_spectra_plot(box, isim, iz, im, slope, fits, single, paper_ready=False
                         fiducial_idx = 0
                     fiducial_spec = np.asarray(auto_spectra_list[fiducial_idx], dtype=float)
 
-                    if paper_ready and data == None:
+                    if paper_ready and data == None and plot_type != 'fixed_sample':
                         line, = ax.plot(ell_namaster, auto_spectra_list[i], 
                                         linestyle='solid', alpha=0.8, color=FLAMINGO_colors_sorted[i], 
                                         label=f'{var}')
@@ -541,7 +605,7 @@ def power_spectra_plot(box, isim, iz, im, slope, fits, single, paper_ready=False
                     else:
                         line, = ax.plot(ell_namaster, auto_spectra_list[i], 
                                     linestyle='solid', alpha=0.8, color=FLAMINGO_colors_sorted[i], 
-                                    label=f'{var}, {ims[i]}, {slopes[i]}, {mean_mstar[i]:.5f}, {nhalos_list[i]}, {chi2[i]:.3f}' if data != None else f'{var}, {ims[i]}, {slopes[i]}, {nhalos_list[i]}, {mle_log_likelihood[i]}')
+                                    label=f'{var}, {ims[i]}, {slopes[i]}, {mean_mstar[i]:.5f}, {nhalos_list[i]}, {chi2[i]:.3f}' if data != None else f'{var}')
                         
                     ratio = auto_spectra_list[i] / fiducial_spec
                     ax_ratio.plot(
@@ -806,11 +870,12 @@ def power_spectra_plot(box, isim, iz, im, slope, fits, single, paper_ready=False
         fig, ax = pb.subplots(1, 1, figsize=(8,6))
 
     if multi_sim and box == 'L2800N5040':
-        l1000_idx = [i for i, b in enumerate(isim_boxes) if b == 'L1000N1800']
+        l1000m9_idx = [i for i, b in enumerate(isim_boxes) if b == 'L1000N1800']
+        l1000m8_idx = [i for i, b in enumerate(isim_boxes) if b == 'L1000N3600']
         l2800_idx = [i for i, b in enumerate(isim_boxes) if b == 'L2800N5040']
 
-        # L1000 reference line
-        i_ref = l1000_idx[0]
+        # L1000N1800 reference line
+        i_ref = l1000m9_idx[0]
         fiducial_spec = np.asarray(cross_spectra_list[i_ref], dtype=float)
 
         ax.plot(
@@ -822,7 +887,52 @@ def power_spectra_plot(box, isim, iz, im, slope, fits, single, paper_ready=False
             label=FLAMINGO_names[i_ref]
         )
 
+        ax.text(
+            0.8,                      # x position in axes coords
+            0.95,            # y position, spaced by loop index
+            f'{float(mle_chi2_cross[i_ref]):.1f}',
+            transform=ax.transAxes,
+            color=FLAMINGO_colors_sorted[i_ref],
+            fontsize=10,
+            fontfamily='serif',
+            ha='left',
+            va='top'
+        )
+
         ax_ratio.axhline(1.0, color=FLAMINGO_colors_sorted[i_ref], linestyle='solid', alpha=0.8)
+
+        #L1000N3600 line
+        i_hires = l1000m8_idx[0]
+        hires_spec = np.asarray(cross_spectra_list[i_hires], dtype=float)
+
+        ax.plot(
+            ell_namaster,
+            hires_spec,
+            color=FLAMINGO_colors_sorted[i_hires],
+            linestyle='solid',
+            alpha=0.9,
+            label=FLAMINGO_names[i_hires]
+        )
+
+        ax.text(
+            0.8,                      # x position in axes coords
+            0.95- 0.045*l1000m8_idx[0],            # y position, spaced by loop index
+            f'({float(mle_chi2_cross[i_hires])- float(mle_chi2_cross[i_ref]):.1f})',
+            transform=ax.transAxes,
+            color=FLAMINGO_colors_sorted[i_hires],
+            fontsize=10,
+            fontfamily='serif',
+            ha='left',
+            va='top'
+        )
+
+        ax_ratio.plot(
+            ell_namaster,
+            hires_spec / fiducial_spec,
+            color=FLAMINGO_colors_sorted[l1000m8_idx[0]],
+            linestyle='solid',
+            alpha=0.9
+        )
 
         # L2800 mean + min/max envelope
         l2800_cross = np.asarray([cross_spectra_list[i] for i in l2800_idx], dtype=float)
@@ -838,6 +948,20 @@ def power_spectra_plot(box, isim, iz, im, slope, fits, single, paper_ready=False
             linestyle='solid',
             alpha=0.9,
             label=FLAMINGO_names[l2800_idx[0]]
+        )
+
+        l2800_chi_sq_cross = np.sum((((obs_data[:,3]*1e5) - l2800_mean)**2)/((obs_data_std_cross*1e5)**2))
+
+        ax.text(
+            0.8,                      # x position in axes coords
+            0.95 - 0.045*l2800_idx[0],            # y position, spaced by loop index
+            f'({float(l2800_chi_sq_cross) - float(mle_chi2_cross[i_ref]):.1f})',
+            transform=ax.transAxes,
+            color=FLAMINGO_colors_sorted[l2800_idx[0]],
+            fontsize=10,
+            fontfamily='serif',
+            ha='left',
+            va='top'
         )
 
         ax.fill_between(
@@ -914,7 +1038,7 @@ def power_spectra_plot(box, isim, iz, im, slope, fits, single, paper_ready=False
                         fiducial_idx = 0
                     fiducial_spec = np.asarray(cross_spectra_list[fiducial_idx], dtype=float)
                     
-                    if paper_ready and data == None:
+                    if paper_ready and data == None and plot_type != 'fixed_sample':
                         line, = ax.plot(ell_namaster, cross_spectra_list[i], 
                                         linestyle='solid', color=FLAMINGO_colors_sorted[i], 
                                         label=f'{var}')
@@ -933,7 +1057,7 @@ def power_spectra_plot(box, isim, iz, im, slope, fits, single, paper_ready=False
                     else:
                         line, = ax.plot(ell_namaster, cross_spectra_list[i], 
                             linestyle='solid', color=FLAMINGO_colors_sorted[i], 
-                            label=f'{var}, {ims[i]}, {slopes[i]}, {mean_mstar[i]:.5f}, {nhalos_list[i]}, {chi2[i]:.3f}' if data != None else f'{var}, {ims[i]}, {slopes[i]}, {nhalos_list[i]}, {mle_log_likelihood[i]}')
+                            label=f'{var}, {ims[i]}, {slopes[i]}, {mean_mstar[i]:.5f}, {nhalos_list[i]}, {chi2[i]:.3f}' if data != None else f'{var}')
                         
                     ratio = cross_spectra_list[i] / fiducial_spec
                     ax_ratio.plot(
@@ -1166,4 +1290,4 @@ if __name__ == "__main__":
 
     lc = int(sys.argv[8])
 
-    power_spectra_plot(box, isim, iz, im, slope, fits, single, paper_ready=True, template=False, multi_sim=True, plot_type=None, mle=True, shot_noise=False, lc=lc, file='png')
+    power_spectra_plot(box, isim, iz, im, slope, fits, single, paper_ready=True, template=False, multi_sim=True, plot_type=None, mle=False, shot_noise=False, lc=lc, file='png')

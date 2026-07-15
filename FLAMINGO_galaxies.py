@@ -1,5 +1,5 @@
 import os
-import numpy as np, polars as pl
+import numpy as np, pandas as pd
 from pathlib import Path
 from joblib import Parallel, delayed
 from imp_patchy_screening import patchyScreening
@@ -32,6 +32,7 @@ def build_shell_cache_one(
         ncpu=1,                # kept constant; not used for caching
         lightcone_method=("FULL", "shell"),
         lightcone=lightcone,
+        mle=False,            # kept constant; not used for caching
     )
 
     # minimal columns for downstream filtering/sampling
@@ -40,9 +41,10 @@ def build_shell_cache_one(
 
     # deterministic rand for fast/reproducible sampling later
     rng = np.random.default_rng(seed_base + int(iz))
-    df = df.with_columns(pl.Series("rand", rng.random(df.height)))
+    df = df.copy()
+    df["rand"] = rng.random(len(df))
 
-    df.write_parquet(outpath, compression="zstd")
+    df.to_parquet(outpath, compression="zstd")
     return str(outpath)
 
 

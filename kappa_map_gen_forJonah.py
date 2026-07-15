@@ -14,7 +14,7 @@ from pathlib import Path
 def get_num(x):
     return int(x.split('/')[-2].lstrip().split('_')[-1])
 
-def map_reading_kernel(file_dir, quantity, nside, ibox, nrot, theta, phi, dchi, z_mid, chi_mid, chi_CMB, cosmology, matter_mean, rotate=False):
+def map_reading_kernel(file_dir, quantity, nside, ibox, nrot, theta, phi, dchi, z_mid, chi_mid, chi_CMB, cosmology, matter_mean, rotate=False, Jeger_rot=False):
 
     map_stacked = np.zeros((healpy.nside2npix(nside)))
 
@@ -24,7 +24,19 @@ def map_reading_kernel(file_dir, quantity, nside, ibox, nrot, theta, phi, dchi, 
     ##FLAMINGO S_8 tension paper Eq 5
 
 
-    if rotate == True:
+    if rotate:
+       if Jeger_rot:
+            for i in range(len(theta)):
+                rot_custom = healpy.Rotator(rot=[theta[i], phi[i]], inv=True)
+
+                map_read = np.asarray(h5py.File(file_dir[i], 'r')[quantity])*1e10*u.solMass
+                map_chunck += kernel_input[i]*dchi[i]*(map_read-matter_mean[i])/matter_mean[i]
+
+                map_rot = rot_custom.rotate_map_alms(map_chunck, datapath='./data_files/healpy-data/')
+
+                map_stacked += map_rot
+
+    elif not Jeger_rot:
 
        chunck_num = np.hstack( (np.unique(ibox, return_index = True)[1], len(file_dir)) )
        count = 0
@@ -35,7 +47,7 @@ def map_reading_kernel(file_dir, quantity, nside, ibox, nrot, theta, phi, dchi, 
            arg_min = int(chunck_num[j])
            arg_max = int(chunck_num[j+1])
 
-           rot_custom=healpy.Rotator(rot=[theta[count], phi[count]], deg=True)
+           rot_custom=healpy.Rotator(rot=[theta[count], phi[count]], inv=True)
            map_chunck = np.zeros((healpy.nside2npix(nside)))
            print(j)
            print(theta[count])
@@ -48,13 +60,13 @@ def map_reading_kernel(file_dir, quantity, nside, ibox, nrot, theta, phi, dchi, 
            if j ==0:
               map_rot = map_chunck
            else:
-              map_rot = rot_custom.rotate_map_alms(map_chunck)
+              map_rot = rot_custom.rotate_map_alms(map_chunck, datapath='./data_files/healpy-data/')
 
            map_stacked += map_rot
            count+=1
            #map_write = healpy.write_map('....../' + box + sim_list +'lightcone'+str(lc_id)+'_shells/'+quantity+'_rot_'+str(j)+'.fits',map_stacked,overwrite=True) just in case you want to save kappa map per shell, feel free to add your own directory
 
-    elif rotate == False:
+    elif not rotate:
 
            for i in range(0, len(file_dir)):
                map_read = np.asarray(h5py.File(file_dir[i], 'r')[quantity])*1e10*u.solMass
@@ -66,7 +78,7 @@ def map_reading_kernel(file_dir, quantity, nside, ibox, nrot, theta, phi, dchi, 
     return map_stacked
 
 
-def kappa_map_gen_forJonah(box_id, sim_id, lc_id=0):
+def kappa_map_gen_forJonah(box_id, sim_id, lc_id=0, rotate=False):
 
     #box_id = my_task_input[0] ## loop ober all resolution runs, default here: L1000N1800/
     #box_id = int(1)
@@ -174,8 +186,19 @@ def kappa_map_gen_forJonah(box_id, sim_id, lc_id=0):
 
 
     np.random.seed(10)
-    theta_rot =np.random.uniform(0.0,360.0,rot_times)
-    phi_rot =np.random.uniform(-90.0,90.0,rot_times)
+    # theta_rot =np.random.uniform(0.0,360.0,rot_times)
+    # phi_rot =np.random.uniform(-90.0,90.0,rot_times)
+    if box == 'L1000N1800' or box == 'L1000N3600':
+        ## for 1Gpc
+        angles = np.array([[0. , 0. , 3.26757547 , 3.26757547 , 3.26757547 , 1.51289711, 1.51289711, 3.13885639, 3.13885639 ,3.13885639, 2.17061318, 2.17061318, 2.17061318, 2.17061318, 4.59420579, 4.59420579,4.59420579, 1.14273623, 1.14273623, 1.14273623, 1.14273623, 2.02717201, 2.02717201, 2.02717201, 2.02717201, 2.77675054, 2.77675054, 2.77675054, 2.77675054, 2.77675054, 0.83245259, 0.83245259, 0.83245259, 0.83245259, 0.83245259, 0.83245259, 4.95779263, 4.95779263, 4.95779263, 4.95779263, 4.95779263, 4.95779263, 4.95779263,2.52359739, 2.52359739, 2.52359739, 2.52359739, 2.52359739, 2.52359739, 2.52359739,2.52359739, 2.69301628, 2.69301628, 2.69301628, 2.69301628, 2.69301628, 2.69301628, 2.69301628, 2.69301628, 2.69301628], [0. , 0. , 1.41518902, 1.41518902 , 1.41518902 , 0.80580058, 0.80580058, 0.71830831, 0.71830831, 0.71830831, 1.77536892, 1.77536892,1.77536892, 1.77536892, 0.62434822, 0.62434822,0.62434822, 2.14076603, 2.14076603, 2.14076603, 2.14076603, 0.49840908, 0.49840908, 0.49840908,0.49840908, 2.0136344 , 2.0136344, 2.0136344 , 2.0136344, 2.0136344, 2.25356928 , 2.25356928, 2.25356928 , 2.25356928 , 2.25356928, 2.25356928, 1.85187078, 1.85187078, 1.85187078, 1.85187078, 1.85187078, 1.85187078 , 1.85187078, 1.36014098, 1.36014098, 1.36014098, 1.36014098, 1.36014098, 1.36014098, 1.36014098, 1.36014098, 2.35895331, 2.35895331, 2.35895331, 2.35895331, 2.35895331, 2.35895331, 2.35895331, 2.35895331, 2.35895331]])
+
+    elif box == 'L2800N5040':
+        ##for 2.8 Gpc
+        angles = np.array(([[0. , 0. , 0. , 0. , 0. , 0., 0. , 2.11833333, 2.11833333 , 2.11833333, 2.11833333 , 2.11833333, 2.11833333, 2.11833333 , 2.11833333 , 2.11833333 , 1.29070838, 1.29070838, 1.29070838, 1.29070838, 1.29070838, 1.29070838, 1.29070838, 1.29070838, 1.29070838, 1.29070838, 1.29070838, 5.69217656, 5.69217656, 5.69217656, 5.69217656, 5.69217656, 5.69217656, 5.69217656, 5.69217656, 5.69217656, 5.69217656,5.69217656, 5.69217656, 5.69217656, 5.69217656, 5.69217656, 5.69217656, 5.69217656, 3.79736641, 3.79736641, 3.79736641, 3.79736641, 3.79736641, 3.79736641, 3.79736641, 3.79736641, 3.79736641, 3.79736641, 3.79736641, 3.79736641, 3.79736641, 3.79736641, 3.79736641, 3.79736641, 3.79736641, 3.79736641, 1.32878635 , 1.32878635 , 1.32878635 , 1.32878635 , 1.32878635 , 1.32878635 ], [0. , 0. , 0. , 0. , 0. , 0., 0. , 0.96440001 , 0.96440001, 0.96440001 , 0.96440001 , 0.96440001,0.96440001 , 0.96440001 , 0.96440001 , 0.96440001 , 1.74841793, 1.74841793, 1.74841793, 1.74841793, 1.74841793, 1.74841793, 1.74841793, 1.74841793, 1.74841793, 1.74841793, 1.74841793, 0.56258515, 0.56258515, 0.56258515, 0.56258515, 0.56258515, 0.56258515, 0.56258515, 0.56258515, 0.56258515, 0.56258515, 0.56258515, 0.56258515, 0.56258515, 0.56258515, 0.56258515, 0.56258515, 0.56258515, 1.45462313, 1.45462313, 1.45462313, 1.45462313, 1.45462313, 1.45462313, 1.45462313, 1.45462313, 1.45462313, 1.45462313, 1.45462313, 1.45462313, 1.45462313, 1.45462313, 1.45462313, 1.45462313, 1.45462313, 1.45462313, 2.48706614, 2.48706614, 2.48706614, 2.48706614 , 2.48706614, 2.48706614]]))
+    
+    theta_rot = (angles[1, :]*(180.0/np.pi)*u.deg).to_value(u.deg)
+    phi_rot = (angles[0, :]*(180.0/np.pi)*u.deg).to_value(u.deg)
+
     print(theta_rot)
     print(phi_rot)
 
@@ -185,12 +208,19 @@ def kappa_map_gen_forJonah(box_id, sim_id, lc_id=0):
     kappa_stacked = map_reading_kernel(lightcone_files, 'TotalMass', nside, box_index, 
                                        rot_times, theta_rot, phi_rot, 
                                        dchi, z_mid, chi_mid, chi_CMB, 
-                                       [cosmo.Om0, cosmo.H0], matter_mean, rotate=False) ##change rotate to True if you want box rotation
-    try:
-        kappa_map_write = healpy.write_map(f'{path}/kappa_nonrot.fits', kappa_stacked, overwrite=True) ##feel free to add your own directory
-    except FileNotFoundError:
-        kappa_map_write = healpy.write_map(f'{path}/kappa_nonrot.fits', kappa_stacked) ##feel free to add your own directory
-    # del kappa_stacked
+                                       [cosmo.Om0, cosmo.H0], matter_mean, rotate=rotate) ##change rotate to True if you want box rotation
+    if rotate:
+        try:
+            kappa_map_write = healpy.write_map(f'{path}/kappa_rot.fits', kappa_stacked, overwrite=True) ##feel free to add your own directory
+        except FileNotFoundError:
+            kappa_map_write = healpy.write_map(f'{path}/kappa_rot.fits', kappa_stacked) ##feel free to add your own directory
+        # del kappa_stacked
+    elif not rotate:
+        try:
+            kappa_map_write = healpy.write_map(f'{path}/kappa_nonrot.fits', kappa_stacked, overwrite=True) ##feel free to add your own directory
+        except FileNotFoundError:
+            kappa_map_write = healpy.write_map(f'{path}/kappa_nonrot.fits', kappa_stacked) ##feel free to add your own directory
+        # del kappa_stacked
     return kappa_stacked
 
 if __name__ == "__main__":
@@ -201,4 +231,4 @@ if __name__ == "__main__":
     isim = str(sys.argv[2])
     lc = int(sys.argv[3])
 
-    kappa_map_gen_forJonah(box, isim, lc)
+    kappa_map_gen_forJonah(box, isim, lc, rotate=True)

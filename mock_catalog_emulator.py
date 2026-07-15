@@ -139,7 +139,7 @@ if __name__ == '__main__':
 
     spectra = str(sys.argv[4])
     amp = 10.808
-    slope = 0.257
+    slope = 0.259
     residual = 0.0
 
     if iz == 'Blue':
@@ -198,7 +198,7 @@ if __name__ == '__main__':
         fp_list = []
         fn_list = []
         
-        x_train = np.load(f"./gpy_model/{box}/{isim}/{iz}/lightcone{lightcone}/training/X_training_data.npy")
+        x_train = np.load(f"./gpy_model/{box}/{isim}/{iz}/lightcone{lightcone}/training/X_training_data_{spectra}.npy")
         pred_errors = []
 
         for i in range(x_train.shape[0]): 
@@ -275,75 +275,75 @@ if __name__ == '__main__':
         pb.savefig('./Plots/confusion_matrix_abundance.png', dpi=400)
         pb.clf()
 
-    # quit()
-
-    farren_data = np.loadtxt(f'./unWISExLens_lklh/data/v1.0/bandpowers/unWISExACT-DR6_{str(iz).lower()}_baseline_Clgg+Clkk+Clkg.dat', usecols=(0,1,3)).reshape(-1,3)
-    ell_200_mask = np.where(farren_data[:,0] > 200)
-
-    pb.loglog(farren_data[:,0][ell_200_mask], farren_data[:,1][ell_200_mask]*1e5 if spectra=='auto' else farren_data[:,2][ell_200_mask]*1e5, color='k', marker='.', markersize=5, label='ACT x unWISE (Farren et al. 2023)')
-    pb.loglog(true[:,0], true[:,1], label=f'Mock catalog {amp+residual, slope}', color='b')
-    if amp+residual >= 11.3:
-        pass
     else:
-        pass
-        # pb.loglog(true_plus_1[:,0], true_plus_1[:,1], label=f'Mock catalog {amp+0.1, slope}', color='g')
-    pb.loglog(farren_data[:,0][ell_200_mask], pred, label='Emulator', color='r')
-    pb.title(f'Mock catalog emulator test (x_test: Amplitude={test[0]:.3f}, Slope={test[1]})')
-    pb.xlabel('$\ell$')
-    pb.ylabel('$C_{\ell}^{gg}$x10^5' if spectra=='auto' else '$C_{\ell}^{\kappa g}x10^5$')
-    pb.legend()
-    pb.tight_layout()
-    pb.savefig('./Plots/mock_catalog_emulator_test.png', dpi=400)
-    pb.clf()
 
-    pb.hlines(y=1.000, xmin=-1, xmax=np.max(true[:,0])*1.1, color='k', linestyles='solid', alpha=0.5, label=None)
-    pb.hlines(y=0.990, xmin=-1, xmax=np.max(true[:,0])*1.1, color='k', linestyles='dashed', alpha=0.5, label='1% error')
-    pb.hlines(y=1.010, xmin=-1, xmax=np.max(true[:,0])*1.1, color='k', linestyles='dashed', alpha=0.5, label=None)
-    pb.hlines(y=0.950, xmin=-1, xmax=np.max(true[:,0])*1.1, color='k', linestyles='dotted', alpha=0.5, label='5% error')
-    pb.hlines(y=1.050, xmin=-1, xmax=np.max(true[:,0])*1.1, color='k', linestyles='dotted', alpha=0.5, label=None)
-    pb.plot(true[:,0], pred/true[:,1], label='Error w.r.t. simulated clustering')
-    pb.plot(true[:,0], pred/(farren_data[:,1][ell_200_mask]*1e5) if spectra=='auto' else pred/(farren_data[:,2][ell_200_mask]*1e5), label='Error w.r.t. observed clustering')
-    pb.title(f'Emulator error test (x_test: Amplitude={test[0]}, Slope={test[1]})')
-    pb.xlabel('$\ell$')
-    pb.ylabel('Residual')
-    pb.xlim(100, 3000)
-    pb.legend()
-    pb.tight_layout()
-    pb.savefig('./Plots/mock_catalog_emulator_error_test.png', dpi=400)
-    pb.clf()
-    quit()
+        farren_data = np.loadtxt(f'./unWISExLens_lklh/data/v1.0/bandpowers/unWISExACT-DR6_{str(iz).lower()}_baseline_Clgg+Clkk+Clkg.dat', usecols=(0,1,3)).reshape(-1,3)
+        ell_200_mask = np.where(farren_data[:,0] > 200)
 
-    x_train = np.load(f"./gpy_model/{box}/{isim}/{iz}/lightcone{lightcone}/training/X_training_data.npy")
-    # x_train = np.loadtxt('./data_files/mock_catalog_test_points.txt')
-    pred_errors = []
-    for i in range(x_train.shape[0]): 
-        name_i = [f"{float(x_train[i,0]):.1f}".replace('.', 'p'), f"{float(x_train[i,1]):.1f}".replace('.', 'p')]
-        pred_i = emulator(x_train[i,:], spectra, box, isim, iz, oos_test=True, load=True, lightcone=lightcone)
-        true_i = np.loadtxt(f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/power_spectra/{dir_type}/{box}/{isim}/{iz}/lightcone{lightcone}/{dir_type}_power_spectrum_{name_i[0]}_{name_i[1]}.txt',
-                        # delimiter=' ', skiprows=1, usecols=(0,1) if spectra=='auto' else (0,1))
-                        delimiter=' ', skiprows=1, usecols=(0,2) if spectra=='auto' else (0,1))
-        error_i = (pred_i)/true_i[:,1]
-        error_i = np.array(error_i)
-        print(error_i)
-        pred_errors.append(error_i)
-    print(pred_errors)
-    pred_errors = np.array(pred_errors)
-    mean_pred_errors = np.mean(pred_errors, axis=0)
-    print(mean_pred_errors.shape)
-    std_pred_errors = np.std(pred_errors, axis=0)
+        pb.loglog(farren_data[:,0][ell_200_mask], farren_data[:,1][ell_200_mask]*1e5 if spectra=='auto' else farren_data[:,2][ell_200_mask]*1e5, color='k', marker='.', markersize=5, label='ACT x unWISE (Farren et al. 2023)')
+        # pb.loglog(true[:,0], true[:,1], label=f'Mock catalog {amp+residual, slope}', color='b')
+        if amp+residual >= 11.3:
+            pass
+        else:
+            pass
+            # pb.loglog(true_plus_1[:,0], true_plus_1[:,1], label=f'Mock catalog {amp+0.1, slope}', color='g')
+        pb.loglog(farren_data[:,0][ell_200_mask], pred, label='Emulator', color='r')
+        pb.title(f'Mock catalog emulator test (x_test: Amplitude={test[0]:.3f}, Slope={test[1]})')
+        pb.xlabel('$\ell$')
+        pb.ylabel('$C_{\ell}^{gg}$x10^5' if spectra=='auto' else '$C_{\ell}^{\kappa g}x10^5$')
+        pb.legend()
+        pb.tight_layout()
+        pb.savefig('./Plots/mock_catalog_emulator_test.png', dpi=400)
+        pb.clf()
 
-    pb.hlines(y=1.000, xmin=-1, xmax=np.max(true[:,0])*1.1, color='k', linestyles='solid', alpha=0.5, label=None)
-    pb.hlines(y=0.990, xmin=-1, xmax=np.max(true[:,0])*1.1, color='k', linestyles='dashed', alpha=0.5, label='1% error')
-    pb.hlines(y=1.010, xmin=-1, xmax=np.max(true[:,0])*1.1, color='k', linestyles='dashed', alpha=0.5, label=None)
-    pb.hlines(y=0.950, xmin=-1, xmax=np.max(true[:,0])*1.1, color='k', linestyles='dotted', alpha=0.5, label='5% error')
-    pb.hlines(y=1.050, xmin=-1, xmax=np.max(true[:,0])*1.1, color='k', linestyles='dotted', alpha=0.5, label=None)
-    pb.plot(true[:,0], mean_pred_errors, label='Mean error w.r.t. simulated clustering')
-    pb.fill_between(true[:,0], mean_pred_errors - std_pred_errors, mean_pred_errors + std_pred_errors, color='gray', alpha=0.5, label='1$\sigma$ scatter')
-    pb.title(f'Mean emulator error test over training set ({spectra}, {box}, {isim}, {iz})', wrap=True)
-    pb.xlabel('$\ell$')
-    pb.ylabel('Residual')
-    pb.xlim(100, 3000)
-    pb.legend()
-    pb.tight_layout()
-    pb.savefig('./Plots/mock_catalog_emulator_mean_error_test.png', dpi=400)
-    pb.clf()
+        pb.hlines(y=1.000, xmin=-1, xmax=np.max(true[:,0])*1.1, color='k', linestyles='solid', alpha=0.5, label=None)
+        pb.hlines(y=0.990, xmin=-1, xmax=np.max(true[:,0])*1.1, color='k', linestyles='dashed', alpha=0.5, label='1% error')
+        pb.hlines(y=1.010, xmin=-1, xmax=np.max(true[:,0])*1.1, color='k', linestyles='dashed', alpha=0.5, label=None)
+        pb.hlines(y=0.950, xmin=-1, xmax=np.max(true[:,0])*1.1, color='k', linestyles='dotted', alpha=0.5, label='5% error')
+        pb.hlines(y=1.050, xmin=-1, xmax=np.max(true[:,0])*1.1, color='k', linestyles='dotted', alpha=0.5, label=None)
+        # pb.plot(true[:,0], pred/true[:,1], label='Error w.r.t. simulated clustering')
+        pb.plot(true[:,0], pred/(farren_data[:,1][ell_200_mask]*1e5) if spectra=='auto' else pred/(farren_data[:,2][ell_200_mask]*1e5), label='Error w.r.t. observed clustering')
+        pb.title(f'Emulator error test (x_test: Amplitude={test[0]}, Slope={test[1]})')
+        pb.xlabel('$\ell$')
+        pb.ylabel('Residual')
+        pb.xlim(100, 3000)
+        pb.legend()
+        pb.tight_layout()
+        pb.savefig('./Plots/mock_catalog_emulator_error_test.png', dpi=400)
+        pb.clf()
+        # quit()
+
+        x_train = np.load(f"./gpy_model/{box}/{isim}/{iz}/lightcone{lightcone}/training/X_training_data_{spectra}.npy")
+        # x_train = np.loadtxt('./data_files/mock_catalog_test_points.txt')
+        pred_errors = []
+        for i in range(x_train.shape[0]): 
+            name_i = [f"{float(x_train[i,0]):.1f}".replace('.', 'p'), f"{float(x_train[i,1]):.1f}".replace('.', 'p')]
+            pred_i = emulator(x_train[i,:], spectra, box, isim, iz, oos_test=True, load=True, lightcone=lightcone)
+            true_i = np.loadtxt(f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/power_spectra/{dir_type}/{box}/{isim}/{iz}/lightcone{lightcone}/{dir_type}_power_spectrum_{name_i[0]}_{name_i[1]}.txt',
+                            # delimiter=' ', skiprows=1, usecols=(0,1) if spectra=='auto' else (0,1))
+                            delimiter=' ', skiprows=1, usecols=(0,2) if spectra=='auto' else (0,1))
+            error_i = (pred_i)/true_i[:,1]
+            error_i = np.array(error_i)
+            print(error_i)
+            pred_errors.append(error_i)
+        print(pred_errors)
+        pred_errors = np.array(pred_errors)
+        mean_pred_errors = np.mean(pred_errors, axis=0)
+        print(mean_pred_errors.shape)
+        std_pred_errors = np.std(pred_errors, axis=0)
+
+        pb.hlines(y=1.000, xmin=-1, xmax=np.max(true[:,0])*1.1, color='k', linestyles='solid', alpha=0.5, label=None)
+        pb.hlines(y=0.990, xmin=-1, xmax=np.max(true[:,0])*1.1, color='k', linestyles='dashed', alpha=0.5, label='1% error')
+        pb.hlines(y=1.010, xmin=-1, xmax=np.max(true[:,0])*1.1, color='k', linestyles='dashed', alpha=0.5, label=None)
+        pb.hlines(y=0.950, xmin=-1, xmax=np.max(true[:,0])*1.1, color='k', linestyles='dotted', alpha=0.5, label='5% error')
+        pb.hlines(y=1.050, xmin=-1, xmax=np.max(true[:,0])*1.1, color='k', linestyles='dotted', alpha=0.5, label=None)
+        pb.plot(true[:,0], mean_pred_errors, label='Mean error w.r.t. simulated clustering')
+        pb.fill_between(true[:,0], mean_pred_errors - std_pred_errors, mean_pred_errors + std_pred_errors, color='gray', alpha=0.5, label='1$\sigma$ scatter')
+        # pb.title(f'Mean emulator error test over training set ({spectra}, {box}, {isim}, {iz})', wrap=True)
+        pb.xlabel('Multipole moment $\ell$')
+        pb.ylabel('Residual error')
+        pb.xlim(100, 3000)
+        pb.legend()
+        pb.tight_layout()
+        pb.savefig(f'./Plots/mock_catalog_emulator_mean_error_test_{spectra}.pdf', dpi=400)
+        pb.clf()

@@ -111,6 +111,8 @@ def unWISE_data_matching(boxname, simname, z_sample, mass_cut, n_cut, nsamp='nto
             
         kusiak_ntotal = kusiak_nbar * 41253 #4pi steradians
         nsamp = kusiak_ntotal
+    else:
+        nsamp = total_available_halos
     
     if nsamp > total_available_halos:
         nsamp = total_available_halos
@@ -247,21 +249,32 @@ def rescale_dndz(difference, halo_lightcones, galaxies_required, nsamp, FLAMINGO
 if __name__ == '__main__':
     import sys
 
+    pb.rc("text", usetex=True)
+    pb.rc("font", family="serif", size=8)
+    pb.rcParams["font.size"] = 11
+
     plot=False
     try:
         unWISE_data_matching(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6], plot=plot, lightcone=sys.argv[7])
     except IndexError:
         unWISE_data_matching(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], plot=plot, lightcone=sys.argv[6])
 
-    '''if plot==True:
+    if plot==True:
+        dndz_blue_match = np.loadtxt(f"/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/unWISExLens_lklh/data/v1.0/aux_data/dndz/unWISE_blue_xmatch_dndz.txt", usecols=(0,1))
+        dndz_green_match = np.loadtxt(f"/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/unWISExLens_lklh/data/v1.0/aux_data/dndz/unWISE_green_xmatch_dndz.txt", usecols=(0,1))
+
         pb.plot(dndz_blue_match[:,0], dndz_blue_match[:,1], color='tab:blue', label='Blue sample')
         pb.plot(dndz_green_match[:,0], dndz_green_match[:,1], color='tab:green', label='Green sample')
-        pb.plot(FLAMINGO_z_bins, dndz_blue_match_interpolated, color='tab:cyan', marker='.', label='FLAMINGO bins')
-        pb.plot(FLAMINGO_z_bins, dndz_green_match_interpolated, color='tab:olive', marker='.', label='FLAMINGO bins')
-        pb.xlim(left=0, right=2)
-        pb.xlabel('z')
-        pb.ylabel('dn/dz')
-        pb.title('unWISE galaxy redshift distribution cross-match')
-        pb.legend()
-        pb.savefig('./Plots/unWISE_dndz_match.png', dpi=1200)
-        pb.clf()'''
+        pb.vlines(x=0.6, color='tab:grey', linestyle='--', ymin=0, ymax=2.0, label='Mean z')
+        pb.vlines(x=0.6, color='tab:blue', linestyle='--', ymin=0, ymax=2.0)
+        pb.vlines(x=1.1, color='tab:green', linestyle='--', ymin=0, ymax=2.0)
+        # pb.plot(FLAMINGO_z_bins, dndz_blue_match_interpolated, color='tab:cyan', marker='.', label='FLAMINGO bins')
+        # pb.plot(FLAMINGO_z_bins, dndz_green_match_interpolated, color='tab:olive', marker='.', label='FLAMINGO bins')
+        pb.xlim(left=0, right=4.0)
+        pb.ylim(bottom=0, top=1.2)
+        pb.xlabel('$z$')
+        pb.ylabel(r"$\frac{1}{N_{\rm g, total}}\frac{dN_{\rm g}}{dz}$")
+        # pb.title('unWISE galaxy redshift distribution cross-match')
+        pb.legend(frameon=False)
+        pb.savefig('./Plots/unWISE_dndz_match.pdf', dpi=400)
+        pb.clf()

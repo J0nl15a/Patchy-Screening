@@ -1,4 +1,4 @@
-import numpy as np, healpy as hp, pymaster as nmt
+import numpy as np, healpy as hp, pymaster as nmt, astropy.units as u
 from scipy.interpolate import CubicSpline
 from imp_patchy_screening import patchyScreening
 import yaml, sys, time
@@ -23,13 +23,29 @@ smooth = sys.argv[10].lower() in ("true", "1", "yes", "y")
 single = sys.argv[11].lower() in ("true", "1", "yes", "y")
 save = sys.argv[12].lower() in ("true", "1", "yes", "y")
 plot = sys.argv[13].lower() in ("true", "1", "yes", "y")
+mle = sys.argv[14].lower() in ("true", "1", "yes", "y")
+rotate = sys.argv[16].lower() in ("true", "1", "yes", "y")
 
-lightcone = int(sys.argv[14])
+lightcone = int(sys.argv[15])
 
-if round(float(im), 1) == float(im):
-    im_name = f"{float(im):.1f}".replace('.', 'p')
-else:
-    im_name = f"{float(im):.3f}".replace('.', 'p')
+def name_float(x, mle=False):
+    if mle:
+        return f"{float(x):.3f}".replace(".", "p")
+    else:
+        return f"{float(x):.1f}".replace(".", "p")
+
+if box == 'L1000N1800' or box == 'L1000N3600':
+    ## for 1Gpc
+    snap_max = 77
+    angles = np.array([[0. , 0. , 3.26757547 , 3.26757547 , 3.26757547 , 1.51289711, 1.51289711, 3.13885639, 3.13885639 ,3.13885639, 2.17061318, 2.17061318, 2.17061318, 2.17061318, 4.59420579, 4.59420579,4.59420579, 1.14273623, 1.14273623, 1.14273623, 1.14273623, 2.02717201, 2.02717201, 2.02717201, 2.02717201, 2.77675054, 2.77675054, 2.77675054, 2.77675054, 2.77675054, 0.83245259, 0.83245259, 0.83245259, 0.83245259, 0.83245259, 0.83245259, 4.95779263, 4.95779263, 4.95779263, 4.95779263, 4.95779263, 4.95779263, 4.95779263,2.52359739, 2.52359739, 2.52359739, 2.52359739, 2.52359739, 2.52359739, 2.52359739,2.52359739, 2.69301628, 2.69301628, 2.69301628, 2.69301628, 2.69301628, 2.69301628, 2.69301628, 2.69301628, 2.69301628], [0. , 0. , 1.41518902, 1.41518902 , 1.41518902 , 0.80580058, 0.80580058, 0.71830831, 0.71830831, 0.71830831, 1.77536892, 1.77536892,1.77536892, 1.77536892, 0.62434822, 0.62434822,0.62434822, 2.14076603, 2.14076603, 2.14076603, 2.14076603, 0.49840908, 0.49840908, 0.49840908,0.49840908, 2.0136344 , 2.0136344, 2.0136344 , 2.0136344, 2.0136344, 2.25356928 , 2.25356928, 2.25356928 , 2.25356928 , 2.25356928, 2.25356928, 1.85187078, 1.85187078, 1.85187078, 1.85187078, 1.85187078, 1.85187078 , 1.85187078, 1.36014098, 1.36014098, 1.36014098, 1.36014098, 1.36014098, 1.36014098, 1.36014098, 1.36014098, 2.35895331, 2.35895331, 2.35895331, 2.35895331, 2.35895331, 2.35895331, 2.35895331, 2.35895331, 2.35895331]])
+
+elif box == 'L2800N5040':
+    ##for 2.8 Gpc
+    snap_max = 78
+    angles = np.array(([[0. , 0. , 0. , 0. , 0. , 0., 0. , 2.11833333, 2.11833333 , 2.11833333, 2.11833333 , 2.11833333, 2.11833333, 2.11833333 , 2.11833333 , 2.11833333 , 1.29070838, 1.29070838, 1.29070838, 1.29070838, 1.29070838, 1.29070838, 1.29070838, 1.29070838, 1.29070838, 1.29070838, 1.29070838, 5.69217656, 5.69217656, 5.69217656, 5.69217656, 5.69217656, 5.69217656, 5.69217656, 5.69217656, 5.69217656, 5.69217656,5.69217656, 5.69217656, 5.69217656, 5.69217656, 5.69217656, 5.69217656, 5.69217656, 3.79736641, 3.79736641, 3.79736641, 3.79736641, 3.79736641, 3.79736641, 3.79736641, 3.79736641, 3.79736641, 3.79736641, 3.79736641, 3.79736641, 3.79736641, 3.79736641, 3.79736641, 3.79736641, 3.79736641, 3.79736641, 1.32878635 , 1.32878635 , 1.32878635 , 1.32878635 , 1.32878635 , 1.32878635 ], [0. , 0. , 0. , 0. , 0. , 0., 0. , 0.96440001 , 0.96440001, 0.96440001 , 0.96440001 , 0.96440001,0.96440001 , 0.96440001 , 0.96440001 , 0.96440001 , 1.74841793, 1.74841793, 1.74841793, 1.74841793, 1.74841793, 1.74841793, 1.74841793, 1.74841793, 1.74841793, 1.74841793, 1.74841793, 0.56258515, 0.56258515, 0.56258515, 0.56258515, 0.56258515, 0.56258515, 0.56258515, 0.56258515, 0.56258515, 0.56258515, 0.56258515, 0.56258515, 0.56258515, 0.56258515, 0.56258515, 0.56258515, 0.56258515, 1.45462313, 1.45462313, 1.45462313, 1.45462313, 1.45462313, 1.45462313, 1.45462313, 1.45462313, 1.45462313, 1.45462313, 1.45462313, 1.45462313, 1.45462313, 1.45462313, 1.45462313, 1.45462313, 1.45462313, 1.45462313, 2.48706614, 2.48706614, 2.48706614, 2.48706614 , 2.48706614, 2.48706614]]))
+
+
+im_name = name_float(im, mle=mle)
 
 if single == False:
     slopes = [round(n, 2) for n in np.arange(0.0, float(slope)+0.1, 0.1)] #CHANGE BACK
@@ -46,40 +62,73 @@ mean_mstar = []
 # ps = patchyScreening(isim, iz, im, slope, ncpu, theta_d, fits_file=fits, signal=sig)
 # ps.get_halo_coordinates()
 
-def compute_catalog(slope, box=box, isim=isim, iz=iz, im=im, ncpu=ncpu, theta_d=theta_d, fits=fits, sig=sig, lightcone=lightcone):
+def compute_catalog(slope, box=box, isim=isim, iz=iz, im=im, ncpu=ncpu, theta_d=theta_d, fits=fits, sig=sig, lightcone=lightcone, mle=mle):
     if slope == 0.0:
         slope = abs(slope)
         
-    ps = patchyScreening(box, isim, iz, im, slope, ncpu, theta_d, fits_file=fits, signal=sig, lightcone=lightcone)
+    ps = patchyScreening(box, isim, iz, im, slope, ncpu, theta_d, fits_file=fits, signal=sig, lightcone=lightcone, lightcone_method=('FULL','dndz'), mle=mle)
     #ps_camb = patchyScreening(isim, iz, im, im_name, ncpu, theta_d, cmb_method='CAMB', signal=sig, rect_size=20)
     ps.get_halo_coordinates()
-    return ps.source_vector, ps.nhalo, np.log10(np.mean(ps.merge['mstar'].to_numpy()))
+    
+    return ps.merge, ps.source_vector, ps.nhalo, np.log10(np.mean(ps.merge['mstar'].to_numpy()))
 
 if single == False:
     results = Parallel(n_jobs=ncpu, backend="loky")(delayed(compute_catalog)(slope) for slope in slopes)
     for i in range(len(results)):
-        if round(slopes[i], 1) == slopes[i]:
-            slopes_name.append(f"{float(slopes[i]):.1f}".replace('.', 'p'))
-        else:
-            slopes_name.append(f"{float(slopes[i]):.3f}".replace('.', 'p'))
-        print(slope)
-        source_vectors.append(results[i][0])
-        nhalos.append(results[i][1])
-        mean_mstar.append(results[i][2])
+        slopes_name.append(name_float(slopes[i], mle=mle))
+        print(slopes[i])
+        source_vectors.append(results[i][1])
+        nhalos.append(results[i][2])
+        mean_mstar.append(results[i][3])
+
 elif single == True:
     results = compute_catalog(slope)
-    if round(slope, 1) == slope:
-        slopes_name.append(f"{float(slope):.1f}".replace('.', 'p'))
-    else:
-        slopes_name.append(f"{float(slope):.3f}".replace('.', 'p'))
-    source_vectors.append(results[0])
-    nhalos.append(results[1])
-    mean_mstar.append(results[2])
+    
+    slopes_name.append(name_float(slope, mle=mle))
+    source_vectors.append(results[1])
+    nhalos.append(results[2])
+    mean_mstar.append(results[3])
+
 print(round(mean_mstar[0], 5))
 
 print('Finished computing halo catalogs: {:.2f} seconds'.format(time.time() - job_start_time))
 
 print(mean_mstar)
+
+if rotate:
+    map_redshift_bins = np.loadtxt(f"/cosma8/data/dp004/flamingo/Runs/{box}/{isim}/shell_redshifts_z3.txt", skiprows=1, usecols=(0,1), delimiter=',')
+    mock_catalogue = results[0]
+    mock_catalogue_z_total = 0
+
+    for i in range(len(angles[0])):
+        rot_custom = hp.Rotator(rot=[(angles[1, i]*(180.0/np.pi)*u.deg).to_value(u.deg), (angles[0, i]*(180.0/np.pi)*u.deg).to_value(u.deg)], inv=True)
+
+        zmin, zmax = map_redshift_bins[i, 0], map_redshift_bins[i, 1]
+
+        galaxies_in_snap_z = mock_catalogue[
+            mock_catalogue['z'].between(zmin, zmax, inclusive='left')
+        ]
+
+        mock_catalogue_z_total += len(galaxies_in_snap_z)
+
+        vec = np.zeros((len(galaxies_in_snap_z), 3))
+        vec[:,0]=galaxies_in_snap_z['xminpot'].to_numpy()
+        vec[:,1]=galaxies_in_snap_z['yminpot'].to_numpy()
+        vec[:,2]=galaxies_in_snap_z['zminpot'].to_numpy()
+
+        theta, phi = hp.pixelfunc.vec2ang(vec, lonlat=True)
+        theta_rot, phi_rot = rot_custom(theta, phi, lonlat=True)
+
+        if i == 0:
+            source_vectors_rot = hp.ang2vec(theta_rot, phi_rot, lonlat=True)
+            if source_vectors_rot.ndim == 1:
+                source_vectors_rot = source_vectors_rot.reshape(1, -1)
+        else:
+            source_vectors_rot = np.concatenate((source_vectors_rot, hp.ang2vec(theta_rot, phi_rot, lonlat=True)), axis=0)
+
+    source_vectors = []
+    source_vectors.append(source_vectors_rot)
+    print(mock_catalogue_z_total)
 
 bin_setup = yaml.safe_load(open("./unWISExLens_lklh/unWISExLens_lklh/config_files/binning_setup.yaml"))
 if iz == 'Blue':
@@ -144,11 +193,22 @@ print(obs_shot_noise)
 nside_cl = 2048
 npix = hp.nside2npix(nside_cl)
 
-try:
-    kappa_map = hp.read_map(f'./data_files/kappa_maps/{box}/{isim}/lightcone{lightcone}/kappa_nonrot.fits', dtype=np.float64, verbose=False)
-except FileNotFoundError:
-    # kappa_map = load_kappa_map(isim)
-    kappa_map = kappa_map_gen_forJonah(box, isim, lightcone)
+if rotate:
+    if box == 'L1000N1800':
+        box_alt = 'L1_m9'
+        try:
+            kappa_map = hp.read_map(f'/cosma8/data/dp004/dc-yang3/maps/Jeger_rot/{box_alt}/{isim}/lightcone{lightcone}_shells/CMB_lensing_rot_Jeger_rot.fits', dtype=np.float64, verbose=False)
+        except FileNotFoundError:
+            try:
+                kappa_map = hp.read_map(f'./data_files/kappa_maps/{box}/{isim}/lightcone{lightcone}/kappa_nonrot.fits', dtype=np.float64, verbose=False)
+            except FileNotFoundError:
+                kappa_map = kappa_map_gen_forJonah(box, isim, lightcone, rotate=rotate)
+else:
+    try:
+        kappa_map = hp.read_map(f'./data_files/kappa_maps/{box}/{isim}/lightcone{lightcone}/kappa_nonrot.fits', dtype=np.float64, verbose=False)
+    except FileNotFoundError:
+        # kappa_map = load_kappa_map(isim)
+        kappa_map = kappa_map_gen_forJonah(box, isim, lightcone, rotate=rotate)
 kappa_map = hp.pixelfunc.ud_grade(kappa_map, nside_cl)
 
 print('Finished loading kappa map: {:.2f} seconds'.format(time.time() - job_start_time))

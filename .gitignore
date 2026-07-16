@@ -1,19 +1,43 @@
 #Ignore Thumbs.db file
 Thumbs.db
 
+#Ignore checkpoint files
+*Store*
+
+#Ignore Python cache files
+__pycache__/
+
 #Ignore data directory
-L1000N1800/
+L1000N1800/*
 
 #Ignore plotting directory
-Plots/	
+Plots/*
 
 #Ignore batch files directory
-batch_files/
+batch_files/*
+
+#Ignore data files directory
+data_files/*
+
+#Ignore gpy_model directory
+gpy_model/*
 
 #Ignore bash scripts
 *.sh	
+
+#Ignore observational data directory
+unWISExLens_lklh
+
+#Ignore COPY files
+*COPY*
 
 #Ignore SLURM output scripts
 *.dump
 *.out
 *.err
+
+#Ignore specific python files
+coulton_mock_parallel_test.py
+coulton_mock_parallel.py
+imp_patchy_screening_IAN.py
+cmb.py

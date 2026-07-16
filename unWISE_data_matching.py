@@ -1,23 +1,36 @@
-import numpy as np
-import pylab as pb
+import numpy as np, pylab as pb
 from scipy.interpolate import interp1d
 from scipy.integrate import simpson
-import re
+import re, math, textwrap
 from io import StringIO
-import math
-import textwrap
+from pathlib import Path
 
-def unWISE_data_matching(simname, z_sample, mass_cut, n_cut, nsamp='ntotal', plot=False):
+def unWISE_data_matching(boxname, simname, z_sample, mass_cut, n_cut, nsamp='ntotal', plot=False, lightcone=0):
+    box_list = ['L1000N1800', 'L2800N5040']
     sim_list = ['HYDRO_FIDUCIAL','HYDRO_PLANCK','HYDRO_PLANCK_LARGE_NU_FIXED','HYDRO_PLANCK_LARGE_NU_VARY','HYDRO_STRONG_AGN','HYDRO_WEAK_AGN','HYDRO_LOW_SIGMA8','HYDRO_STRONGER_AGN','HYDRO_JETS_published','HYDRO_STRONGEST_AGN','HYDRO_STRONG_SUPERNOVA','HYDRO_STRONGER_AGN_STRONG_SUPERNOVA','HYDRO_STRONG_JETS']
-    
+
+    try:
+        box = int(boxname)
+        boxname = box_list[box]
+    except (ValueError, IndexError):
+        boxname = str(boxname)
+
     try:
         isim = int(simname)
         simname = sim_list[isim]
     except (ValueError, IndexError):
         simname = str(simname)
+
     z_sample = str(z_sample)
-    im_name = f"{float(mass_cut):.1f}".replace('.', 'p')
-    slope_name = f"{float(n_cut):.1f}".replace('.', 'p')
+
+    if round(float(mass_cut), 1) == float(mass_cut):
+        im_name = f"{float(mass_cut):.1f}".replace('.', 'p')
+    else:
+        im_name = f"{float(mass_cut):.3f}".replace('.', 'p')
+    if round(float(n_cut), 1) == float(n_cut):
+        slope_name = f"{float(n_cut):.1f}".replace('.', 'p')
+    else:
+        slope_name = f"{float(n_cut):.3f}".replace('.', 'p')
     if float(n_cut) < 0.0:
         slope_name = f"{slope_name}".replace('-', 'minus')
 
@@ -26,15 +39,14 @@ def unWISE_data_matching(simname, z_sample, mass_cut, n_cut, nsamp='ntotal', plo
     except ValueError:
         nsamp = str(nsamp)
 
-    if z_sample == 'Blue':
-        dndz_match = np.loadtxt("/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/unWISExLens_lklh/data/v1.0/aux_data/dndz/unWISE_blue_xmatch_dndz.txt", usecols=(0,1))
-    elif z_sample == 'Green':
-        dndz_match = np.loadtxt("/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/unWISExLens_lklh/data/v1.0/aux_data/dndz/unWISE_green_xmatch_dndz.txt", usecols=(0,1))
+    lightcone = int(lightcone)
+
+    dndz_match = np.loadtxt(f"/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/unWISExLens_lklh/data/v1.0/aux_data/dndz/unWISE_{z_sample.lower()}_xmatch_dndz.txt", usecols=(0,1))
 
     print(min(dndz_match[:,0]), max(dndz_match[:,0]))
 
     halo_z_bins = np.genfromtxt(
-        '/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/FLAMINGO_halo_redshift_values.txt',
+        f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/halo_redshifts/{boxname}/{simname}/lightcone{lightcone}/FLAMINGO_halo_redshift_values.txt',
         dtype=[('i',   'i4'),
                ('z_min', 'f8'),
                ('mid_z', 'f8'),
@@ -42,14 +54,14 @@ def unWISE_data_matching(simname, z_sample, mass_cut, n_cut, nsamp='ntotal', plo
         delimiter=None
     )
 
-    FLAMINGO_z_bins = np.zeros((len(halo_z_bins['z_max'][np.where(halo_z_bins['z_max'] <= 3.0)])+1))
-    FLAMINGO_z_bins[:-1] = halo_z_bins['z_max'][np.where(halo_z_bins['z_max'] <= 3.0)]
+    FLAMINGO_z_bins = np.zeros((len(halo_z_bins['z_max'][np.where(halo_z_bins['mid_z'] <= 3.0)])+1))
+    FLAMINGO_z_bins[:-1] = halo_z_bins['z_max'][np.where(halo_z_bins['mid_z'] <= 3.0)]
     FLAMINGO_z_bins[-1] = 3.0
     FLAMINGO_mid_point = halo_z_bins['mid_z'][np.where(halo_z_bins['mid_z'] <= 3.0)]
     print(FLAMINGO_mid_point)
     print(FLAMINGO_z_bins)
-    
-    with open(f"/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/halo_totals/FLAMINGO_halo_totals_{simname}_{z_sample}_{im_name}_{slope_name}.txt", "r") as f:
+
+    with open(f"/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/halo_totals/{boxname}/{simname}/{z_sample}/lightcone{lightcone}/FLAMINGO_halo_totals_{im_name}_{slope_name}.txt", "r") as f:
         first_line = f.readline().strip()
         remaining_lines = f.readlines()
 
@@ -74,6 +86,7 @@ def unWISE_data_matching(simname, z_sample, mass_cut, n_cut, nsamp='ntotal', plo
     total_area = simpson(y=dndz_match_interpolated, x=FLAMINGO_z_bins)
     print(total_area)
 
+
     if plot==True:
         pb.plot(dndz_match[:,0], dndz_match[:,1], color='g', marker='.', label='Original curve')
         pb.plot(FLAMINGO_z_bins, dndz_match_interpolated, color='b', marker='.', label='Interpolated curve')
@@ -86,54 +99,33 @@ def unWISE_data_matching(simname, z_sample, mass_cut, n_cut, nsamp='ntotal', plo
         pb.savefig(f'./Plots/unWISE_dndz_match_curve_{z_sample}_test.png', dpi=400)
         pb.clf()
 
-    outfile_name = f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/dndz_samples/dndz_galaxies_sampled_{simname}_{z_sample}_{im_name}_{slope_name}.txt'
+    outfile_name = f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/dndz_samples/{boxname}/{simname}/{z_sample}/lightcone{lightcone}/dndz_galaxies_sampled_{im_name}_{slope_name}.txt'
+    outfile_name = Path(outfile_name)
+    outfile_name.parent.mkdir(parents=True, exist_ok=True)
 
     if nsamp == 'ntotal':
         if z_sample == 'Blue':
-            kusiak_nbar_blue = 3409 #From Kusiak paper
-            kusiak_ntotal_blue = kusiak_nbar_blue * 41253 #4pi steradians
-            nsamp = kusiak_ntotal_blue
+            kusiak_nbar = 3409 #From Kusiak paper
         elif z_sample == 'Green':
-            kusiak_nbar_green = 1846 #From Kusiak paper
-            kusiak_ntotal_green = kusiak_nbar_green * 41253
-            nsamp = kusiak_ntotal_green
+            kusiak_nbar = 1846 #From Kusiak paper
+            
+        kusiak_ntotal = kusiak_nbar * 41253 #4pi steradians
+        nsamp = kusiak_ntotal
+    else:
+        nsamp = total_available_halos
     
     if nsamp > total_available_halos:
         nsamp = total_available_halos
         
     print(nsamp)
-
-    galaxies_required = compute_galaxies_required(FLAMINGO_mid_point, FLAMINGO_z_bins, m, nsamp, total_area, halo_lightcones[:,1])
-    print(galaxies_required)
-    conflict, difference = validate_required_vs_available(galaxies_required, halo_lightcones[:, 1])
-
-    if plot==True:
-        pb.plot(FLAMINGO_mid_point, galaxies_required, color='b', marker='.', label='Galaxies required')
-        pb.plot(FLAMINGO_mid_point, halo_lightcones[:, 1], color='r', marker='.', label='Galaxies available')
-        pb.xlim(left=0, right=3)
-        pb.xlabel('z')
-        pb.ylabel('dn/dz')
-        pb.title("\n".join(textwrap.wrap(f'unWISE galaxy redshift distribution cross-match (rescaled, simname = {simname}, {z_sample} sample, stellar cut at mean z = {mass_cut}, stellar cut slope = {n_cut}, total number of galaxies = {nsamp})', width=75)))
-        pb.legend()
-        pb.savefig(f'./Plots/unWISE_dndz_match_rescaled_{simname}_{z_sample}_{im_name}_{slope_name}_0.png', dpi=400)
-        pb.clf()
-
+    
     count = 0
+    conflict = True
     while conflict == True:
 
-        print("Rescaling required")
-        count+=1
-        print(difference)
-        max_diff_index = np.argmax(difference)
-        print(max_diff_index)
-        print(halo_lightcones[max_diff_index, 0])
-        print(halo_lightcones[max_diff_index, 1], galaxies_required[max_diff_index])
-        ratio_nsamp = halo_lightcones[max_diff_index, 1]/galaxies_required[max_diff_index]
-        print(ratio_nsamp)
-        print(nsamp * ratio_nsamp, math.floor(nsamp*ratio_nsamp))
-        nsamp = math.floor(nsamp*ratio_nsamp)
         galaxies_required = compute_galaxies_required(FLAMINGO_mid_point, FLAMINGO_z_bins, m, nsamp, total_area, halo_lightcones[:,1])
-        conflict, difference = validate_required_vs_available(galaxies_required, halo_lightcones[:, 1])
+        difference = validate_required_vs_available(galaxies_required, halo_lightcones[:,1])
+        nsamp, galaxies_required, conflict, count = rescale_dndz(difference, halo_lightcones, galaxies_required, nsamp, FLAMINGO_mid_point, count, z_sample)
 
         if plot==True:
             pb.plot(FLAMINGO_mid_point, galaxies_required, color='b', marker='.', label='Galaxies required')
@@ -141,9 +133,9 @@ def unWISE_data_matching(simname, z_sample, mass_cut, n_cut, nsamp='ntotal', plo
             pb.xlim(left=0, right=3)
             pb.xlabel('z')
             pb.ylabel('dn/dz')
-            pb.title("\n".join(textwrap.wrap(f'unWISE galaxy redshift distribution cross-match (rescaled, simname = {simname}, {z_sample} sample, stellar cut at mean z = {mass_cut}, stellar cut slope = {n_cut}, total number of galaxies = {nsamp})', width=75)))
+            pb.title("\n".join(textwrap.wrap(f'unWISE galaxy redshift distribution cross-match (rescaled, boxname = {boxname}, simname = {simname}, {z_sample} sample, stellar cut at mean z = {mass_cut}, stellar cut slope = {n_cut}, total number of galaxies = {nsamp})', width=75)))
             pb.legend()
-            pb.savefig(f'./Plots/unWISE_dndz_match_rescaled_{simname}_{z_sample}_{im_name}_{slope_name}_{count}.png', dpi=400)
+            pb.savefig(f'./Plots/unWISE_dndz_match_rescaled_{boxname}_{simname}_{z_sample}_{im_name}_{slope_name}_{count}.png', dpi=400)
             pb.clf()
 
     print(simpson(y=dndz_match[:,1]*(nsamp/simpson(y=dndz_match[:,1], x=dndz_match[:,0])*0.05), x=dndz_match[:,0]), simpson(y=galaxies_required, x=FLAMINGO_mid_point))
@@ -155,9 +147,9 @@ def unWISE_data_matching(simname, z_sample, mass_cut, n_cut, nsamp='ntotal', plo
         pb.xlim(left=0, right=3)
         pb.xlabel('z')
         pb.ylabel('dn/dz')
-        pb.title("\n".join(textwrap.wrap(f'unWISE galaxy redshift distribution cross-match (rescaled, simname = {simname}, {z_sample} sample, stellar cut at mean z = {mass_cut}, stellar cut slope = {n_cut}, total number of galaxies = {nsamp})', width=75)))
+        pb.title("\n".join(textwrap.wrap(f'unWISE galaxy redshift distribution cross-match (rescaled, boxname = {boxname}, simname = {simname}, {z_sample} sample, stellar cut at mean z = {mass_cut}, stellar cut slope = {n_cut}, total number of galaxies = {nsamp})', width=75)))
         pb.legend()
-        pb.savefig(f'./Plots/unWISE_dndz_match_rescaled_{simname}_{z_sample}_{im_name}_{slope_name}_test.png', dpi=400)
+        pb.savefig(f'./Plots/unWISE_dndz_match_rescaled_{boxname}_{simname}_{z_sample}_{im_name}_{slope_name}_test.png', dpi=400)
         pb.clf()
 
         pb.plot(FLAMINGO_z_bins[1:], dndz_match_interpolated[1:]/galaxies_required, color='b', marker='.', label='Galaxies required')
@@ -165,12 +157,12 @@ def unWISE_data_matching(simname, z_sample, mass_cut, n_cut, nsamp='ntotal', plo
         pb.xlabel('z')
         pb.ylabel('dn/dz')
         pb.yscale('log')
-        pb.title("\n".join(textwrap.wrap(f'unWISE galaxy redshift distribution cross-match (rescaled, simname = {simname}, {z_sample} sample, stellar cut at mean z = {mass_cut}, stellar cut slope = {n_cut}, total number of galaxies = {nsamp})', width=75)))
+        pb.title("\n".join(textwrap.wrap(f'unWISE galaxy redshift distribution cross-match (rescaled, boxname = {boxname}, simname = {simname}, {z_sample} sample, stellar cut at mean z = {mass_cut}, stellar cut slope = {n_cut}, total number of galaxies = {nsamp})', width=75)))
         pb.legend()
-        pb.savefig(f'./Plots/unWISE_dndz_match_{simname}_{z_sample}_{im_name}_{slope_name}_ratio.png', dpi=400)
+        pb.savefig(f'./Plots/unWISE_dndz_match_{boxname}_{simname}_{z_sample}_{im_name}_{slope_name}_ratio.png', dpi=400)
         pb.clf()
 
-    write_sampled_galaxies_file(outfile_name, FLAMINGO_z_bins, galaxies_required, nsamp)
+    write_sampled_galaxies_file(outfile_name, FLAMINGO_mid_point, galaxies_required, nsamp)
 
     return
 
@@ -191,39 +183,98 @@ def compute_galaxies_required(FLAMINGO_mid_point, FLAMINGO_z_bins, dndz_func, ns
 
 def validate_required_vs_available(galaxies_required, available_counts):
     diff = galaxies_required - available_counts
-    excess = diff > 0.0
-    return excess.any(), diff
+    return diff 
 
-def write_sampled_galaxies_file(outfile_name, FLAMINGO_z_bins, galaxies_required, nsamp):
+def write_sampled_galaxies_file(outfile_name, FLAMINGO_mid_point, galaxies_required, nsamp):
     with open(outfile_name, 'w') as outfile:
         outfile.write(f"#Total number of sampled galaxies: {int(round(nsamp))}\n")
-        for i in range(1, len(FLAMINGO_z_bins)):
-            zmin = FLAMINGO_z_bins[i-1]
-            zmax = FLAMINGO_z_bins[i]
-            n_gals = int(round(galaxies_required[i-1]))
-            outfile.write(f"{zmin} {zmax} {n_gals}\n")
+        for i in range(len(FLAMINGO_mid_point)):
+            zmid = FLAMINGO_mid_point[i]
+            n_gals = int(round(galaxies_required[i]))
+            outfile.write(f"{zmid} {n_gals}\n")
     print(f"Wrote file: {outfile_name}")
     return
+
+def rescale_dndz(difference, halo_lightcones, galaxies_required, nsamp, FLAMINGO_mid_point, count, galaxy_sample):
+    count+=1
+    if galaxy_sample == 'Blue':
+        z_mean = 0.6
+        z_width = 0.3
+        z_limit = (7 * (z_width / 2)) + z_mean 
+    elif galaxy_sample == 'Green':
+        z_mean = 1.1
+        z_width = 0.4
+        z_limit = (7 * (z_width / 2)) + z_mean
+    print(difference)
+    excess = difference > 0.0
+    if excess.any() == False:
+        print('No rescaling')
+        return nsamp, galaxies_required, False, count
+    elif excess.any() == True:
+        diff_indicies = np.where(difference > 0.0)[0]
+        print(diff_indicies)
+        max_diff_index = np.argmax(difference[np.where(FLAMINGO_mid_point <= z_limit)])
+        print(max_diff_index)
+        print(FLAMINGO_mid_point[min(diff_indicies)])
+        print(np.argmax(np.where(FLAMINGO_mid_point <= z_limit)))
+        if FLAMINGO_mid_point[min(diff_indicies)] > z_limit: #or difference[max_diff_index] < 0.0: 
+            print(f'Past z={z_limit}')
+            oversampled = np.where(galaxies_required[diff_indicies] > halo_lightcones[diff_indicies, 1])[0]
+            galaxies_required[diff_indicies[oversampled]] = halo_lightcones[diff_indicies[oversampled], 1]
+            print(galaxies_required[np.where(FLAMINGO_mid_point > z_limit)], halo_lightcones[np.where(FLAMINGO_mid_point > z_limit), 1])
+            print(galaxies_required)
+            return nsamp, galaxies_required, False, count
+        elif FLAMINGO_mid_point[np.argmin(diff_indicies)] <= z_limit:
+            print('Rescaling required')
+            print(FLAMINGO_mid_point[max_diff_index])
+            print(difference[max_diff_index])
+            print(halo_lightcones[max_diff_index, 0])
+            print(halo_lightcones[max_diff_index, 1], galaxies_required[max_diff_index])
+            print(len(halo_lightcones), len(galaxies_required))
+            ratio_nsamp = halo_lightcones[max_diff_index, 1]/galaxies_required[max_diff_index]
+            if galaxies_required[max_diff_index] == 0:
+                galaxies_required[np.where(FLAMINGO_mid_point > FLAMINGO_mid_point[max_diff_index])] = halo_lightcones[np.where(FLAMINGO_mid_point > FLAMINGO_mid_point[max_diff_index]), 1]
+                return nsamp, galaxies_required, False, count
+            print(ratio_nsamp)
+            print(nsamp * ratio_nsamp, math.floor(nsamp*ratio_nsamp))
+            rescaled_nsamp = math.floor(nsamp*ratio_nsamp)
+            return rescaled_nsamp, galaxies_required, True, count
+        else:
+            print('ISSUE!!')
+            print(FLAMINGO_mid_point[diff_indicies[0]], FLAMINGO_mid_point[max_diff_index])
+            quit()
+
 
 
 if __name__ == '__main__':
     import sys
 
+    pb.rc("text", usetex=True)
+    pb.rc("font", family="serif", size=8)
+    pb.rcParams["font.size"] = 11
+
     plot=False
     try:
-        unWISE_data_matching(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], plot=plot)
+        unWISE_data_matching(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6], plot=plot, lightcone=sys.argv[7])
     except IndexError:
-        unWISE_data_matching(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], plot=plot)
+        unWISE_data_matching(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], plot=plot, lightcone=sys.argv[6])
 
     if plot==True:
+        dndz_blue_match = np.loadtxt(f"/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/unWISExLens_lklh/data/v1.0/aux_data/dndz/unWISE_blue_xmatch_dndz.txt", usecols=(0,1))
+        dndz_green_match = np.loadtxt(f"/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/unWISExLens_lklh/data/v1.0/aux_data/dndz/unWISE_green_xmatch_dndz.txt", usecols=(0,1))
+
         pb.plot(dndz_blue_match[:,0], dndz_blue_match[:,1], color='tab:blue', label='Blue sample')
         pb.plot(dndz_green_match[:,0], dndz_green_match[:,1], color='tab:green', label='Green sample')
-        pb.plot(FLAMINGO_z_bins, dndz_blue_match_interpolated, color='tab:cyan', marker='.', label='FLAMINGO bins')
-        pb.plot(FLAMINGO_z_bins, dndz_green_match_interpolated, color='tab:olive', marker='.', label='FLAMINGO bins')
-        pb.xlim(left=0, right=4)
-        pb.xlabel('z')
-        pb.ylabel('dn/dz')
-        pb.title('unWISE galaxy redshift distribution cross-match')
-        pb.legend()
-        pb.savefig('./Plots/unWISE_dndz_match.png', dpi=1200)
+        pb.vlines(x=0.6, color='tab:grey', linestyle='--', ymin=0, ymax=2.0, label='Mean z')
+        pb.vlines(x=0.6, color='tab:blue', linestyle='--', ymin=0, ymax=2.0)
+        pb.vlines(x=1.1, color='tab:green', linestyle='--', ymin=0, ymax=2.0)
+        # pb.plot(FLAMINGO_z_bins, dndz_blue_match_interpolated, color='tab:cyan', marker='.', label='FLAMINGO bins')
+        # pb.plot(FLAMINGO_z_bins, dndz_green_match_interpolated, color='tab:olive', marker='.', label='FLAMINGO bins')
+        pb.xlim(left=0, right=4.0)
+        pb.ylim(bottom=0, top=1.2)
+        pb.xlabel('$z$')
+        pb.ylabel(r"$\frac{1}{N_{\rm g, total}}\frac{dN_{\rm g}}{dz}$")
+        # pb.title('unWISE galaxy redshift distribution cross-match')
+        pb.legend(frameon=False)
+        pb.savefig('./Plots/unWISE_dndz_match.pdf', dpi=400)
         pb.clf()

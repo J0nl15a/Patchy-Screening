@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Check that exactly two arguments were given
+# Check that exactly five arguments were given
 if [ "$#" -ne 5 ]; then
   echo "Usage: $0 <param1> <param2> <param3> <param4> <param5>"
   exit 1
@@ -19,16 +19,22 @@ jid1=$(sbatch --parsable << EOF
 #!/bin/bash
 #SBATCH -c 1
 #SBATCH -p cosma8
-#SBATCH -A dp203
+#SBATCH -A dp004
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=ARIJCONL@ljmu.ac.uk
 #SBATCH --job-name=z_stellar_cut
-#SBATCH --output=./batch_files/job.z_stellar_cut.%j.dump
-#SBATCH --error=./batch_files/job.z_stellar_cut.%j.err
+#SBATCH --output=./batch_files/z_stellar_cut_logs/job.%j.dump
+#SBATCH --error=./batch_files/z_stellar_cut_logs/job.%j.err
 #SBATCH --time=00:01:00
 
 module purge
+source ~/.bashrc 
 mamba activate patchy_screening
+
+export OMP_NUM_THREADS=1
+export OPENBLAS_NUM_THREADS=1
+export MKL_NUM_THREADS=1
+export NUMEXPR_NUM_THREADS=1
 
 echo "=== Step 1 (Job ID \$SLURM_JOB_ID) starting"
 echo "    Received arguments: Sample='${param2}', M_cut(z_mean)='${param3}', n_cut='${param4}'"
@@ -54,18 +60,24 @@ jid2=$(sbatch --parsable \
               --kill-on-invalid-dep=yes \
               <<EOF
 #!/bin/bash
-#SBATCH -c 128
+#SBATCH -c 78
 #SBATCH -p cosma8
-#SBATCH -A dp203
+#SBATCH -A dp004
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=ARIJCONL@ljmu.ac.uk
 #SBATCH --job-name=halo_lightcones
-#SBATCH --output=./batch_files/job.FLAMINGO_halo_lightcones.%j.dump
-#SBATCH --error=./batch_files/job.FLAMINGO_halo_lightcones.%j.err
-#SBATCH --time=00:30:00
+#SBATCH --output=./batch_files/FLAMINGO_halo_lightcones_logs/job.%j.dump
+#SBATCH --error=./batch_files/FLAMINGO_halo_lightcones_logs/job.%j.err
+#SBATCH --time=02:00:00
 
 module purge
+source ~/.bashrc
 mamba activate patchy_screening
+
+export OMP_NUM_THREADS=1
+export OPENBLAS_NUM_THREADS=1
+export MKL_NUM_THREADS=1
+export NUMEXPR_NUM_THREADS=1
 
 echo "=== Step 2 (Job ID \$SLURM_JOB_ID) starting"
 echo "    Received arguments: ncpu='\$SLURM_CPUS_PER_TASK', Sim='${param1}', Sample='${param2}', M_cut(z_mean)='${param3}', n_cut='${param4}'"
@@ -94,16 +106,22 @@ jid3=$(sbatch --parsable \
 #!/bin/bash
 #SBATCH -c 1
 #SBATCH -p cosma8
-#SBATCH -A dp203
+#SBATCH -A dp004
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=ARIJCONL@ljmu.ac.uk
 #SBATCH --job-name=unWISE_data_matching
-#SBATCH --output=./batch_files/job.unWISE_data_matching.%j.dump
-#SBATCH --error=./batch_files/job.unWISE_data_matching.%j.err
+#SBATCH --output=./batch_files/unWISE_data_matching_logs/job.%j.dump
+#SBATCH --error=./batch_files/unWISE_data_matching_logs/job.%j.err
 #SBATCH --time=00:01:00
 
 module purge
+source ~/.bashrc
 mamba activate patchy_screening
+
+export OMP_NUM_THREADS=1
+export OPENBLAS_NUM_THREADS=1
+export MKL_NUM_THREADS=1
+export NUMEXPR_NUM_THREADS=1
 
 echo "=== Step 3 (Job ID \$SLURM_JOB_ID) starting"
 echo "    Received arguments: Sim='${param1}', Sample='${param2}', M_cut(z_mean)='${param3}', n_cut='${param4}', nsamp='${param5}'"
@@ -129,18 +147,24 @@ jid4=$(sbatch --parsable \
 	      --kill-on-invalid-dep=yes \
 	      <<EOF
 #!/bin/bash
-#SBATCH -c 128
+#SBATCH -c 78
 #SBATCH -p cosma8
-#SBATCH -A dp203
+#SBATCH -A dp004
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=ARIJCONL@ljmu.ac.uk
 #SBATCH --job-name=halo_sampling
-#SBATCH --output=./batch_files/job.FLAMINGO_halo_sampling.%j.dump
-#SBATCH --error=./batch_files/job.FLAMINGO_halo_sampling.%j.err
-#SBATCH --time=00:30:00
+#SBATCH --output=./batch_files/FLAMINGO_halo_sampling/job.%j.dump
+#SBATCH --error=./batch_files/FLAMINGO_halo_sampling/job.%j.err
+#SBATCH --time=01:00:00
 
 module purge
+source ~/.bashrc
 mamba activate patchy_screening
+
+export OMP_NUM_THREADS=1
+export OPENBLAS_NUM_THREADS=1
+export MKL_NUM_THREADS=1
+export NUMEXPR_NUM_THREADS=1
 
 echo "=== Step 4 (Job ID \$SLURM_JOB_ID) starting"
 echo "    Received arguments: ncpu="\$SLURM_CPUS_PER_TASK", Sim='${param1}', Sample='${param2}', M_cut(z_mean)='${param3}', n_cut='${param4}'"
@@ -159,3 +183,47 @@ EOF
 )
        
 echo "Job 4: Sampling FLAMINGO halo lightcones using rescaled unWISE dndz curve for sim ${param1}, ${param2} sample and stellar cut with: M_cut(z_mean) = ${param3}, n_cut = ${param4}."
+
+# 5) Launch step 5 after job‐ID=$jid4 succeeds
+jid5=$(sbatch --parsable \
+	      --dependency=afterok:${jid4} \
+	      --kill-on-invalid-dep=yes \
+	      <<EOF
+#!/bin/bash
+#SBATCH -c 128
+#SBATCH -p cosma8
+#SBATCH -A dp004
+#SBATCH --mail-type=ALL
+#SBATCH --mail-user=ARIJCONL@ljmu.ac.uk
+#SBATCH --job-name=unWISE_power_spectra_calculation
+#SBATCH --output=./batch_files/unWISE_power_spectra_logs/job.%j.dump
+#SBATCH --error=./batch_files/unWISE_power_spectra_logs/job.%j.err
+#SBATCH --time=15:00:00
+
+export OMP_NUM_THREADS=1
+export OPENBLAS_NUM_THREADS=1
+export MKL_NUM_THREADS=1
+export NUMEXPR_NUM_THREADS=1
+
+module purge
+source ~/.bashrc 
+mamba activate patchy_screening
+
+echo "=== Step 5 (Job ID \$SLURM_JOB_ID) starting"
+echo "    Received arguments: ncpu="\$SLURM_CPUS_PER_TASK", Sim='${param1}', Sample='${param2}', M_cut(z_mean)='${param3}', n_cut='${param4}'"
+echo "=============================="
+
+python3 unWISE_power_spectra.py "\$SLURM_CPUS_PER_TASK" "$param1" "$param2" "$param3" "$param4" unlensed True False True True True False
+
+exit_code=\$?
+echo "Step 5 finished with exit code \$exit_code"
+exit \$exit_code
+
+echo "Job done, info follows."
+sacct -j $SLURM_JOBID --format=JobID,JobName,Partition,AveRSS,MaxRSS,AveVMSize,MaxVMSize,Elapsed,ExitCode
+
+EOF
+)
+       
+echo "Job 5: Computing the clustering and lensing cross-spectra of FLAMINGO unWISE mock catalogs for sim ${param1}, ${param2} sample and stellar cut with: M_cut(z_mean) = ${param3}, n_cut = ${param4}."
+# End of script

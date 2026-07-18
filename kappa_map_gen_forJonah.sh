@@ -5,7 +5,9 @@
 #SBATCH --mem=200G ##300G for particle lc, rest 200G
 #SBATCH -p cosma8
 #SBATCH -A dp004
-#SBATCH --time=3:00:00
+#SBATCH --mail-type=ALL
+#SBATCH --mail-user=ARIJCONL@ljmu.ac.uk
+#SBATCH --time=24:00:00
 pwd; hostname; date
 module purge
 conda activate patchy_screening

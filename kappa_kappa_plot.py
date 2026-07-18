@@ -52,7 +52,7 @@ except FileNotFoundError:
 kappa_map = hp.pixelfunc.ud_grade(kappa_map, nside_cl)
 
 kappa_map_Tianyi = hp.read_map(f'/cosma8/data/dp004/dc-yang3/maps/Jeger_rot/L1_m9/{isim}/lightcone{lightcone}_shells/CMB_lensing_rot_Jeger_rot.fits', dtype=np.float64, verbose=False)
-
+kappa_map_Tianyi = hp.pixelfunc.ud_grade(kappa_map_Tianyi, nside_cl)
 
 auto_spectra_list = []
 
@@ -67,6 +67,7 @@ deproj_auto = nmt.deprojection_bias(f_kappa, f_kappa, clg)
 
 w_auto = nmt.NmtWorkspace.from_fields(f_kappa, f_kappa, b)
 cl_auto_namaster = w_auto.decouple_cell(pcl_auto - deproj_auto).squeeze()[ell_200_mask]
+print(cl_auto_namaster)
 
 if smooth:
     auto_spectra_list.append(savgol_filter(cl_auto_namaster, window_length=10, polyorder=5))

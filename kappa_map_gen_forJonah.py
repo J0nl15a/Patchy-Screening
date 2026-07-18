@@ -26,7 +26,10 @@ def map_reading_kernel(file_dir, quantity, nside, ibox, nrot, theta, phi, dchi, 
 
     if rotate:
        if Jeger_rot:
+            
             for i in range(len(theta)):
+                print(i)
+                map_chunck = np.zeros((healpy.nside2npix(nside)))
                 rot_custom = healpy.Rotator(rot=[theta[i], phi[i]], inv=True)
 
                 map_read = np.asarray(h5py.File(file_dir[i], 'r')[quantity])*1e10*u.solMass
@@ -208,7 +211,7 @@ def kappa_map_gen_forJonah(box_id, sim_id, lc_id=0, rotate=False):
     kappa_stacked = map_reading_kernel(lightcone_files, 'TotalMass', nside, box_index, 
                                        rot_times, theta_rot, phi_rot, 
                                        dchi, z_mid, chi_mid, chi_CMB, 
-                                       [cosmo.Om0, cosmo.H0], matter_mean, rotate=rotate) ##change rotate to True if you want box rotation
+                                       [cosmo.Om0, cosmo.H0], matter_mean, rotate=rotate, Jeger_rot=True) ##change rotate to True if you want box rotation
     if rotate:
         try:
             kappa_map_write = healpy.write_map(f'{path}/kappa_rot.fits', kappa_stacked, overwrite=True) ##feel free to add your own directory

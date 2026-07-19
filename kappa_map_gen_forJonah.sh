@@ -7,7 +7,7 @@
 #SBATCH -A dp004
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=ARIJCONL@ljmu.ac.uk
-#SBATCH --time=24:00:00
+#SBATCH --time=36:00:00
 pwd; hostname; date
 module purge
 conda activate patchy_screening

@@ -27,7 +27,7 @@ def map_reading_kernel(file_dir, quantity, nside, ibox, nrot, theta, phi, dchi, 
     if rotate:
        if Jeger_rot:
             
-            for i in range(len(theta)):
+            for i in range(len(file_dir)):
                 print(i)
                 map_chunck = np.zeros((healpy.nside2npix(nside)))
                 rot_custom = healpy.Rotator(rot=[theta[i], phi[i]], inv=True)

@@ -51,7 +51,7 @@ except FileNotFoundError:
     kappa_map = kappa_map_gen_forJonah(box, isim, lightcone)
 kappa_map = hp.pixelfunc.ud_grade(kappa_map, nside_cl)
 
-if isim in ['HYDRO_FIDUCIAL', 'HYDRO_LOW_SIGMA8', 'HYDRO_STRONEST_AGN', 'HYDRO_STRONG_SUPERNOVA'] and box == 'L1000N1800':
+if isim in ['HYDRO_FIDUCIAL', 'HYDRO_LOW_SIGMA8', 'HYDRO_STRONGEST_AGN', 'HYDRO_STRONG_SUPERNOVA'] and box == 'L1000N1800':
     Tianyi_map = True
     Tianyi_box = 'L1_m9'
 elif box == 'L2800N5040':
@@ -62,8 +62,12 @@ else:
     
 
 if Tianyi_map:
-    kappa_map_Tianyi = hp.read_map(f'/cosma8/data/dp004/dc-yang3/maps/Jeger_rot/{Tianyi_box}/{isim}/lightcone{lightcone}_shells/CMB_lensing_rot_Jeger_rot.fits', 
-                                   dtype=np.float64, verbose=False)
+    if Tianyi_box == 'L1_m9':
+        kappa_map_Tianyi = hp.read_map(f'/cosma8/data/dp004/dc-yang3/maps/Jeger_rot/{Tianyi_box}/{isim}/lightcone{lightcone}_shells/CMB_lensing_rot_Jeger_rot.fits', 
+                                       dtype=np.float64, verbose=False)
+    elif Tianyi_box == 'L2p8_m9_fid':
+        kappa_map_Tianyi = hp.read_map(f'/cosma8/data/dp004/dc-yang3/maps/Jeger_rot/{Tianyi_box}/lightcone{lightcone}_shells/CMB_lensing_rot_Jeger_rot.fits', 
+                                       dtype=np.float64, verbose=False)
     kappa_map_Tianyi = hp.pixelfunc.ud_grade(kappa_map_Tianyi, nside_cl)
 
 auto_spectra_list = []

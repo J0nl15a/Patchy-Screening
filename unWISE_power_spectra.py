@@ -124,7 +124,10 @@ if rotate:
             if source_vectors_rot.ndim == 1:
                 source_vectors_rot = source_vectors_rot.reshape(1, -1)
         else:
-            source_vectors_rot = np.concatenate((source_vectors_rot, hp.ang2vec(theta_rot, phi_rot, lonlat=True)), axis=0)
+            source_vector_rot = hp.ang2vec(theta_rot, phi_rot, lonlat=True)
+            if source_vector_rot.ndim == 1:
+                source_vector_rot = source_vector_rot.reshape(1, -1)
+            source_vectors_rot = np.concatenate((source_vectors_rot, source_vector_rot), axis=0)
 
     source_vectors = []
     source_vectors.append(source_vectors_rot)

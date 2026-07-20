@@ -51,8 +51,20 @@ except FileNotFoundError:
     kappa_map = kappa_map_gen_forJonah(box, isim, lightcone)
 kappa_map = hp.pixelfunc.ud_grade(kappa_map, nside_cl)
 
-kappa_map_Tianyi = hp.read_map(f'/cosma8/data/dp004/dc-yang3/maps/Jeger_rot/L1_m9/{isim}/lightcone{lightcone}_shells/CMB_lensing_rot_Jeger_rot.fits', dtype=np.float64, verbose=False)
-kappa_map_Tianyi = hp.pixelfunc.ud_grade(kappa_map_Tianyi, nside_cl)
+if isim in ['HYDRO_FIDUCIAL', 'HYDRO_LOW_SIGMA8', 'HYDRO_STRONEST_AGN', 'HYDRO_STRONG_SUPERNOVA'] and box == 'L1000N1800':
+    Tianyi_map = True
+    Tianyi_box = 'L1_m9'
+elif box == 'L2800N5040':
+    Tianyi_map = True
+    Tianyi_box = 'L2p8_m9_fid'
+else:
+    Tianyi_map = False
+    
+
+if Tianyi_map:
+    kappa_map_Tianyi = hp.read_map(f'/cosma8/data/dp004/dc-yang3/maps/Jeger_rot/{Tianyi_box}/{isim}/lightcone{lightcone}_shells/CMB_lensing_rot_Jeger_rot.fits', 
+                                   dtype=np.float64, verbose=False)
+    kappa_map_Tianyi = hp.pixelfunc.ud_grade(kappa_map_Tianyi, nside_cl)
 
 auto_spectra_list = []
 
@@ -75,22 +87,23 @@ elif not smooth:
     auto_spectra_list.append(cl_auto_namaster)
 
 
-kappa_mask_Tianyi = kappa_map_Tianyi*0.0+1.0
-f_kappa_Tianyi = nmt.NmtField(kappa_mask_Tianyi, [kappa_map_Tianyi], lmax=lmax_bins, n_iter=0)
+if Tianyi_map:
+    kappa_mask_Tianyi = kappa_map_Tianyi*0.0+1.0
+    f_kappa_Tianyi = nmt.NmtField(kappa_mask_Tianyi, [kappa_map_Tianyi], lmax=lmax_bins, n_iter=0)
 
-pcl_auto = nmt.compute_coupled_cell(f_kappa_Tianyi, f_kappa_Tianyi)
+    pcl_auto = nmt.compute_coupled_cell(f_kappa_Tianyi, f_kappa_Tianyi)
 
-pcl_shape = (f_kappa_Tianyi.nmaps * f_kappa_Tianyi.nmaps, f_kappa_Tianyi.ainfo.lmax+1)
-clg = np.zeros(pcl_shape)
-deproj_auto = nmt.deprojection_bias(f_kappa_Tianyi, f_kappa_Tianyi, clg)
+    pcl_shape = (f_kappa_Tianyi.nmaps * f_kappa_Tianyi.nmaps, f_kappa_Tianyi.ainfo.lmax+1)
+    clg = np.zeros(pcl_shape)
+    deproj_auto = nmt.deprojection_bias(f_kappa_Tianyi, f_kappa_Tianyi, clg)
 
-w_auto = nmt.NmtWorkspace.from_fields(f_kappa_Tianyi, f_kappa_Tianyi, b)
-cl_auto_namaster_Tianyi = w_auto.decouple_cell(pcl_auto - deproj_auto).squeeze()[ell_200_mask]
+    w_auto = nmt.NmtWorkspace.from_fields(f_kappa_Tianyi, f_kappa_Tianyi, b)
+    cl_auto_namaster_Tianyi = w_auto.decouple_cell(pcl_auto - deproj_auto).squeeze()[ell_200_mask]
 
-if smooth:
-    auto_spectra_list.append(savgol_filter(cl_auto_namaster_Tianyi, window_length=10, polyorder=5))
-elif not smooth:
-    auto_spectra_list.append(cl_auto_namaster_Tianyi)
+    if smooth:
+        auto_spectra_list.append(savgol_filter(cl_auto_namaster_Tianyi, window_length=10, polyorder=5))
+    elif not smooth:
+        auto_spectra_list.append(cl_auto_namaster_Tianyi)
 
 
 auto_output_path = f'./data_files/power_spectra/kappa_kappa_{isim}_{iz}_{im_name}'
@@ -108,7 +121,10 @@ isim_names = [isim]
 # variable_list = [slope]
 variable_list = auto_spectra_list
 # variable_name_list = [slope_name]
-variable_name_list = ["My rotated map", "Tianyi's rotated map"]
+if Tianyi_map:
+    variable_name_list = ["My rotated map", "Tianyi's rotated map"]
+else: 
+    variable_name_list = ["My rotated map"]
 
 # obs_data = np.loadtxt(f'./unWISExLens_lklh/data/v1.0/bandpowers/unWISExACT-DR6_{str(iz).lower()}_baseline_Clgg+Clkk+Clkg.dat', usecols=(0,1,2,3))[ell_200_mask, :].reshape(-1,4)
 # Planck_obs_data = np.loadtxt(f'./unWISExLens_lklh/data/v1.0/bandpowers/unWISExPlanck-PR4_{str(iz).lower()}_baseline_Clgg+Clkk+Clkg.dat', usecols=(0,1,2,3))

@@ -200,11 +200,11 @@ if rotate:
     if box == 'L1000N1800':
         box_alt = 'L1_m9'
         try:
-            kappa_map = hp.read_map(f'/cosma8/data/dp004/dc-yang3/maps/Jeger_rot/{box_alt}/{isim}/lightcone{lightcone}_shells/CMB_lensing_rot_Jeger_rot.fits', dtype=np.float64, verbose=False)
+            kappa_map = hp.read_map(f'./data_files/kappa_maps/{box}/{isim}/lightcone{lightcone}/kappa_rot.fits', dtype=np.float64, verbose=False)
         except FileNotFoundError:
-            try:
-                kappa_map = hp.read_map(f'./data_files/kappa_maps/{box}/{isim}/lightcone{lightcone}/kappa_nonrot.fits', dtype=np.float64, verbose=False)
-            except FileNotFoundError:
+            if isim in ['HYDRO_FIDUCIAL', 'HYDRO_LOW_SIGMA8', 'HYDRO_STRONGEST_AGN', 'HYDRO_STRONG_SUPERNOVA']:
+                kappa_map = hp.read_map(f'/cosma8/data/dp004/dc-yang3/maps/Jeger_rot/{box_alt}/{isim}/lightcone{lightcone}_shells/CMB_lensing_rot_Jeger_rot.fits', dtype=np.float64, verbose=False)
+            else:
                 kappa_map = kappa_map_gen_forJonah(box, isim, lightcone, rotate=rotate)
 else:
     try:

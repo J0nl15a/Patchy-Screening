@@ -5,7 +5,6 @@ import astropy.units as u
 from astropy.cosmology import FlatLambdaCDM
 from joblib import Parallel, delayed
 import camb
-from camb import model, initialpower
 import time
 from datetime import datetime
 from numbers import Real

@@ -96,7 +96,10 @@ print('Finished computing halo catalogs: {:.2f} seconds'.format(time.time() - jo
 print(mean_mstar)
 
 if rotate:
-    map_redshift_bins = np.loadtxt(f"/cosma8/data/dp004/flamingo/Runs/{box}/{isim}/shell_redshifts_z3.txt", skiprows=1, usecols=(0,1), delimiter=',')
+    if box == 'L1000N1800' or box == 'L1000N3600':
+        map_redshift_bins = np.loadtxt(f"/cosma8/data/dp004/flamingo/Runs/{box}/{isim}/shell_redshifts_z3.txt", skiprows=1, usecols=(0,1), delimiter=',')
+    elif box == 'L2800N5040':
+        map_redshift_bins = np.loadtxt(f"/cosma8/data/dp004/flamingo/Runs/{box}/{isim}/shell_redshifts.txt", skiprows=1, usecols=(0,1), delimiter=',')
     mock_catalogue = results[0]
     mock_catalogue_z_total = 0
 
@@ -197,15 +200,26 @@ nside_cl = 2048
 npix = hp.nside2npix(nside_cl)
 
 if rotate:
-    if box == 'L1000N1800':
-        box_alt = 'L1_m9'
-        try:
-            kappa_map = hp.read_map(f'./data_files/kappa_maps/{box}/{isim}/lightcone{lightcone}/kappa_rot.fits', dtype=np.float64, verbose=False)
-        except FileNotFoundError:
+    try:
+        kappa_map = hp.read_map(f'./data_files/kappa_maps/{box}/{isim}/lightcone{lightcone}/kappa_rot.fits', dtype=np.float64, verbose=False)
+    except FileNotFoundError:
+        if box == 'L1000N1800':
+            box_alt = 'L1_m9'
             if isim in ['HYDRO_FIDUCIAL', 'HYDRO_LOW_SIGMA8', 'HYDRO_STRONGEST_AGN', 'HYDRO_STRONG_SUPERNOVA']:
                 kappa_map = hp.read_map(f'/cosma8/data/dp004/dc-yang3/maps/Jeger_rot/{box_alt}/{isim}/lightcone{lightcone}_shells/CMB_lensing_rot_Jeger_rot.fits', dtype=np.float64, verbose=False)
             else:
                 kappa_map = kappa_map_gen_forJonah(box, isim, lightcone, rotate=rotate)
+
+        elif box == 'L1000N3600':
+            kappa_map = kappa_map_gen_forJonah(box, isim, lightcone, rotate=rotate)
+
+        elif box == 'L2800N5040':
+            box_alt = 'L2p8_m9_fid'
+            try:
+                kappa_map = hp.read_map(f'/cosma8/data/dp004/dc-yang3/maps/Jeger_rot/{box_alt}/lightcone{lightcone}_shells/CMB_lensing_rot_Jeger_rot.fits', dtype=np.float64, verbose=False)
+            except FileExistsError:
+                kappa_map = kappa_map_gen_forJonah(box, isim, lightcone, rotate=rotate)
+
 else:
     try:
         kappa_map = hp.read_map(f'./data_files/kappa_maps/{box}/{isim}/lightcone{lightcone}/kappa_nonrot.fits', dtype=np.float64, verbose=False)

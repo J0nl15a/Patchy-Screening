@@ -342,22 +342,22 @@ if __name__ == "__main__":
 
     # Load your data files here
 
-    data_1 = np.loadtxt(f'./data_files/power_spectra/galaxy_galaxy/L1000N1800/HYDRO_FIDUCIAL/Blue/lightcone0/galaxy_galaxy_power_spectrum_10p799_0p506.txt', skiprows=1, usecols=(0,2))
+    data_1 = np.loadtxt(f'./data_files/power_spectra/galaxy_galaxy/L1000N1800/HYDRO_FIDUCIAL/Blue/lightcone0/galaxy_galaxy_power_spectrum_10p799_0p498.txt', skiprows=1, usecols=(0,2))
     ell_namaster = data_1[:,0]
     spectrum_1 = data_1[:,1]  # Path to first spectrum values
     spectrum_1_error = None  # Optional error for first spectrum
 
-    data_2 = np.loadtxt(f'./data_files/power_spectra/galaxy_galaxy/L1000N1800/HYDRO_PLANCK/Blue/lightcone0/galaxy_galaxy_power_spectrum_10p801_0p585_non_rotated.txt', skiprows=1, usecols=(0,2))
+    data_2 = np.loadtxt(f'./data_files/power_spectra/galaxy_galaxy/L1000N1800/HYDRO_PLANCK/Blue/lightcone0/galaxy_galaxy_power_spectrum_10p792_0p710.txt', skiprows=1, usecols=(0,2))
     ell_namaster = data_2[:,0]
     spectrum_2 = data_2[:,1]  # Path to second spectrum values
     spectrum_2_error = None  # Optional error for second spectrum
 
-    data_3 = np.loadtxt(f'./data_files/power_spectra/galaxy_galaxy/L1000N1800/HYDRO_LOW_SIGMA8/Blue/lightcone0/galaxy_galaxy_power_spectrum_10p730_0p887.txt', skiprows=1, usecols=(0,2))
+    data_3 = np.loadtxt(f'./data_files/power_spectra/galaxy_galaxy/L1000N1800/HYDRO_LOW_SIGMA8/Blue/lightcone0/galaxy_galaxy_power_spectrum_10p730_0p884.txt', skiprows=1, usecols=(0,2))
     ell_namaster = data_3[:,0]
     spectrum_3 = data_3[:,1]  # Path to third spectrum values
     spectrum_3_error = None  # Optional error for third spectrum
 
-    data_4 = np.loadtxt(f'./data_files/power_spectra/galaxy_galaxy/L1000N3600/HYDRO_FIDUCIAL/Blue/lightcone0/galaxy_galaxy_power_spectrum_10p679_0p972.txt', skiprows=1, usecols=(0,2))
+    data_4 = np.loadtxt(f'./data_files/power_spectra/galaxy_galaxy/L1000N3600/HYDRO_FIDUCIAL/Blue/lightcone0/galaxy_galaxy_power_spectrum_10p680_0p987.txt', skiprows=1, usecols=(0,2))
     ell_namaster = data_4[:,0]
     spectrum_4 = data_4[:,1]  # Path to fourth spectrum values
     spectrum_4_error = None  # Optional error for fourth spectrum
@@ -367,7 +367,7 @@ if __name__ == "__main__":
     spectrum_5 = data_5[:,1]  # Path to fifth spectrum values
     spectrum_5_error = None  # Optional error for fifth spectrum
 
-    data_6 = np.loadtxt(f'./data_files/power_spectra/galaxy_galaxy/L1000N1800/HYDRO_PLANCK/Blue/lightcone0/galaxy_galaxy_power_spectrum_0p0_0p0_non_rotated.txt', skiprows=1, usecols=(0,2))
+    data_6 = np.loadtxt(f'./data_files/power_spectra/galaxy_galaxy/L1000N1800/HYDRO_PLANCK/Blue/lightcone0/galaxy_galaxy_power_spectrum_0p0_0p0.txt', skiprows=1, usecols=(0,2))
     ell_namaster = data_6[:,0]
     spectrum_6 = data_6[:,1]  # Path to sixth spectrum values
     spectrum_6_error = None  # Optional error for sixth spectrum

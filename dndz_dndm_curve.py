@@ -6,16 +6,25 @@ from scipy.integrate import simpson
 # from plothist import make_hist, plot_error_hist, plot_hist
 pb.rcParams['font.family'] = 'serif'
 
+def name_float(x, mle=False):
+    if mle:
+        return f"{float(x):.3f}".replace(".", "p")
+    else:
+        return f"{float(x):.1f}".replace(".", "p")
+
 box = str(sys.argv[2])
 isim = str(sys.argv[3])
 iz = str(sys.argv[4])
 lc = int(sys.argv[5])
-m_cut = float(np.loadtxt(f"./data_files/mle_parameters/{box}/{isim}/{iz}/lightcone{lc}/mle_values.txt", usecols=1, skiprows=6, max_rows=1, delimiter='='))
-s_cut = float(np.loadtxt(f"./data_files/mle_parameters/{box}/{isim}/{iz}/lightcone{lc}/mle_values.txt", usecols=1, skiprows=7, max_rows=1, delimiter='='))
-# m_cut = 11.0
-# s_cut = 0.4
-m_cut_name = f"{m_cut:.3f}".replace(".", "p")
-s_cut_name = f"{s_cut:.3f}".replace(".", "p")
+mle = True
+if mle:
+    m_cut = float(np.loadtxt(f"./data_files/mle_parameters/{box}/{isim}/{iz}/lightcone{lc}/mle_values.txt", usecols=1, skiprows=6, max_rows=1, delimiter='='))
+    s_cut = float(np.loadtxt(f"./data_files/mle_parameters/{box}/{isim}/{iz}/lightcone{lc}/mle_values.txt", usecols=1, skiprows=7, max_rows=1, delimiter='='))
+elif not mle:
+    m_cut = 11.0
+    s_cut = 0.4
+m_cut_name = name_float(m_cut, mle=mle)
+s_cut_name = name_float(s_cut, mle=mle)
 print(m_cut, s_cut)
 if iz == "Blue":
     z_mean = 0.6
@@ -30,16 +39,16 @@ redshift_bins = np.loadtxt(f"/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screeni
 redshift_midpoints = redshift_bins[:,2]
 obs_dndz = np.loadtxt(f"/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/unWISExLens_lklh/data/v1.0/aux_data/dndz/unWISE_{iz.lower()}_xmatch_dndz.txt", usecols=(0,1))
 
-ps = patchyScreening(box, isim, iz, m_cut, s_cut, ncpu=int(sys.argv[1]), lightcone=lc, mle=False)
+ps = patchyScreening(box, isim, iz, m_cut, s_cut, ncpu=int(sys.argv[1]), lightcone=lc, mle=mle)
 ps.filter_stellar_mass()
 
 m_cut_hires = float(np.loadtxt(f"./data_files/mle_parameters/L1000N3600/{isim}/{iz}/lightcone{lc}/mle_values.txt", usecols=1, skiprows=6, max_rows=1, delimiter='='))
 s_cut_hires = float(np.loadtxt(f"./data_files/mle_parameters/L1000N3600/{isim}/{iz}/lightcone{lc}/mle_values.txt", usecols=1, skiprows=7, max_rows=1, delimiter='='))
-ps_hires = patchyScreening('L1000N3600', isim, iz, m_cut_hires, s_cut_hires, ncpu=int(sys.argv[1]), lightcone=lc, mle=False)
+ps_hires = patchyScreening('L1000N3600', isim, iz, m_cut_hires, s_cut_hires, ncpu=int(sys.argv[1]), lightcone=lc, mle=mle)
 ps_hires.filter_stellar_mass()
 m_cut_hires = float(np.loadtxt(f"./data_files/mle_parameters/L2800N5040/{isim}/{iz}/lightcone{lc}/mle_values.txt", usecols=1, skiprows=6, max_rows=1, delimiter='='))
 s_cut_hires = float(np.loadtxt(f"./data_files/mle_parameters/L2800N5040/{isim}/{iz}/lightcone{lc}/mle_values.txt", usecols=1, skiprows=7, max_rows=1, delimiter='='))
-ps_largebox = patchyScreening('L2800N5040', isim, iz, m_cut_hires, s_cut_hires, ncpu=int(sys.argv[1]), lightcone=lc, mle=False)
+ps_largebox = patchyScreening('L2800N5040', isim, iz, m_cut_hires, s_cut_hires, ncpu=int(sys.argv[1]), lightcone=lc, mle=mle)
 ps_largebox.filter_stellar_mass()
 
 if both_samples:
@@ -54,7 +63,7 @@ if both_samples:
     s_cut_other_name = f"{s_cut_other:.3f}".replace(".", "p")
 
 
-    ps_other = patchyScreening(box, isim, "Green" if iz == "Blue" else "Blue", m_cut_other, s_cut_other, ncpu=int(sys.argv[1]), lightcone=lc, mle=False)
+    ps_other = patchyScreening(box, isim, "Green" if iz == "Blue" else "Blue", m_cut_other, s_cut_other, ncpu=int(sys.argv[1]), lightcone=lc, mle=mle)
     ps_other.filter_stellar_mass()
 
 n_bins = 100

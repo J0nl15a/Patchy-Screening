@@ -102,7 +102,7 @@ def read_mle_cut(data_root: Path, box: str, isim: str, iz: str, lc: int) -> tupl
 
 def load_catalogue(data_root: Path, box: str, isim: str, iz: str, lc: int, ncpu: int):
     m_cut, s_cut = read_mle_cut(data_root, box, isim, iz, lc)
-    ps = patchyScreening(box, isim, iz, m_cut, s_cut, ncpu=ncpu, lightcone=lc, mle=False)
+    ps = patchyScreening(box, isim, iz, m_cut, s_cut, ncpu=ncpu, lightcone=lc, mle=True)
     ps.filter_stellar_mass()
     return ps.merge
 

@@ -271,7 +271,7 @@ def configure_axes(axs) -> None:
         ax.set_xlim(11.0, 16.2)
         ax.set_ylim(1e3, 1e8)
     for ax in stellar_axes:
-        ax.set_xlim(10.5, 12.5)
+        ax.set_xlim(10.25, 12.5)
         ax.set_ylim(1e3, 1e8)
 
 

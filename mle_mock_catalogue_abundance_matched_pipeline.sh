@@ -166,7 +166,7 @@ echo "=============================="
 if [ -f "./data_files/z_dependant_stellar_cuts/${BOX}/${IZ}/z_stellar_cut_data_${mle_amp//./p}_${mle_slope//./p}.txt" ]; then
     echo "Found stellar cut data for MLE values — skipping FLAMINGO_halo_lightcones_shell.py"
 else
-    python3 stellar_cut_z.py "$SLURM_CPUS_PER_TASK" "$BOX" "$ISIM" "$IZ" "$mle_amp" "$mle_slope" "$LIGHTCONE"
+    python3 stellar_cut_z.py "$SLURM_CPUS_PER_TASK" "$BOX" "$ISIM" "$IZ" "$mle_amp" "$mle_slope" "$LIGHTCONE" True
 fi
 
 echo "Job 9: Compute z-dependant stellar cut values for box $BOX, $IZ sample for MLE values only."

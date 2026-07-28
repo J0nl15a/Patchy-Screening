@@ -36,7 +36,7 @@ module list
 
 # ─── Run your Python script, passing CHECKPOINT_DIR in the environment ───
 # mpiexec -n $SLURM_NTASKS python3 $PYTHON_SCRIPT $SLURM_CPUS_PER_TASK "$@" tau_mpi "$RUN_ID" true
-mpiexec -n $SLURM_NTASKS python3 $PYTHON_SCRIPT $SLURM_CPUS_PER_TASK "$@" tau_mpi "$RUN_ID" true
+mpiexec -n $SLURM_NTASKS python3 $PYTHON_SCRIPT $SLURM_CPUS_PER_TASK "$@" tau_mpi_image "$RUN_ID" true
 
 
 echo "Job done, info follows."

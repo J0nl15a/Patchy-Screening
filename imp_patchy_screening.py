@@ -85,7 +85,7 @@ class patchyScreening:
 
         self.rotate = rotate
         self.rect_size = rect_size
-        self.lightcone = lightcone
+        self.lightcone = int(lightcone)
 
         self.cosmology = FlatLambdaCDM(H0=68.1, Om0=0.3, Tcmb0=2.725)
         self.mock_CMB_primary = None
@@ -1223,7 +1223,9 @@ class patchyScreening:
 
         elif mode == "tau_mpi":
             self.run_tau_mpi_from_saved()
-            # self.run_tau_mpi_from_saved_image(plot)
+
+        elif mode == "tau_mpi_image":
+            self.run_tau_mpi_from_saved_image(plot)
 
         elif mode == "full":
             self.generate_cmb_map(plot)
@@ -1371,14 +1373,15 @@ if __name__ == '__main__':
     iz = sys.argv[4]
     im = sys.argv[5]
     slope = sys.argv[6]
-    fits = sys.argv[7]
-    sig = sys.argv[8]
-    mode = sys.argv[9] if len(sys.argv) > 9 else "full"
-    run_id = sys.argv[10] if len(sys.argv) > 10 else None
-    cleanup_tmp = sys.argv[11].lower() in ("true", "1", "yes", "y") if len(sys.argv) > 11 else False
+    lightcone = sys.argv[7] 
+    fits = sys.argv[8]
+    sig = sys.argv[9]
+    mode = sys.argv[10] if len(sys.argv) > 10 else "full"
+    run_id = sys.argv[11] if len(sys.argv) > 11 else None
+    cleanup_tmp = sys.argv[12].lower() in ("true", "1", "yes", "y") if len(sys.argv) > 12 else False
 
 
-    ps = patchyScreening(box, isim, iz, im, slope, ncpu, fits_file=fits, signal=sig, run_id=run_id, cleanup_tmp=cleanup_tmp)#, cmb_method='CAMB')#, lightcone_method=('SHELL','shell'))#, cmb_method='CAMB')
+    ps = patchyScreening(box, isim, iz, im, slope, ncpu, lightcone=lightcone, fits_file=fits, signal=sig, run_id=run_id, cleanup_tmp=cleanup_tmp)#, cmb_method='CAMB')#, lightcone_method=('SHELL','shell'))#, cmb_method='CAMB')
     ps.run_analysis(mode=mode, plot=False)
     # ps.balance_large_scale_signs(plot=False, seed=1000)
     # ps.reconstruct_tau_map(plot=True)

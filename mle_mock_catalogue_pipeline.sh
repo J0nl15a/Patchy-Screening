@@ -503,7 +503,7 @@ if [ -f "./data_files/power_spectra/galaxy_galaxy/${BOX}/${ISIM}/${IZ}/lightcone
 else
     python3 unWISE_power_spectra.py \
       "$SLURM_CPUS_PER_TASK" "$BOX" "$ISIM" "$IZ" "$mle_amp" "$mle_slope" \
-      unlensed True False False True True False False "$LIGHTCONE"
+      unlensed True False False True True False False "$LIGHTCONE" True
 fi
 
 echo "Job 15: Compute power spectra for box $BOX, sim $ISIM, lightcone $LIGHTCONE, $IZ sample for MLE values only."

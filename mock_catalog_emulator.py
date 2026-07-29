@@ -16,7 +16,7 @@ from pathlib import Path
 # spec.loader.exec_module(module)
 
 def emulator(x, spectra, box, isim, iz, 
-             save=False, load=False, log=True, oos_test=False, retrain=False, lightcone=0, abundance_cut=0.05,
+             save=False, load=False, log=True, oos_test=False, retrain=False, lightcone=0, abundance_cut=0.5,
              amp_min=10.3, amp_max=11.3, amp_step=0.1, slope_min=0.0, slope_max=1.0, slope_step=0.1):
     
     try:
@@ -138,8 +138,8 @@ if __name__ == '__main__':
     lightcone = int(sys.argv[5])
 
     spectra = str(sys.argv[4])
-    amp = 10.808
-    slope = 0.259
+    amp = 10.909
+    slope = 0.335
     residual = 0.0
 
     if iz == 'Blue':
@@ -162,27 +162,26 @@ if __name__ == '__main__':
     elif spectra == 'cross':
         dir_type = 'kappa_galaxy'
 
-    true = np.loadtxt(f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/power_spectra/{dir_type}/{box}/{isim}/{iz}/lightcone{lightcone}/{dir_type}_power_spectrum_{test_name[0]}_{test_name[1]}.txt', 
-                    # delimiter=' ', skiprows=1, usecols=(0,1) if spectra=='auto' else (0,1))
-                    delimiter=' ', skiprows=1, usecols=(0,2) if spectra=='auto' else (0,1))
-    
-    with open(f"/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/dndz_samples/{box}/{isim}/{iz}/lightcone{lightcone}/dndz_galaxies_sampled_{test_name[0]}_{test_name[1]}.txt", "r") as f:
-        first_line = f.readline().strip()
-        abundance = int(first_line.split(":")[-1])
-        print(f"Abundance for test point {test_name}: {abundance}")
-    
-    if amp+residual >= 11.3:
+    if amp+residual > 11.3:
         pass
     else:
+        true = np.loadtxt(f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/power_spectra/{dir_type}/{box}/{isim}/{iz}/lightcone{lightcone}/{dir_type}_power_spectrum_{test_name[0]}_{test_name[1]}.txt', 
+                          # delimiter=' ', skiprows=1, usecols=(0,1) if spectra=='auto' else (0,1))
+                          delimiter=' ', skiprows=1, usecols=(0,2) if spectra=='auto' else (0,1))
+    
+        with open(f"/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/dndz_samples/{box}/{isim}/{iz}/lightcone{lightcone}/dndz_galaxies_sampled_{test_name[0]}_{test_name[1]}.txt", "r") as f:
+            first_line = f.readline().strip()
+            abundance = int(first_line.split(":")[-1])
+            print(f"Abundance for test point {test_name}: {abundance}")
+    
         # true_plus_1 = np.loadtxt(f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/power_spectra/{dir_type}/{box}/{isim}/{iz}/lightcone{lightcone}/{dir_type}_power_spectrum_{test_name_plus_1[0]}_{test_name_plus_1[1]}.txt', 
         #                         # delimiter=' ', skiprows=1, usecols=(0,1) if spectra=='auto' else (0,1))
         #                         delimiter=' ', skiprows=1, usecols=(0,2) if spectra=='auto' else (0,1))
-        pass
 
     pred_train = emulator(test, spectra, box, isim, iz, save=True, retrain=True, lightcone=lightcone, 
-                    abundance_cut=0.05 if spectra != 'abundance' else 0.0, slope_max=2.0 if iz == 'Blue' else 1.0)
+                    abundance_cut=0.5 if spectra != 'abundance' else 0.0, slope_max=2.0 if iz == 'Blue' else 1.0)
     pred = emulator(test, spectra, box, isim, iz, load=True, lightcone=lightcone, 
-                    abundance_cut=0.05 if spectra != 'abundance' else 0.0, log=True, slope_max=2.0 if iz == 'Blue' else 1.0)
+                    abundance_cut=0.5 if spectra != 'abundance' else 0.0, log=True, slope_max=2.0 if iz == 'Blue' else 1.0)
     print(pred_train, abundance)
     # print(pred)
 
@@ -206,7 +205,7 @@ if __name__ == '__main__':
             name_i = [f"{float(x_train[i,0]):.1f}".replace('.', 'p'), f"{float(x_train[i,1]):.1f}".replace('.', 'p')]
             print(x_train[i,:])
             pred_i = emulator(x_train[i,:], spectra, box, isim, iz, oos_test=True, load=True, lightcone=lightcone, 
-                              abundance_cut=0.0, log=True, slope_max=2.0 if iz == 'Blue' else 1.0)
+                              abundance_cut=0.5, log=True, slope_max=2.0 if iz == 'Blue' else 1.0)
             print(pred_i)
 
             with open(f"./data_files/dndz_samples/{box}/{isim}/{iz}/lightcone{lightcone}/dndz_galaxies_sampled_{name_i[0]}_{name_i[1]}.txt", "r") as f:
@@ -318,7 +317,7 @@ if __name__ == '__main__':
         pred_errors = []
         for i in range(x_train.shape[0]): 
             name_i = [f"{float(x_train[i,0]):.1f}".replace('.', 'p'), f"{float(x_train[i,1]):.1f}".replace('.', 'p')]
-            pred_i = emulator(x_train[i,:], spectra, box, isim, iz, oos_test=True, load=True, lightcone=lightcone)
+            pred_i = emulator(x_train[i,:], spectra, box, isim, iz, oos_test=True, load=True, lightcone=lightcone, abundance_cut=0.5)
             true_i = np.loadtxt(f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/power_spectra/{dir_type}/{box}/{isim}/{iz}/lightcone{lightcone}/{dir_type}_power_spectrum_{name_i[0]}_{name_i[1]}.txt',
                             # delimiter=' ', skiprows=1, usecols=(0,1) if spectra=='auto' else (0,1))
                             delimiter=' ', skiprows=1, usecols=(0,2) if spectra=='auto' else (0,1))

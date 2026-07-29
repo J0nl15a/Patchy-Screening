@@ -33,12 +33,14 @@ GROUPS = {
     },
 }
 
+
 def tau_path(base_dir, box, sim, sample, lightcone, nside, primary_method, file_method, no_ps):
     suffix = "_no_ps" if no_ps else ""
-    if box == 'L2800N5040':
-        nside = 4096
+    # if box == 'L2800N5040':
+    #     nside = 4096
     filename = f"tau_mle_catalogue_nside{nside}_{primary_method}_{file_method}{suffix}.pickle"
     return Path(base_dir) / box / sim / sample / f"lightcone{lightcone}" / filename
+
 
 def load_tau_profile(path):
     if not path.exists():
@@ -52,16 +54,107 @@ def load_tau_profile(path):
         raise ValueError(f"theta shape {theta.shape} != tau shape {tau.shape} in {path}")
     return theta, tau, distance
 
+
 def load_named_profile(args, box, sim, lightcone=0):
     path = tau_path(args.base_dir, box, sim, args.sample, lightcone, args.nside, args.primary_method, args.file_method, args.no_ps)
     theta, tau, distance = load_tau_profile(path)
     return {"theta": theta, "tau": tau, "distance": distance, "path": path}
+
 
 def put_on_reference_grid(theta_ref, theta, values):
     if theta.shape == theta_ref.shape and np.allclose(theta, theta_ref):
         return values
 
     raise ValueError("Tau profiles use different radial-bin grids.")
+
+
+def plot_shifted_ratios(ax_ratio, theta, profiles, reference, colors, shift_padding=0.05, alpha=0.9):
+    """
+    Shift all profiles by the same numerical value so they are positive,
+    divide each shifted profile by the shifted reference, and plot the ratios.
+
+    Parameters
+    ----------
+    ax_ratio : matplotlib.axes.Axes
+        Axis on which to plot the ratios.
+
+    theta : array-like
+        Common radial grid.
+
+    profiles : sequence of array-like
+        Profiles to compare with the reference.
+
+    reference : array-like
+        Fiducial/reference profile.
+
+    colors : sequence
+        Plot colour for each profile.
+
+    shift_padding : float
+        Additional shift as a fraction of the full profile amplitude range.
+        This keeps the shifted denominator safely away from zero.
+
+    alpha : float
+        Line transparency.
+
+    Returns
+    -------
+    ratios : list of ndarray
+        Shifted ratios that were plotted.
+
+    shift : float
+        Common additive shift applied to every profile.
+    """
+    reference = np.asarray(reference, dtype=float)
+    profiles = [np.asarray(profile, dtype=float) for profile in profiles]
+
+    if len(profiles) != len(colors):
+        raise ValueError("profiles and colors must have the same length.")
+
+    all_values = np.concatenate([reference.ravel()] + [profile.ravel() for profile in profiles])
+
+    finite_values = all_values[np.isfinite(all_values)]
+
+    if finite_values.size == 0:
+        raise ValueError("No finite profile values were supplied.")
+
+    global_min = np.min(finite_values)
+    global_max = np.max(finite_values)
+    amplitude_range = global_max - global_min
+
+    # A fallback is needed if all values happen to be identical.
+    if amplitude_range == 0.0:
+        amplitude_range = max(np.abs(global_max), 1.0)
+
+    # Make the smallest shifted value equal to
+    # shift_padding * amplitude_range, rather than exactly zero.
+    minimum_allowed = shift_padding * amplitude_range
+    shift = max(0.0, -global_min + minimum_allowed)
+
+    shifted_reference = reference + shift
+
+    if np.any(~np.isfinite(shifted_reference) | (shifted_reference <= 0.0)):
+        raise ValueError("The shifted reference profile is not strictly positive.")
+
+    ax_ratio.axhline(1.0, color="k", linestyle="--", linewidth=0.8, alpha=0.7)
+
+    ratios = []
+
+    for profile, color in zip(profiles, colors):
+        shifted_profile = profile + shift
+
+        ratio = np.full_like(shifted_profile, np.nan, dtype=float)
+
+        valid = (np.isfinite(shifted_profile) & np.isfinite(shifted_reference) & (shifted_profile > 0.0) & (shifted_reference > 0.0))
+
+        np.divide(shifted_profile, shifted_reference, out=ratio, where=valid)
+
+        ax_ratio.plot(theta, ratio, color=color, alpha=alpha)
+
+        ratios.append(ratio)
+
+    return ratios, shift
+
 
 def stable_fractional_difference(numerator, reference, absolute_threshold=1e-12):
     numerator = np.asarray(numerator, dtype=float)
@@ -78,6 +171,7 @@ def stable_fractional_difference(numerator, reference, absolute_threshold=1e-12)
 
     return result
 
+
 def symmetric_ratio(numerator, reference, threshold=1e-12):
     numerator = np.asarray(numerator, dtype=float)
     reference = np.asarray(reference, dtype=float)
@@ -91,6 +185,7 @@ def symmetric_ratio(numerator, reference, threshold=1e-12):
     result[valid] = (2.0 * (numerator[valid] - reference[valid]) / denominator[valid])
 
     return result
+
 
 def plot_resolution(ax, ax_ratio, args):
     fid = load_named_profile(args, "L1000N1800", "HYDRO_FIDUCIAL", 0)
@@ -114,56 +209,114 @@ def plot_resolution(ax, ax_ratio, args):
     ax.plot(theta, mean, color="#332288", label=r"L2p8\_m9")
     ax.fill_between(theta, lo, hi, color="#332288", alpha=0.25, linewidth=0)
 
+    # ratios, shift = plot_shifted_ratios(ax_ratio=ax_ratio, theta=theta, profiles=[tau_fid, tau_hires, mean], reference=tau_fid, colors=["#117733", "#CC6677", "#332288"], shift_padding=args.shift_padding)
+
+    # print(f"resolution: shifted ratio offset = {shift:.6e}")
+
+    # shifted_reference = tau_fid + shift
+
+    # lo_ratio = (lo + shift) / shifted_reference
+    # hi_ratio = (hi + shift) / shifted_reference
+
+    # envelope_lower = np.minimum(lo_ratio, hi_ratio)
+    # envelope_upper = np.maximum(lo_ratio, hi_ratio)
+    # envelope_valid = (np.isfinite(envelope_lower) & np.isfinite(envelope_upper) & (shifted_reference > 0.0))
+
+    # ax_ratio.fill_between(theta, envelope_lower, envelope_upper, where=envelope_valid, color="#332288", alpha=0.25, linewidth=0)
+
+
     ax_ratio.axhline(0.0, color="k", linestyle="--", linewidth=0.8, alpha=0.7)
 
-    fid_difference = stable_fractional_difference(tau_fid, tau_fid, args.ratio_threshold)
-    hires_difference = stable_fractional_difference(tau_hires, tau_fid, args.ratio_threshold)
-    mean_difference = stable_fractional_difference(mean, tau_fid, args.ratio_threshold)
-    lo_difference = stable_fractional_difference(lo, tau_fid, args.ratio_threshold)
-    hi_difference = stable_fractional_difference(hi, tau_fid, args.ratio_threshold)
+    ax_ratio.plot(theta, (tau_fid - tau_fid), color="#117733")
+    ax_ratio.plot(theta, (tau_hires - tau_fid), color="#CC6677")
+    ax_ratio.plot(theta, (mean - tau_fid), color="#332288")
+    ax_ratio.fill_between(theta, (lo - tau_fid), (hi - tau_fid), color="#332288", alpha=0.25, linewidth=0)
 
-    ax_ratio.plot(theta, fid_difference, color="#117733")
-    ax_ratio.plot(theta, hires_difference, color="#CC6677")
-    ax_ratio.plot(theta, mean_difference, color="#332288")
-    ax_ratio.fill_between(theta, lo_difference, hi_difference, where=(np.isfinite(lo_difference) & np.isfinite(hi_difference)), 
-                          color="#332288", alpha=0.25, linewidth=0)
+
+    # fid_difference = stable_fractional_difference(tau_fid, tau_fid, args.ratio_threshold)
+    # hires_difference = stable_fractional_difference(tau_hires, tau_fid, args.ratio_threshold)
+    # mean_difference = stable_fractional_difference(mean, tau_fid, args.ratio_threshold)
+    # lo_difference = stable_fractional_difference(lo, tau_fid, args.ratio_threshold)
+    # hi_difference = stable_fractional_difference(hi, tau_fid, args.ratio_threshold)
+
+    # ax_ratio.plot(theta, fid_difference, color="#117733")
+    # ax_ratio.plot(theta, hires_difference, color="#CC6677")
+    # ax_ratio.plot(theta, mean_difference, color="#332288")
+    # ax_ratio.fill_between(theta, lo_difference, hi_difference, where=(np.isfinite(lo_difference) & np.isfinite(hi_difference)), 
+    #                       color="#332288", alpha=0.25, linewidth=0)
     
     return fid
+
+
+# Use for stable fractional difference
+
+# def plot_standard_group(ax, ax_ratio, args, group_key):
+#     group = GROUPS[group_key]
+#     profiles = []
+
+#     for sim, name, color in zip(
+#         group["sims"],
+#         group["names"],
+#         group["colors"],
+#     ):
+#         profile = load_named_profile(args, group["box"], sim, 0)
+#         profiles.append((profile, name, color))
+
+#     # Use the first profile in each group as the reference.
+#     reference = profiles[0][0]
+#     theta_ref = reference["theta"]
+#     tau_ref = reference["tau"]
+
+#     ax_ratio.axhline(0.0, color="k", linestyle="--", linewidth=0.8, alpha=0.7)
+
+#     for profile, name, color in profiles:
+#         tau = put_on_reference_grid(
+#             theta_ref,
+#             profile["theta"],
+#             profile["tau"],
+#         )
+
+#         ax.plot(theta_ref, tau, color=color, label=name, alpha=0.9)
+
+#         difference = stable_fractional_difference(tau, tau_ref, args.ratio_threshold)
+#         ax_ratio.plot(theta_ref, difference, color=color, alpha=0.9)
+        
+#     return reference
 
 def plot_standard_group(ax, ax_ratio, args, group_key):
     group = GROUPS[group_key]
     profiles = []
 
-    for sim, name, color in zip(
-        group["sims"],
-        group["names"],
-        group["colors"],
-    ):
+    for sim, name, color in zip(group["sims"], group["names"], group["colors"]):
         profile = load_named_profile(args, group["box"], sim, 0)
         profiles.append((profile, name, color))
 
-    # Use the first profile in each group as the reference.
     reference = profiles[0][0]
     theta_ref = reference["theta"]
     tau_ref = reference["tau"]
 
-    ax_ratio.axhline(0.0, color="k", linestyle="--", linewidth=0.8, alpha=0.7)
+    tau_profiles = []
+    colors = []
 
     for profile, name, color in profiles:
-        tau = put_on_reference_grid(
-            theta_ref,
-            profile["theta"],
-            profile["tau"],
-        )
+        tau = put_on_reference_grid(theta_ref, profile["theta"], profile["tau"])
 
         ax.plot(theta_ref, tau, color=color, label=name, alpha=0.9)
 
-        difference = stable_fractional_difference(tau, tau_ref, args.ratio_threshold)
-        ax_ratio.plot(theta_ref, difference, color=color, alpha=0.9)
-        
+        tau_profiles.append(tau)
+        colors.append(color)
+
+        ax_ratio.plot(theta_ref, (tau - tau_ref), color=color, label=name, alpha=0.9)
+        # print(name, tau, tau_ref, tau - tau_ref)  
+
+    # ratios, shift = plot_shifted_ratios(ax_ratio=ax_ratio, theta=theta_ref, profiles=tau_profiles, reference=tau_ref, colors=colors, shift_padding=args.shift_padding)
+
+    # print(f"{group_key}: shifted ratio offset = {shift:.6e}")
+
     return reference
 
-def configure_axis(ax, title, args, show_ylabel=True):
+
+def configure_axis(ax, ax_ratio, args, show_ylabel=True):
     ax.axhline(0.0, color="k", linewidth=0.8, alpha=0.7)
     ax.set_xlim(args.xmin, args.xmax)
     if args.ymin is not None or args.ymax is not None:
@@ -178,7 +331,10 @@ def configure_axis(ax, title, args, show_ylabel=True):
     formatter.set_powerlimits((-4, -4))
     ax.yaxis.set_major_formatter(formatter)
     ax.ticklabel_format(axis="y", style="sci", scilimits=(-4, -4))
+    ax_ratio.yaxis.set_major_formatter(formatter)
+    ax_ratio.ticklabel_format(axis="y", style="sci", scilimits=(-4, -4))
     ax.legend(fontsize=7, loc="best", frameon=False, title=f"{args.sample} sample")
+
 
 def add_distance_axis(ax, theta, distance, show_label=True, show_ticklabels=True):
     if distance is None or len(distance) != len(theta):
@@ -198,6 +354,7 @@ def add_distance_axis(ax, theta, distance, show_label=True, show_ticklabels=True
         sec.tick_params(axis="x", which="both", top=False, labeltop=False)
 
     return sec
+
 
 def make_overview(args):
     fig, axes = plt.subplots(4, 2, figsize=(10, 9.0), sharex="col", gridspec_kw={"height_ratios": [3.0, 1.0, 3.0, 1.0], "hspace": 0.10, "wspace": 0.08})
@@ -228,7 +385,7 @@ def make_overview(args):
         shared_ymax += y_padding
 
     for key, ax in panel_map.items():
-        configure_axis(ax, GROUPS[key]["title"], args, show_ylabel=key in ("resolution", "agn_feedback"))
+        configure_axis(ax, ratio_map[key], args, show_ylabel=key in ("resolution", "agn_feedback"))
         ax.set_ylim(shared_ymin, shared_ymax)
         if args.distance_axis:
             is_top_panel = key in ("resolution", "cosmology")
@@ -248,8 +405,10 @@ def make_overview(args):
     for key, ax_ratio in ratio_map.items():
         ax_ratio.set_xlim(args.xmin, args.xmax)
         ax_ratio.set_ylim(args.ratio_ymin, args.ratio_ymax)
-        ax_ratio.set_ylabel(r"$\Delta\tau/\max|\tau_{\rm fid}|$")
-        # ax_ratio.set_ylabel(r"$2(\tau-\tau_{\rm fid})/(|\tau|+|\tau_{\rm fid}|)$")
+        ax_ratio.set_ylabel(r"$\tau - \tau_{\rm fid}$") # For difference
+        # ax_ratio.set_ylabel(r"$(\tau+s)/(\tau_{\rm fid}+s)$") # For shifted ratio
+        # ax_ratio.set_ylabel(r"$\Delta\tau/\max|\tau_{\rm fid}|$") # For stable fractional difference
+        # ax_ratio.set_ylabel(r"$2(\tau-\tau_{\rm fid})/(|\tau|+|\tau_{\rm fid}|)$") # For symmetric rato
         ax_ratio.grid(alpha=0.25)
 
     ratio_map["cosmology"].tick_params(axis="y", labelleft=False)
@@ -268,6 +427,7 @@ def make_overview(args):
     plt.close(fig)
     print(f"Saved {output}")
 
+
 def main():
     parser = argparse.ArgumentParser(description="Create a four-panel overview of mock-catalogue tau profiles.")
     parser.add_argument("sample", choices=["Blue", "Green"])
@@ -282,13 +442,15 @@ def main():
     parser.add_argument("--xmax", type=float, default=11.0)
     parser.add_argument("--ymin", type=float, default=None)
     parser.add_argument("--ymax", type=float, default=None)
-    parser.add_argument("--ratio-ymin", type=float, default=-0.7)
-    parser.add_argument("--ratio-ymax", type=float, default=0.7)
+    parser.add_argument("--ratio-ymin", type=float, default=0.1)
+    parser.add_argument("--ratio-ymax", type=float, default=1.9)
     parser.add_argument("--ratio-threshold", type=float, default=1e-24, help=("Do not calculate ratios where the absolute reference tau profile is below this value."))
+    parser.add_argument("--shift-padding", type=float, default=0.05, help=("Extra positive offset, expressed as a fraction of the full profile amplitude range, used when calculating shifted profile ratios."))
     parser.add_argument("--file", choices=["png", "pdf"], default="png")
     parser.add_argument("--dpi", type=int, default=400)
     parser.add_argument("--output-dir", default="./Plots")
     make_overview(parser.parse_args())
+
 
 if __name__ == "__main__":
     main()

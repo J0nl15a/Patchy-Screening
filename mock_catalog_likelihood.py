@@ -20,7 +20,7 @@ import importlib.util
 # spec.loader.exec_module(module)
 
 
-def log_likelihood(theta, f_obs, f_obs_err, box, isim, iz, lightcone=0, abundance_cut=0.05, 
+def log_likelihood(theta, f_obs, f_obs_err, box, isim, iz, lightcone=0, abundance_cut=0.5, 
                    amp_min=10.3, amp_max=11.3, amp_step=0.1, slope_min=0.0, slope_max=1.0, slope_step=0.1, ell_1000_mask=None):
     amp, slope = theta
     # print(theta)
@@ -51,7 +51,7 @@ def log_likelihood_mock_catalogue(theta, f_obs, f_obs_err, box, isim, iz, lightc
     return -0.5 * (chi_sq_auto + chi_sq_cross)
 
 # def log_prior(theta, plateau_point, m, c):
-def log_prior(theta, plateau_point, c, vertical_limit, box, isim, iz, lightcone=0, abundance_cut=0.05,
+def log_prior(theta, plateau_point, c, vertical_limit, box, isim, iz, lightcone=0, abundance_cut=0.5,
               amp_min=10.3, amp_max=11.3, amp_step=0.1, slope_min=0.0, slope_max=1.0, slope_step=0.1):
     amp, slope = theta
     if iz == 'Blue':
@@ -64,7 +64,7 @@ def log_prior(theta, plateau_point, c, vertical_limit, box, isim, iz, lightcone=
     # elif plateau_point < amp <= vertical_limit and slope_min <= slope <= (-1 * amp + c):
     #     return 0.0
     if amp_min <= amp <= amp_max and slope_min <= slope <= slope_max:
-        predicted_nbar = emulator(theta, 'abundance', box, isim, iz, load=True, lightcone=lightcone, abundance_cut=0.0,
+        predicted_nbar = emulator(theta, 'abundance', box, isim, iz, load=True, lightcone=lightcone, abundance_cut=0.5,
                                  amp_min=amp_min, amp_max=amp_max, amp_step=amp_step, slope_min=slope_min, slope_max=slope_max, slope_step=slope_step)
         if predicted_nbar >= (obs_nbar_full_sky * abundance_cut):
             return 0.0
@@ -73,7 +73,7 @@ def log_prior(theta, plateau_point, c, vertical_limit, box, isim, iz, lightcone=
     else:
         return -np.inf
 
-def log_probability(theta, f_obs, f_obs_err, box, isim, iz, plateau_point, c, vertical_limit, lightcone=0, abundance_cut=0.05,
+def log_probability(theta, f_obs, f_obs_err, box, isim, iz, plateau_point, c, vertical_limit, lightcone=0, abundance_cut=0.5,
                     amp_min=10.3, amp_max=11.3, amp_step=0.1, slope_min=0.0, slope_max=1.0, slope_step=0.1, ell_1000_mask=None):
     lp = log_prior(theta, plateau_point, c, vertical_limit, box, isim, iz, lightcone=lightcone, abundance_cut=abundance_cut,
                    amp_min=amp_min, amp_max=amp_max, amp_step=amp_step, slope_min=slope_min, slope_max=slope_max, slope_step=slope_step)
@@ -82,7 +82,7 @@ def log_probability(theta, f_obs, f_obs_err, box, isim, iz, plateau_point, c, ve
     return lp + log_likelihood(theta, f_obs, f_obs_err, box, isim, iz, lightcone=lightcone, abundance_cut=abundance_cut,
                                 amp_min=amp_min, amp_max=amp_max, amp_step=amp_step, slope_min=slope_min, slope_max=slope_max, slope_step=slope_step, ell_1000_mask=ell_1000_mask)
 
-def multiprocess(f_obs, f_obs_err, box, isim, iz, plateau_point, c, vertical_limit, lightcone=0, abundance_cut=0.05,
+def multiprocess(f_obs, f_obs_err, box, isim, iz, plateau_point, c, vertical_limit, lightcone=0, abundance_cut=0.5,
                  amp_min=10.3, amp_max=11.3, amp_step=0.1, slope_min=0.0, slope_max=1.0, slope_step=0.1, ell_1000_mask=None): #, backend):
 
     with multiprocessing.get_context("spawn").Pool() as pool:
@@ -343,8 +343,8 @@ if __name__ == '__main__':
         pb.clf()
 
     # Save MCMC chain
-    np.save(f"./data_files/mcmc_chains/flat_samples_{box}_{isim}_{iz}_lightcone{lightcone}.npy", flat_samples)
-    quit()
+    # np.save(f"./data_files/mcmc_chains/flat_samples_{box}_{isim}_{iz}_lightcone{lightcone}.npy", flat_samples)
+    # quit()
 
     # write to text file in a known place
     path = f"./data_files/mle_parameters/{box}/{isim}/{iz}/lightcone{lightcone}/mle_values.txt"
@@ -391,6 +391,8 @@ if __name__ == '__main__':
 
     # print(f"[INFO] Wrote MLEs to {outfile}")
 
+    # mle_amp = 10.909
+    # mle_slope = 0.335
     x = np.array((mle_amp, mle_slope))
     f_sim_auto = emulator(x, 'auto', box, isim, iz, load=True, lightcone=lightcone) 
     f_sim_cross = emulator(x, 'cross', box, isim, iz, load=True, lightcone=lightcone) 

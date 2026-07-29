@@ -61,9 +61,9 @@ class patchyScreening:
         self.theta_d = theta_d
         self.nside = nside
 
-        if self.boxname == 'L2800N5040' and self.nside > 4096:
-            self.nside = 4096
-            print("Setting nside to 4096 for L2800N5040.")
+        # if self.boxname == 'L2800N5040' and self.nside > 4096:
+        #     self.nside = 4096
+        #     print("Setting nside to 4096 for L2800N5040.")
 
         self.pix_res = hp.pixelfunc.nside2resol(nside, arcmin=True)
         self.npix_cutout = int(20.0/self.pix_res)
@@ -233,13 +233,16 @@ class patchyScreening:
         if self.lightcone_method[0] == 'SHELL':
             if self.boxname == 'L1000N1800' and self.lightcone == 0:
                 map_dir = 'neutrino_corrected_maps'
+                machine = 'cosma8'
             elif self.boxname == 'L2800N5040' and self.simname == 'HYDRO_FIDUCIAL':
-                map_dir = 'neutrino_corrected_maps_downsampled_4096'
+                # map_dir = 'neutrino_corrected_maps_downsampled_4096'
+                map_dir = 'neutrino_corrected_maps'
+                machine = 'cosma6'
             else:
                 print("Lightcone map not available for this box/simulation combination.")
                 sys.exit()
             
-            # map_lightcone = f'/cosma8/data/dp004/flamingo/Runs/{self.boxname}/{self.simname}/{map_dir}/lightcone{self.lightcone}_shells/shell_{self.z_sample}/lightcone{self.lightcone}.shell_{self.z_sample}.0.hdf5'
+            # map_lightcone = f'/{machine}/data/dp004/flamingo/Runs/{self.boxname}/{self.simname}/{map_dir}/lightcone{self.lightcone}_shells/shell_{self.z_sample}/lightcone{self.lightcone}.shell_{self.z_sample}.0.hdf5'
             # g = h5py.File(map_lightcone,'r')
             # conversion_factor = g['DM'].attrs['Conversion factor to CGS (not including cosmological corrections)']
             # tau = g['DM'][...] * conversion_factor * 6.6524587321e-25 #6.65246e-25 = Thomson cross-section (in cgs)
@@ -261,14 +264,14 @@ class patchyScreening:
                 plt.savefig(f'./Plots/tau_map_{self.boxname}_{self.simname}_{self.z_sample_name}_shell_{self.z_sample}.png', dpi=400)
                 plt.clf()
 
-            # map_lightcone_lower = f'/cosma8/data/dp004/flamingo/Runs/{self.boxname}/{self.simname}/{map_dir}/lightcone{self.lightcone}_shells/shell_{self.z_sample-1}/lightcone{self.lightcone}.shell_{self.z_sample-1}.0.hdf5'
+            # map_lightcone_lower = f'/{machine}/data/dp004/flamingo/Runs/{self.boxname}/{self.simname}/{map_dir}/lightcone{self.lightcone}_shells/shell_{self.z_sample-1}/lightcone{self.lightcone}.shell_{self.z_sample-1}.0.hdf5'
             # g_low = h5py.File(map_lightcone_lower,'r')
             # conversion_factor = g_low['DM'].attrs['Conversion factor to CGS (not including cosmological corrections)']
             # tau_low = g_low['DM'][...] * conversion_factor * 6.6524587321e-25
             # redshift_low = g_low['DM'].attrs['Central redshift assumed for correction']
             # tau_low *= (1+redshift_low)
 
-            # map_lightcone_higher = f'/cosma8/data/dp004/flamingo/Runs/{self.boxname}/{self.simname}/{map_dir}/lightcone{self.lightcone}_shells/shell_{self.z_sample+1}/lightcone{self.lightcone}.shell_{self.z_sample+1}.0.hdf5'
+            # map_lightcone_higher = f'/{machine}/data/dp004/flamingo/Runs/{self.boxname}/{self.simname}/{map_dir}/lightcone{self.lightcone}_shells/shell_{self.z_sample+1}/lightcone{self.lightcone}.shell_{self.z_sample+1}.0.hdf5'
             # g_high = h5py.File(map_lightcone_higher,'r')
             # conversion_factor = g_high['DM'].attrs['Conversion factor to CGS (not including cosmological corrections)']
             # tau_high = g_high['DM'][...] * conversion_factor * 6.6524587321e-25

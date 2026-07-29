@@ -7,8 +7,13 @@ sample_redshift_shell = {'Blue':11, 'Green':21, 'Red':29}
 
 def read_one_shell(i, box, sim, lightcone, map_dir, scale_factor):
 
+    if box == 'L1000N1800' or 'L1000N3600':
+        machine = 'cosma8'
+    elif box == 'L2800N5040':
+        machine = 'cosma6'
+
     map_lightcone = (
-        f'/cosma8/data/dp004/flamingo/Runs/{box}/{sim}/{map_dir}/'
+        f'/{machine}/data/dp004/flamingo/Runs/{box}/{sim}/{map_dir}/'
         f'lightcone{lightcone}_shells/shell_{i}/'
         f'lightcone{lightcone}.shell_{i}.0.hdf5'
     )

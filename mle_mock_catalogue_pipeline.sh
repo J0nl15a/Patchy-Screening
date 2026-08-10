@@ -156,8 +156,8 @@ echo "=== Step 8 (Job ID \$SLURM_JOB_ID) starting"
 echo "    Received arguments: ncpu='\$SLURM_CPUS_PER_TASK', Box='${BOX}', Sim='${ISIM}', Lightcone='${LIGHTCONE}', Sample='${IZ}'"
 echo "=============================="
 
-python3 mock_catalog_likelihood_parallel.py \
-    "\$SLURM_CPUS_PER_TASK" "${BOX}" "${ISIM}" "${IZ}" "${LIGHTCONE}" "${ABUNDANCE_CUT}" \
+python3 mock_catalogue_likelihood_pipeline.py \
+    "${BOX}" "${ISIM}" "${IZ}" "${LIGHTCONE}" "${ABUNDANCE_CUT}" \
     "${AMP_MIN}" "${AMP_MAX}" "${AMP_STEP}" \
     "${SLOPE_MIN}" "${SLOPE_MAX}" "${SLOPE_STEP}"
 
@@ -353,7 +353,7 @@ echo "=============================="
 if [ -f "./data_files/dndz_samples/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}/dndz_galaxies_sampled_${mle_amp//./p}_${mle_slope//./p}.txt" ]; then
     echo "Found matched catalogs — skipping unWISE_data_matching.py"
 else
-    python3 unWISE_data_matching.py "$BOX" "$ISIM" "$IZ" "$mle_amp" "$mle_slope" ntotal "$LIGHTCONE"
+    python3 unWISE_data_matching_improved.py "$BOX" "$ISIM" "$IZ" "$mle_amp" "$mle_slope" ntotal True "$LIGHTCONE"
 fi
 
 echo "Job 12: Match FLAMINGO halo catalogs to unWISE dN/dz for box $BOX, sim $ISIM, lightcone $LIGHTCONE, $IZ sample for MLE values only."

@@ -231,7 +231,7 @@ done
 
 if [ "$all_found_lightcones" = true ] &&
    [ "$all_found_dndz" = true ]; then
-        echo "Found matched catalog for — skipping unWISE_data_matching.py"
+        echo "Found matched catalog for — skipping unWISE_data_matching_improved.py"
 else
   jid3=$(sbatch --parsable \
                 --export=ALL,BOX="${BOX}",ISIM="${ISIM}",IZ="${IZ}",LIGHTCONE="${LIGHTCONE}",AMP_MIN="${AMP_MIN}",AMP_MAX="${AMP_MAX}",AMP_STEP="${AMP_STEP}",SLOPE_MIN="${SLOPE_MIN}",SLOPE_MAX="${SLOPE_MAX}",SLOPE_STEP="${SLOPE_STEP}",NSHELL="${NSHELL}",PREV_ARRAY_ID="${jid2}",all_found_lightcones="${all_found_lightcones}",all_found_dndz="${all_found_dndz}" \
@@ -287,7 +287,7 @@ echo "    Received arguments: Box='${BOX}', Sim='${ISIM}', Lightcone='${LIGHTCON
 echo "=============================="
 
 if [ "${all_found_dndz}" = true ]; then
-    echo "Found matched catalogs — skipping unWISE_data_matching.py"
+    echo "Found matched catalogs — skipping unWISE_data_matching_improved.py"
 else
     for amp in \$(seq "${AMP_MIN}" "${AMP_STEP}" "${AMP_MAX}"); do
       for slope in \$(seq "${SLOPE_MIN}" "${SLOPE_STEP}" "${SLOPE_MAX}"); do
@@ -296,7 +296,7 @@ else
         amp_name=\${amp_fmt//./p}
         slope_name=\${slope_fmt//./p}
 
-        python3 unWISE_data_matching.py "${BOX}" "${ISIM}" "${IZ}" "\$amp_fmt" "\$slope_fmt" ntotal "${LIGHTCONE}"
+        python3 unWISE_data_matching_improved.py "${BOX}" "${ISIM}" "${IZ}" "\$amp_fmt" "\$slope_fmt" ntotal False "${LIGHTCONE}"
       done
     done
 fi
@@ -570,10 +570,10 @@ jid8=$(sbatch --parsable \
             --dependency=afterok:${jid7} \
             --kill-on-invalid-dep=yes \
             --job-name=mock_catalog_maximum_likelihood_estimation \
-            -c 16 \
+            -c 1 \
             -p cosma8 \
             -A dp004 \
-            -t 01:00:00 \
+            -t 1:00:00 \
             -o "./batch_files/maximum_likelihood_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}/job.%j.dump" \
             -e "./batch_files/maximum_likelihood_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}/job.%j.err" \
 <<EOF
@@ -597,8 +597,8 @@ echo "=== Step 8 (Job ID \$SLURM_JOB_ID) starting"
 echo "    Received arguments: ncpu='\$SLURM_CPUS_PER_TASK', Box='${BOX}', Sim='${ISIM}', Lightcone='${LIGHTCONE}', Sample='${IZ}'"
 echo "=============================="
 
-python3 mock_catalog_likelihood_parallel.py \
-    "\$SLURM_CPUS_PER_TASK" "${BOX}" "${ISIM}" "${IZ}" "${LIGHTCONE}" "${ABUNDANCE_CUT}" \
+python3 mock_catalogue_likelihood_pipeline.py \
+    "${BOX}" "${ISIM}" "${IZ}" "${LIGHTCONE}" "${ABUNDANCE_CUT}" \
     "${AMP_MIN}" "${AMP_MAX}" "${AMP_STEP}" \
     "${SLOPE_MIN}" "${SLOPE_MAX}" "${SLOPE_STEP}"
 
@@ -786,9 +786,9 @@ echo "    Received arguments: Box='$BOX', Sim='$ISIM', Lightcone='$LIGHTCONE', S
 echo "=============================="
 
 if [ -f "./data_files/dndz_samples/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}/dndz_galaxies_sampled_${mle_amp//./p}_${mle_slope//./p}.txt" ]; then
-    echo "Found matched catalogs — skipping unWISE_data_matching.py"
+    echo "Found matched catalogs — skipping unWISE_data_matching_improved.py"
 else
-    python3 unWISE_data_matching.py "$BOX" "$ISIM" "$IZ" "$mle_amp" "$mle_slope" ntotal "$LIGHTCONE"
+    python3 unWISE_data_matching_improved.py "$BOX" "$ISIM" "$IZ" "$mle_amp" "$mle_slope" ntotal True "$LIGHTCONE"
 fi
 
 echo "Job 12: Match FLAMINGO halo catalogs to unWISE dN/dz for box $BOX, sim $ISIM, lightcone $LIGHTCONE, $IZ sample for MLE values only."

@@ -35,22 +35,18 @@ NSLOPE=$(seq "$SLOPE_MIN" "$SLOPE_STEP" "$SLOPE_MAX" | wc -l)
 NGRID=$(( NAMP * NSLOPE ))
 
 if [ -d "./batch_files/caching_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}" ] && \
-   [ -d "./batch_files/pipeline_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}" ] && \
-   [ -d "./batch_files/maximum_likelihood_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}" ]; then
+   [ -d "./batch_files/pipeline_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}" ]; then
     echo "Directory exists."
 else
     echo "Directory does not exist."
     mkdir -p "./batch_files/caching_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}"
     mkdir -p "./batch_files/pipeline_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}"
-    mkdir -p "./batch_files/maximum_likelihood_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}"
 fi
 
 rm ./batch_files/caching_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}/job.*.dump || true
 rm ./batch_files/caching_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}/job.*.err || true
 rm ./batch_files/pipeline_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}/job.*.dump || true
 rm ./batch_files/pipeline_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}/job.*.err || true
-rm ./batch_files/maximum_likelihood_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}/job.*.dump || true
-rm ./batch_files/maximum_likelihood_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}/job.*.err || true
 
 USE_DIRECT_PARAMS=false
 if [ -n "$CLI_AMP" ] && [ -n "$CLI_SLOPE" ]; then
@@ -297,7 +293,7 @@ echo "=== Step 12 (Job ID $SLURM_JOB_ID) starting"
 echo "    Received arguments: Box='$BOX', Sim='$ISIM', Lightcone='$LIGHTCONE', Sample='$IZ', nsamp='ntotal'"
 echo "=============================="
 
-python3 unWISE_data_matching.py "$BOX" "$ISIM" "$IZ" "$mle_amp" "$mle_slope" ntotal "$LIGHTCONE"
+python3 unWISE_data_matching_improved.py "$BOX" "$ISIM" "$IZ" "$mle_amp" "$mle_slope" ntotal True "$LIGHTCONE"
 
 echo "Job 12: Match FLAMINGO halo catalogs to unWISE dN/dz for box $BOX, sim $ISIM, lightcone $LIGHTCONE, $IZ sample for MLE values only."
 

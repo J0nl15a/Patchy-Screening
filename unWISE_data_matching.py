@@ -5,7 +5,13 @@ import re, math, textwrap
 from io import StringIO
 from pathlib import Path
 
-def unWISE_data_matching(boxname, simname, z_sample, mass_cut, n_cut, nsamp='ntotal', plot=False, lightcone=0):
+def name_float(x, mle=False):
+    if mle:
+        return f"{float(x):.3f}".replace(".", "p")
+    else:
+        return f"{float(x):.1f}".replace(".", "p")
+
+def unWISE_data_matching(boxname, simname, z_sample, mass_cut, n_cut, nsamp='ntotal', mle=False, plot=False, lightcone=0):
     box_list = ['L1000N1800', 'L2800N5040']
     sim_list = ['HYDRO_FIDUCIAL','HYDRO_PLANCK','HYDRO_PLANCK_LARGE_NU_FIXED','HYDRO_PLANCK_LARGE_NU_VARY','HYDRO_STRONG_AGN','HYDRO_WEAK_AGN','HYDRO_LOW_SIGMA8','HYDRO_STRONGER_AGN','HYDRO_JETS_published','HYDRO_STRONGEST_AGN','HYDRO_STRONG_SUPERNOVA','HYDRO_STRONGER_AGN_STRONG_SUPERNOVA','HYDRO_STRONG_JETS']
 
@@ -24,15 +30,14 @@ def unWISE_data_matching(boxname, simname, z_sample, mass_cut, n_cut, nsamp='nto
     z_sample = str(z_sample)
 
     if round(float(mass_cut), 1) == float(mass_cut):
-        im_name = f"{float(mass_cut):.1f}".replace('.', 'p')
+        im_name = name_float(mass_cut, mle=mle)
     else:
-        im_name = f"{float(mass_cut):.3f}".replace('.', 'p')
+        im_name = name_float(mass_cut, mle=mle)
+
     if round(float(n_cut), 1) == float(n_cut):
-        slope_name = f"{float(n_cut):.1f}".replace('.', 'p')
+        slope_name = name_float(n_cut, mle=mle)
     else:
-        slope_name = f"{float(n_cut):.3f}".replace('.', 'p')
-    if float(n_cut) < 0.0:
-        slope_name = f"{slope_name}".replace('-', 'minus')
+        slope_name = name_float(n_cut, mle=mle)
 
     try:
         nsamp = int(nsamp)
@@ -162,7 +167,7 @@ def unWISE_data_matching(boxname, simname, z_sample, mass_cut, n_cut, nsamp='nto
         pb.savefig(f'./Plots/unWISE_dndz_match_{boxname}_{simname}_{z_sample}_{im_name}_{slope_name}_ratio.png', dpi=400)
         pb.clf()
 
-    write_sampled_galaxies_file(outfile_name, FLAMINGO_mid_point, galaxies_required, nsamp)
+    total_sampled = write_sampled_galaxies_file(outfile_name, FLAMINGO_mid_point, galaxies_required)
 
     return
 
@@ -185,15 +190,33 @@ def validate_required_vs_available(galaxies_required, available_counts):
     diff = galaxies_required - available_counts
     return diff 
 
-def write_sampled_galaxies_file(outfile_name, FLAMINGO_mid_point, galaxies_required, nsamp):
-    with open(outfile_name, 'w') as outfile:
-        outfile.write(f"#Total number of sampled galaxies: {int(round(nsamp))}\n")
-        for i in range(len(FLAMINGO_mid_point)):
-            zmid = FLAMINGO_mid_point[i]
-            n_gals = int(round(galaxies_required[i]))
+# def write_sampled_galaxies_file(outfile_name, FLAMINGO_mid_point, galaxies_required, nsamp):
+#     with open(outfile_name, 'w') as outfile:
+#         outfile.write(f"#Total number of sampled galaxies: {int(round(nsamp))}\n")
+#         for i in range(len(FLAMINGO_mid_point)):
+#             zmid = FLAMINGO_mid_point[i]
+#             n_gals = int(round(galaxies_required[i]))
+#             outfile.write(f"{zmid} {n_gals}\n")
+#     print(f"Wrote file: {outfile_name}")
+#     return
+
+def write_sampled_galaxies_file(outfile_name, FLAMINGO_mid_point, galaxies_required):
+
+    sampled_per_shell = np.rint(galaxies_required).astype(int)
+
+    total_sampled = np.sum(sampled_per_shell)
+
+    with open(outfile_name, "w") as outfile:
+
+        outfile.write(f"#Total number of sampled galaxies: {total_sampled}\n")
+
+        for zmid, n_gals in zip(FLAMINGO_mid_point, sampled_per_shell):
             outfile.write(f"{zmid} {n_gals}\n")
+
+    print(f"Total actually sampled: {total_sampled}")
     print(f"Wrote file: {outfile_name}")
-    return
+
+    return total_sampled
 
 def rescale_dndz(difference, halo_lightcones, galaxies_required, nsamp, FLAMINGO_mid_point, count, galaxy_sample):
     count+=1
@@ -255,9 +278,9 @@ if __name__ == '__main__':
 
     plot=False
     try:
-        unWISE_data_matching(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6], plot=plot, lightcone=sys.argv[7])
+        unWISE_data_matching(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6], mle=sys.argv[7], plot=plot, lightcone=sys.argv[8])
     except IndexError:
-        unWISE_data_matching(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], plot=plot, lightcone=sys.argv[6])
+        unWISE_data_matching(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], mle=sys.argv[6], plot=plot, lightcone=sys.argv[7])
 
     if plot==True:
         dndz_blue_match = np.loadtxt(f"/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/unWISExLens_lklh/data/v1.0/aux_data/dndz/unWISE_blue_xmatch_dndz.txt", usecols=(0,1))

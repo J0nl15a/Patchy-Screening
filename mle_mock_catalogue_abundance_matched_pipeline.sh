@@ -162,7 +162,7 @@ echo "=============================="
 if [ -f "./data_files/z_dependant_stellar_cuts/${BOX}/${IZ}/z_stellar_cut_data_${mle_amp//./p}_${mle_slope//./p}.txt" ]; then
     echo "Found stellar cut data for MLE values — skipping FLAMINGO_halo_lightcones_shell.py"
 else
-    python3 stellar_cut_z.py "$SLURM_CPUS_PER_TASK" "$BOX" "$ISIM" "$IZ" "$mle_amp" "$mle_slope" "$LIGHTCONE" True
+    python3 stellar_cut_z.py "$SLURM_CPUS_PER_TASK" "$BOX" "$ISIM" "$IZ" "$mle_amp" "$mle_slope" "$LIGHTCONE" False
 fi
 
 echo "Job 9: Compute z-dependant stellar cut values for box $BOX, $IZ sample for MLE values only."
@@ -293,7 +293,7 @@ echo "=== Step 12 (Job ID $SLURM_JOB_ID) starting"
 echo "    Received arguments: Box='$BOX', Sim='$ISIM', Lightcone='$LIGHTCONE', Sample='$IZ', nsamp='ntotal'"
 echo "=============================="
 
-python3 unWISE_data_matching_improved.py "$BOX" "$ISIM" "$IZ" "$mle_amp" "$mle_slope" ntotal True "$LIGHTCONE"
+python3 unWISE_data_matching_improved.py "$BOX" "$ISIM" "$IZ" "$mle_amp" "$mle_slope" ntotal False "$LIGHTCONE"
 
 echo "Job 12: Match FLAMINGO halo catalogs to unWISE dN/dz for box $BOX, sim $ISIM, lightcone $LIGHTCONE, $IZ sample for MLE values only."
 

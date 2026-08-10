@@ -1,6 +1,6 @@
 from pathlib import Path
 import numpy as np, pylab as pb
-from mock_catalog_emulator import emulator
+from mock_catalogue_emulator_improved import emulator
 import emcee
 from scipy.optimize import minimize
 import os, sys
@@ -21,24 +21,111 @@ import importlib.util
 
 
 def log_likelihood(theta, f_obs, f_obs_err, box, isim, iz, lightcone=0, abundance_cut=0.5, 
-                   amp_min=10.3, amp_max=11.3, amp_step=0.1, slope_min=0.0, slope_max=1.0, slope_step=0.1, ell_1000_mask=None):
+                   amp_min=10.3, amp_max=11.3, amp_step=0.1, slope_min=0.0, slope_max=1.0, slope_step=0.1):
+    
     amp, slope = theta
     # print(theta)
     # print(amp, slope)
     x = np.array((amp, slope))
     # print(x)
-    f_sim_auto = emulator(x, 'auto', box, isim, iz, load=True, lightcone=lightcone, abundance_cut=abundance_cut,
-                           amp_min=amp_min, amp_max=amp_max, amp_step=amp_step, slope_min=slope_min, slope_max=slope_max, slope_step=slope_step) #module.emulator(x, 'auto', box, isim, iz, load=True)
-    f_sim_cross = emulator(x, 'cross', box, isim, iz, load=True, lightcone=lightcone, abundance_cut=abundance_cut,
-                            amp_min=amp_min, amp_max=amp_max, amp_step=amp_step, slope_min=slope_min, slope_max=slope_max, slope_step=slope_step) #module.emulator(x, 'cross', box, isim, iz, load=True)
+
+    f_sim_auto, _, f_sim_var_auto, f_sim_std_auto = emulator(x, 'auto', box, isim, iz, load=True, lightcone=lightcone, 
+                                                             abundance_cut=abundance_cut, amp_min=amp_min, amp_max=amp_max, amp_step=amp_step, 
+                                                             slope_min=slope_min, slope_max=slope_max, slope_step=slope_step) #module.emulator(x, 'auto', box, isim, iz, load=True)
+    f_sim_cross, _, f_sim_var_cross, f_sim_std_cross = emulator(x, 'cross', box, isim, iz, load=True, lightcone=lightcone, 
+                                                                abundance_cut=abundance_cut, amp_min=amp_min, amp_max=amp_max, amp_step=amp_step, 
+                                                                slope_min=slope_min, slope_max=slope_max, slope_step=slope_step) #module.emulator(x, 'cross', box, isim, iz, load=True)
+
     # print(f"f_obs['auto'] = {f_obs['auto']}, f_obs['cross'] = {f_obs['cross']}")
     # print(f"f_sim_auto/f_obs['auto'] = {f_sim_auto/f_obs['auto']}, f_sim_cross/f_obs['cross'] = {f_sim_cross/f_obs['cross']}")
-    chi_sq_auto = np.sum(((f_obs['auto'] - f_sim_auto[ell_1000_mask])/f_obs_err['auto'])**2)
-    chi_sq_cross = np.sum(((f_obs['cross'] - f_sim_cross[ell_1000_mask])/f_obs_err['cross'])**2)
+
+    total_variance_auto =  f_obs_err['auto']**2 #+ f_sim_var_auto
+    total_variance_cross = f_obs_err['cross']**2 #+ f_sim_var_cross
+    
+    chi_sq_auto = np.sum(((f_obs['auto'] - f_sim_auto)/np.sqrt(total_variance_auto))**2)
+    chi_sq_cross = np.sum(((f_obs['cross'] - f_sim_cross)/np.sqrt(total_variance_cross))**2)
+    # chi_sq_auto = np.sum(((f_obs['auto'] - f_sim_auto)/(f_obs_err['auto']))**2)
+    # chi_sq_cross = np.sum(((f_obs['cross'] - f_sim_cross)/(f_obs_err['cross']))**2)
+
+    # residual_auto = f_obs["auto"] - f_sim_auto
+    # residual_cross = f_obs["cross"] - f_sim_cross
+
+    # total_var_auto = f_obs_err["auto"]**2 + f_sim_var_auto
+    # total_var_cross = f_obs_err["cross"]**2 + f_sim_var_cross
+
+    # chi2_auto = np.sum(residual_auto**2 / total_var_auto)
+    # chi2_cross = np.sum(residual_cross**2 / total_var_cross)
+
+    # chi2_total = chi2_auto + chi2_cross
+
+    # nll_auto = 0.5 * np.sum(residual_auto**2 / total_var_auto + np.log(2.0 * np.pi * total_var_auto))
+    # nll_cross = 0.5 * np.sum(residual_cross**2 / total_var_cross + np.log(2.0 * np.pi * total_var_cross))
+    # log_likelihood_auto = -0.5 * np.sum(((f_obs['auto'] - f_sim_auto)**2)/total_variance_auto 
+                                        # + np.log(2 * np.pi * total_variance_auto))
+    # log_likelihood_cross = -0.5 * np.sum(((f_obs['cross'] - f_sim_cross)**2)/total_variance_cross 
+                                        #  + np.log(2 * np.pi * total_variance_cross))
+
+    # negative_log_likelihood = nll_auto + nll_cross
+
     # chi_sq_auto = np.sum(((f_obs['auto'] - f_sim_auto)**2)/(f_obs['auto'] * 0.01))   #using 1% error bars for chi^2 calculation
     # chi_sq_cross = np.sum(((f_obs['cross'] - f_sim_cross)**2)/(f_obs['cross'] * 0.01))   #using 1% error bars for chi^2 calculation
     # print(chi_sq_auto, chi_sq_cross)
+
     return -0.5 * (chi_sq_auto + chi_sq_cross)
+    # return log_likelihood_auto + log_likelihood_cross
+    # return -(negative_log_likelihood)
+
+
+def chi2(theta, f_obs, f_obs_err, box, isim, iz, lightcone=0, abundance_cut=0.5, 
+                   amp_min=10.3, amp_max=11.3, amp_step=0.1, slope_min=0.0, slope_max=1.0, slope_step=0.1):
+    
+    amp, slope = theta
+    x = np.array((amp, slope))
+
+    f_sim_auto, _, f_sim_var_auto, f_sim_std_auto = emulator(x, 'auto', box, isim, iz, load=True, lightcone=lightcone, abundance_cut=abundance_cut,
+                                                          amp_min=amp_min, amp_max=amp_max, amp_step=amp_step, slope_min=slope_min, slope_max=slope_max, slope_step=slope_step)
+    f_sim_cross, _, f_sim_var_cross, f_sim_std_cross = emulator(x, 'cross', box, isim, iz, load=True, lightcone=lightcone, abundance_cut=abundance_cut,
+                                                             amp_min=amp_min, amp_max=amp_max, amp_step=amp_step, slope_min=slope_min, slope_max=slope_max, slope_step=slope_step) 
+
+    residual_auto = f_obs["auto"] - f_sim_auto
+    residual_cross = f_obs["cross"] - f_sim_cross
+
+    total_var_auto = f_obs_err["auto"]**2 + f_sim_var_auto
+    total_var_cross = f_obs_err["cross"]**2 + f_sim_var_cross
+
+    chi2_auto = np.sum(residual_auto**2 / total_var_auto)
+    chi2_cross = np.sum(residual_cross**2 / total_var_cross)
+
+    chi2_total = chi2_auto + chi2_cross
+
+    nll_auto = 0.5 * np.sum(residual_auto**2 / total_var_auto + np.log(2.0 * np.pi * total_var_auto))
+    nll_cross = 0.5 * np.sum(residual_cross**2 / total_var_cross + np.log(2.0 * np.pi * total_var_cross))
+
+    negative_log_likelihood = nll_auto + nll_cross
+
+    return chi2_total, chi2_auto, chi2_cross, -(negative_log_likelihood), -(nll_auto), -(nll_cross)
+
+# def log_likelihood(theta, f_obs, cov_cholesky, box, isim, iz, lightcone=0, abundance_cut=0.5, amp_min=10.3, amp_max=11.3, amp_step=0.1, slope_min=0.0, slope_max=1.0, slope_step=0.1):
+#     theta = np.asarray(theta, dtype=float)
+
+#     f_sim_auto, f_sim_var_auto, f_sim_std_auto = emulator(theta, "auto", box, isim, iz, load=True, lightcone=lightcone, abundance_cut=abundance_cut, amp_min=amp_min, amp_max=amp_max, amp_step=amp_step, slope_min=slope_min, slope_max=slope_max, slope_step=slope_step)
+#     f_sim_cross, f_sim_var_cross, f_sim_std_cross = emulator(theta, "cross", box, isim, iz, load=True, lightcone=lightcone, abundance_cut=abundance_cut, amp_min=amp_min, amp_max=amp_max, amp_step=amp_step, slope_min=slope_min, slope_max=slope_max, slope_step=slope_step)
+
+#     f_sim_auto = np.asarray(f_sim_auto, dtype=float)
+#     f_sim_cross = np.asarray(f_sim_cross, dtype=float)
+
+#     residual = np.concatenate([(f_obs["auto"] - f_sim_auto), (f_obs["cross"] - f_sim_cross)])
+
+#     if not np.all(np.isfinite(residual)):
+#         return -np.inf
+
+#     # Equivalent to residual.T @ inv(covariance) @ residual,
+#     # but more numerically stable.
+#     whitened_residual = np.linalg.solve(cov_cholesky, residual)
+#     chi2 = np.dot(whitened_residual, whitened_residual)
+
+#     return -0.5 * chi2
+
 
 def log_likelihood_mock_catalogue(theta, f_obs, f_obs_err, box, isim, iz, lightcone=0):
     amp, slope = theta
@@ -49,6 +136,7 @@ def log_likelihood_mock_catalogue(theta, f_obs, f_obs_err, box, isim, iz, lightc
     chi_sq_auto = np.sum(((f_obs['auto'] - f_mock_auto)/f_obs_err['auto'])**2)
     chi_sq_cross = np.sum(((f_obs['cross'] - f_mock_cross)/f_obs_err['cross'])**2)
     return -0.5 * (chi_sq_auto + chi_sq_cross)
+
 
 # def log_prior(theta, plateau_point, m, c):
 def log_prior(theta, plateau_point, c, vertical_limit, box, isim, iz, lightcone=0, abundance_cut=0.5,
@@ -64,8 +152,10 @@ def log_prior(theta, plateau_point, c, vertical_limit, box, isim, iz, lightcone=
     # elif plateau_point < amp <= vertical_limit and slope_min <= slope <= (-1 * amp + c):
     #     return 0.0
     if amp_min <= amp <= amp_max and slope_min <= slope <= slope_max:
-        predicted_nbar = emulator(theta, 'abundance', box, isim, iz, load=True, lightcone=lightcone, abundance_cut=0.5,
+        predicted_nbar, _, nbar_var, nbar_std = emulator(theta, 'abundance', box, isim, iz, load=True, lightcone=lightcone, abundance_cut=0.0,
                                  amp_min=amp_min, amp_max=amp_max, amp_step=amp_step, slope_min=slope_min, slope_max=slope_max, slope_step=slope_step)
+        predicted_nbar = float(np.asarray(predicted_nbar).squeeze())
+
         if predicted_nbar >= (obs_nbar_full_sky * abundance_cut):
             return 0.0
         elif predicted_nbar < (obs_nbar_full_sky * abundance_cut):
@@ -73,26 +163,88 @@ def log_prior(theta, plateau_point, c, vertical_limit, box, isim, iz, lightcone=
     else:
         return -np.inf
 
+
 def log_probability(theta, f_obs, f_obs_err, box, isim, iz, plateau_point, c, vertical_limit, lightcone=0, abundance_cut=0.5,
-                    amp_min=10.3, amp_max=11.3, amp_step=0.1, slope_min=0.0, slope_max=1.0, slope_step=0.1, ell_1000_mask=None):
+                    amp_min=10.3, amp_max=11.3, amp_step=0.1, slope_min=0.0, slope_max=1.0, slope_step=0.1):
+    # def log_probability(theta, f_obs, cov_cholesky, box, isim, iz, plateau_point, c, vertical_limit, lightcone=0, abundance_cut=0.5,
+                    # amp_min=10.3, amp_max=11.3, amp_step=0.1, slope_min=0.0, slope_max=1.0, slope_step=0.1):
     lp = log_prior(theta, plateau_point, c, vertical_limit, box, isim, iz, lightcone=lightcone, abundance_cut=abundance_cut,
                    amp_min=amp_min, amp_max=amp_max, amp_step=amp_step, slope_min=slope_min, slope_max=slope_max, slope_step=slope_step)
     if not np.isfinite(lp):
         return -np.inf
     return lp + log_likelihood(theta, f_obs, f_obs_err, box, isim, iz, lightcone=lightcone, abundance_cut=abundance_cut,
-                                amp_min=amp_min, amp_max=amp_max, amp_step=amp_step, slope_min=slope_min, slope_max=slope_max, slope_step=slope_step, ell_1000_mask=ell_1000_mask)
+                                amp_min=amp_min, amp_max=amp_max, amp_step=amp_step, slope_min=slope_min, slope_max=slope_max, slope_step=slope_step)
 
-def multiprocess(f_obs, f_obs_err, box, isim, iz, plateau_point, c, vertical_limit, lightcone=0, abundance_cut=0.5,
-                 amp_min=10.3, amp_max=11.3, amp_step=0.1, slope_min=0.0, slope_max=1.0, slope_step=0.1, ell_1000_mask=None): #, backend):
+    # return lp + log_likelihood(theta, f_obs, cov_cholesky, box, isim, iz, lightcone=0, abundance_cut=0.5, amp_min=10.3, amp_max=11.3, amp_step=0.1, slope_min=0.0, slope_max=1.0, slope_step=0.1)
+
+
+def multiprocess(f_obs, f_obs_err, box, isim, iz, steps, plateau_point, c, vertical_limit, lightcone=0, abundance_cut=0.5,
+                 amp_min=10.3, amp_max=11.3, amp_step=0.1, slope_min=0.0, slope_max=1.0, slope_step=0.1): #, backend):
+    # def multiprocess(f_obs, cov_cholesky, box, isim, iz, plateau_point, c, vertical_limit, lightcone=0, abundance_cut=0.5,
+                #  amp_min=10.3, amp_max=11.3, amp_step=0.1, slope_min=0.0, slope_max=1.0, slope_step=0.1): #, backend):
 
     with multiprocessing.get_context("spawn").Pool() as pool:
         start = time.time()
+
+        moves = [(emcee.moves.StretchMove(a=2.5), 0.6), (emcee.moves.DEMove(), 0.3), (emcee.moves.DESnookerMove(), 0.1)]
+
         sampler = emcee.EnsembleSampler(
             nwalkers, ndim, log_probability, args=(f_obs, f_obs_err, box, isim, iz, plateau_point, c, vertical_limit, lightcone, abundance_cut,
-                                                   amp_min, amp_max, amp_step, slope_min, slope_max, slope_step, ell_1000_mask), 
-            pool=pool #, backend=backend
-        )
-        sampler.run_mcmc(pos, steps, progress=True)
+                                                   amp_min, amp_max, amp_step, slope_min, slope_max, slope_step), 
+            # nwalkers, ndim, log_probability, args=(f_obs, cov_cholesky, box, isim, iz, plateau_point, c, vertical_limit, lightcone, abundance_cut,
+                                                #    amp_min, amp_max, amp_step, slope_min, slope_max, slope_step), 
+            pool=pool, moves=moves) #, backend=backend)
+
+        check_steps = 1000
+        max_steps = 20000
+        old_tau = np.full(ndim, np.inf)
+
+        state = sampler.run_mcmc(pos, steps, progress=True)
+
+        while sampler.iteration < max_steps:
+            try:
+                tau = sampler.get_autocorr_time(tol=0)
+
+                long_enough = np.all(
+                    sampler.iteration > 50.0 * tau
+                )
+
+                stable = (
+                    np.all(np.isfinite(old_tau))
+                    and np.all(
+                        np.abs(old_tau - tau) / tau < 0.05
+                    )
+                )
+
+                print(
+                    f"steps={sampler.iteration}, "
+                    f"tau={tau}, "
+                    f"long_enough={long_enough}, "
+                    f"stable={stable}, "
+                    f"acceptance={np.mean(sampler.acceptance_fraction):.3f}"
+                )
+
+                if long_enough and stable:
+                    break
+
+                old_tau = tau.copy()
+
+            except emcee.autocorr.AutocorrError as error:
+                print(
+                    f"steps={sampler.iteration}: "
+                    f"tau not reliable yet: {error}"
+                )
+
+            # Always extend the chain
+            state = sampler.run_mcmc(
+                state,
+                check_steps,
+                progress=True,
+            )
+
+        else:
+            print(f"Stopped at {sampler.iteration} steps without satisfying the convergence test.")
+
         end = time.time()
         multi_time = end - start
         print("Multiprocessing took {0:.1f} seconds".format(multi_time))
@@ -101,6 +253,7 @@ def multiprocess(f_obs, f_obs_err, box, isim, iz, plateau_point, c, vertical_lim
 
 if __name__ == '__main__':
     from matplotlib.ticker import FormatStrFormatter
+    np.random.seed(1000)
 
     box = sys.argv[2]
     isim = sys.argv[3]
@@ -122,11 +275,11 @@ if __name__ == '__main__':
     ell_200_mask = np.where(farren_data[:,0] > 200)
     ell_1000_mask = None # np.where(farren_data[:,0][ell_200_mask] < 1000)
 
-    f_sim_auto = emulator(np.array((10.65, 0.45)), 'auto', box, isim, iz, save=True, retrain=True, lightcone=lightcone, abundance_cut=abundance_cut,
+    f_sim_auto, _, _, _ = emulator(np.array((10.65, 0.45)), 'auto', box, isim, iz, save=True, retrain=True, lightcone=lightcone, abundance_cut=abundance_cut,
                            amp_min=amp_min, amp_max=amp_max, amp_step=amp_step, slope_min=slope_min, slope_max=slope_max, slope_step=slope_step) #module
-    f_sim_cross = emulator(np.array((10.65, 0.45)), 'cross', box, isim, iz, save=True, retrain=True, lightcone=lightcone, abundance_cut=abundance_cut,
+    f_sim_cross, _, _, _ = emulator(np.array((10.65, 0.45)), 'cross', box, isim, iz, save=True, retrain=True, lightcone=lightcone, abundance_cut=abundance_cut,
                             amp_min=amp_min, amp_max=amp_max, amp_step=amp_step, slope_min=slope_min, slope_max=slope_max, slope_step=slope_step) #module
-    f_sim_abundance = emulator(np.array((10.65, 0.45)), 'abundance', box, isim, iz, save=True, retrain=True, lightcone=lightcone, abundance_cut=0.0,
+    f_sim_abundance, _, _, _ = emulator(np.array((10.65, 0.45)), 'abundance', box, isim, iz, save=True, retrain=True, lightcone=lightcone, abundance_cut=0.0,
                                 amp_min=amp_min, amp_max=amp_max, amp_step=amp_step, slope_min=slope_min, slope_max=slope_max, slope_step=slope_step) #module
     prior_limits = np.load(f'./gpy_model/{box}/{isim}/{iz}/lightcone{lightcone}/training/prior_limits.npy')
     plateau_point = prior_limits[0]
@@ -147,9 +300,23 @@ if __name__ == '__main__':
     #                             delimiter=' ', skiprows=1, usecols=(2))
     #     test_cross = np.loadtxt(f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/power_spectra/kappa_galaxy/{box}/{str(isim)}/{str(iz)}/kappa_galaxy_power_spectrum_{test_name[0]}_{test_name[1]}.txt', 
     #                             delimiter=' ', skiprows=1, usecols=(1))
+
+    ell = farren_data[:, 0]
+    ell_mask = ell > 200
+    n_bins = len(ell)
+    print(f"Total bins per spectrum: {n_bins}")
+    print(f"Selected bins per spectrum: {np.count_nonzero(ell_mask)}")
+    combined_mask = np.concatenate([ell_mask, ell_mask])
+    cov_masked = obs_data_covariance[np.ix_(combined_mask, combined_mask)] * (1e5**2)
+    n_selected = np.count_nonzero(ell_mask)
+    print(f"Original covariance shape: {obs_data_covariance.shape}")
+    print(f"Masked covariance shape:   {cov_masked.shape}")
+    cov_cholesky = np.linalg.cholesky(cov_masked)
     
-    f_obs = {'auto': farren_data[:,1][ell_200_mask][ell_1000_mask] * 1e5, 'cross': farren_data[:,2][ell_200_mask][ell_1000_mask] * 1e5}
-    f_obs_err = {'auto': np.sqrt(farren_data_var_auto[ell_1000_mask]) * 1e5, 'cross': np.sqrt(farren_data_var_cross[ell_1000_mask]) * 1e5}
+    f_obs = {'auto': farren_data[:,1][ell_200_mask] * 1e5, 'cross': farren_data[:,2][ell_200_mask] * 1e5}
+    f_obs_err = {'auto': np.sqrt(farren_data_var_auto) * 1e5, 'cross': np.sqrt(farren_data_var_cross) * 1e5}
+    # f_obs = {'auto': farren_data[ell_mask, 1] * 1e5, 'cross': farren_data[ell_mask, 2] * 1e5}
+    # f_obs_err = {'auto': np.sqrt(farren_data_var_auto) * 1e5, 'cross': np.sqrt(farren_data_var_cross) * 1e5}
     print(np.sqrt(f_obs_err['auto'])*1e5, np.sqrt(f_obs_err['cross'])*1e5)
     print(f_obs['auto'], f_obs['cross'])
     print(f_obs_err['auto'], f_obs_err['cross'])
@@ -181,27 +348,34 @@ if __name__ == '__main__':
             else:
                 allowed = True
 
-        np.random.seed(1000)
-        # nll = lambda *args: -log_likelihood(*args)
+        nll = lambda *args: -log_probability(*args)
         initial = amp_positions[i], slope_positions[i] #10.6, 0.4 #test_points[0], test_points[1]
         print(f"[INFO] Starting MCMC with initial guess: AMP = {initial[0]}, SLOPE = {initial[1]}")
         initial_name = f"{float(initial[0]):.3f}".replace('.', 'p'), f"{float(initial[1]):.3f}".replace('.', 'p')
         gaussian_offset = 0.05
         gaussian_offset_name = f"{float(gaussian_offset):.3f}".replace('.', 'p')
         walkers = int(2 ** 5)
-        # soln = minimize(nll, initial, args=(f_obs, f_obs_err, box, isim, iz))
+        soln = minimize(nll, np.asarray(initial, dtype=float), args=(f_obs, f_obs_err, box, isim, iz, plateau_point, c, vertical_limit, lightcone, 
+                                                                     abundance_cut, amp_min, amp_max, amp_step, 
+                                                                     slope_min, slope_max, slope_step), 
+                                                                     method="L-BFGS-B", bounds=[(amp_min, amp_max), (slope_min, slope_max)])
         # print(soln)
-        pos = initial + gaussian_offset * np.random.randn(walkers, 2) 
+        initial_scale = np.array([0.005 * (amp_max - amp_min), 0.005 * (slope_max - slope_min)])
+
+        pos = soln.x + np.random.randn(walkers, 2) * initial_scale
+        # pos = initial + gaussian_offset * np.random.randn(walkers, 2) 
         # pos = soln.x + 1e-4 * np.random.randn(walkers, 2)
         
         nwalkers, ndim = pos.shape
-        steps = 5000
+        steps = 10000
 
         prec = 4  # <-- change this to the number of decimals you want
         fmt  = f"%.{prec}f"
 
-        log_prob = log_probability((initial[0], initial[1]), f_obs, f_obs_err, box, isim, iz, plateau_point, c, vertical_limit, lightcone=lightcone, abundance_cut=abundance_cut, 
-                                   amp_min=amp_min, amp_max=amp_max, amp_step=amp_step, slope_min=slope_min, slope_max=slope_max, slope_step=slope_step, ell_1000_mask=ell_1000_mask)
+        log_prob = log_probability((pos[0, 0], pos[0, 1]), f_obs, f_obs_err, box, isim, iz, plateau_point, c, vertical_limit, lightcone=lightcone, abundance_cut=abundance_cut, 
+                                   amp_min=amp_min, amp_max=amp_max, amp_step=amp_step, slope_min=slope_min, slope_max=slope_max, slope_step=slope_step)
+        # log_prob = log_probability((initial[0], initial[1]), f_obs, cov_cholesky, box, isim, iz, plateau_point, c, vertical_limit, lightcone=lightcone, abundance_cut=abundance_cut, 
+                                    # amp_min=amp_min, amp_max=amp_max, amp_step=amp_step, slope_min=slope_min, slope_max=slope_max, slope_step=slope_step)                
         print(f"[INFO] Log-probability at initial guess: {log_prob}")
 
         # filename = f"./data_files/mcmc_chains/chain_walkers{nwalkers}_steps{steps}.h5"
@@ -218,51 +392,73 @@ if __name__ == '__main__':
         # for i in bad[:5]:
         #     print("theta:", pos[i], "logp:", vals[i])
 
-        success = False
-        while not success:
-            try:
-                sampler = multiprocess(f_obs, f_obs_err, box, isim, iz, plateau_point, c, vertical_limit, lightcone=lightcone, abundance_cut=abundance_cut,
-                                    amp_min=amp_min, amp_max=amp_max, amp_step=amp_step, slope_min=slope_min, slope_max=slope_max, slope_step=slope_step, ell_1000_mask=ell_1000_mask) #, backend)
-                tau = sampler.get_autocorr_time()
-                # print(tau)
-                success = True
+        # success = False
+        # while not success:
+            # try:
+        sampler = multiprocess(f_obs, f_obs_err, box, isim, iz, steps, plateau_point, c, vertical_limit, lightcone=lightcone, abundance_cut=abundance_cut,
+                                amp_min=amp_min, amp_max=amp_max, amp_step=amp_step, slope_min=slope_min, slope_max=slope_max, slope_step=slope_step) #, backend)
+        # sampler = multiprocess(f_obs, cov_cholesky, box, isim, iz, plateau_point, c, vertical_limit, lightcone=lightcone, abundance_cut=abundance_cut,
+                            #    amp_min=amp_min, amp_max=amp_max, amp_step=amp_step, slope_min=slope_min, slope_max=slope_max, slope_step=slope_step)
+        tau = sampler.get_autocorr_time()
+        # print(tau)
+        success = True
 
-                burnin = int(2 * np.max(tau))
-                thin = int(0.5 * np.min(tau))
-                flat_samples = sampler.get_chain(discard=burnin, thin=thin, flat=True)
+        burnin = int(2 * np.max(tau))
+        thin = int(0.5 * np.min(tau))
+        flat_samples = sampler.get_chain(discard=burnin, thin=thin, flat=True)
 
-                mle_amp = np.percentile(flat_samples[:, 0], [50])[0]
-                mle_slope = np.percentile(flat_samples[:, 1], [50])[0]
+        # mle_amp = np.percentile(flat_samples[:, 0], [50])[0]
+        # mle_slope = np.percentile(flat_samples[:, 1], [50])[0]
 
-                # if plateau_point < mle_amp <= vertical_limit:
-                #     if (-1 * mle_amp + c)*0.99 <= mle_slope <= (-1 * mle_amp + c)*1.01:
-                #         # print(f"[INFO] MLE AMP: {mle_amp} and MLE SLOPE: {mle_slope} is within 1% of the prior boundary.")
-                #         plateau_point += 0.1
-                #         c += 0.1
-                #         # print(f"[INFO] Updated plateau_point to {plateau_point} and c to {c} to ensure MLE is within the prior. Rerunning MCMC...")
-                #         success = False
+        # flat_log_prob = sampler.get_log_prob(discard=burnin, thin=thin, flat=True)
+        # map_index = np.argmax(flat_log_prob)
+        # map_theta = flat_samples[map_index]
+        # mle_amp, mle_slope = map_theta
 
-            except emcee.autocorr.AutocorrError:
-                print("[WARNING] The chain is too short to estimate the autocorrelation time reliably.")
-                success = False
-                steps += 1000
-                continue
+        flat_loglike = np.array([log_likelihood(theta, f_obs, f_obs_err, box, isim, iz, lightcone=lightcone,
+                                                abundance_cut=abundance_cut, amp_min=amp_min, amp_max=amp_max, amp_step=amp_step,
+                                                slope_min=slope_min, slope_max=slope_max, slope_step=slope_step) 
+                                                for theta in flat_samples])
+
+        mle_index = np.argmax(flat_loglike)
+        mle_amp, mle_slope = flat_samples[mle_index]
+
+        # if plateau_point < mle_amp <= vertical_limit:
+        #     if (-1 * mle_amp + c)*0.99 <= mle_slope <= (-1 * mle_amp + c)*1.01:
+        #         # print(f"[INFO] MLE AMP: {mle_amp} and MLE SLOPE: {mle_slope} is within 1% of the prior boundary.")
+        #         plateau_point += 0.1
+        #         c += 0.1
+        #         # print(f"[INFO] Updated plateau_point to {plateau_point} and c to {c} to ensure MLE is within the prior. Rerunning MCMC...")
+        #         success = False
+
+            # except emcee.autocorr.AutocorrError:
+            #     print("[WARNING] The chain is too short to estimate the autocorrelation time reliably.")
+            #     success = False
+            #     steps += 1000
+            #     continue
 
         print(f"[INFO] MLE AMP: {mle_amp}, MLE SLOPE: {mle_slope}")
 
-        log_likelihood_mle = log_likelihood((mle_amp, mle_slope), f_obs, f_obs_err, box, isim, iz, lightcone=lightcone, ell_1000_mask=ell_1000_mask)
+        log_likelihood_mle = log_likelihood((mle_amp, mle_slope), f_obs, f_obs_err, box, isim, iz, lightcone=lightcone, 
+                                            abundance_cut=abundance_cut, amp_min=amp_min, amp_max=amp_max, amp_step=amp_step, 
+                                            slope_min=slope_min, slope_max=slope_max, slope_step=slope_step)
+        # log_likelihood_mle = log_likelihood((mle_amp, mle_slope), f_obs, cov_cholesky, box, isim, iz, lightcone=lightcone)
+        # chi2_mle, chi2_mle_auto, chi2_mle_cross, log_likelihood_mle, log_likelihood_mle_auto, log_likelihood_mle_cross = chi2((mle_amp, mle_slope), f_obs, f_obs_err, box, isim, iz, lightcone=lightcone)
         print(f"[INFO] Log-Likelihood at MLE: {log_likelihood_mle}")
-        print(f"[INFO] Expected number of galaxies at MLE: {emulator((mle_amp, mle_slope), 'abundance', box, isim, iz, load=True, lightcone=lightcone, abundance_cut=0.0, amp_min=amp_min, amp_max=amp_max, amp_step=amp_step, slope_min=slope_min, slope_max=slope_max, slope_step=slope_step)}")
+        # print(f"[INFO] chi^2 at MLE: {chi2_mle}")
+        print(f"[INFO] Expected number of galaxies at MLE: {emulator((mle_amp, mle_slope), 'abundance', box, isim, iz, load=True, lightcone=lightcone, 
+                                                                     abundance_cut=0.0, amp_min=amp_min, amp_max=amp_max, amp_step=amp_step, 
+                                                                     slope_min=slope_min, slope_max=slope_max, slope_step=slope_step)}")
 
         mle_amps.append(mle_amp)
         mle_slopes.append(mle_slope)
         mle_likelihoods.append(log_likelihood_mle)
 
         x = np.array((mle_amp, mle_slope))
-        f_sim_auto = emulator(x, 'auto', box, isim, iz, load=True, lightcone=lightcone) 
-        f_sim_cross = emulator(x, 'cross', box, isim, iz, load=True, lightcone=lightcone) 
-        chi_sq_auto = np.sum(((f_obs['auto'] - f_sim_auto[ell_1000_mask])**2)/(f_obs_err['auto']**2))
-        chi_sq_cross = np.sum(((f_obs['cross'] - f_sim_cross[ell_1000_mask])**2)/(f_obs_err['cross']**2))
+        f_sim_auto, _, f_sim_var_auto, f_sim_std_auto = emulator(x, 'auto', box, isim, iz, load=True, lightcone=lightcone) 
+        f_sim_cross, _, f_sim_var_cross, f_sim_std_cross = emulator(x, 'cross', box, isim, iz, load=True, lightcone=lightcone) 
+        chi_sq_auto = np.sum(((f_obs['auto'] - f_sim_auto)**2)/((f_obs_err['auto'])**2))
+        chi_sq_cross = np.sum(((f_obs['cross'] - f_sim_cross)**2)/((f_obs_err['cross'])**2))
         print(f"Auto chi^2 = {chi_sq_auto}")
         print(f"Auto likelihood = {-0.5 * chi_sq_auto}")
         print(f"Auto reduced chi^2 (Using N-P as d.o.f.) = {chi_sq_auto / (55-2)}")
@@ -271,6 +467,16 @@ if __name__ == '__main__':
         print(f"Cross likelihood = {-0.5 * chi_sq_cross}")
         print(f"Cross reduced chi^2 (Using N-P as d.o.f.) = {chi_sq_cross / (55-2)}")
         print(f"Cross reduced chi^2 (Using N-1 as d.o.f.) = {chi_sq_cross / (55-1)}")
+
+        # print(f"Auto chi^2 = {chi2_mle_auto}")
+        # print(f"Auto likelihood = {log_likelihood_mle_auto}")
+        # print(f"Auto reduced chi^2 (Using N-P as d.o.f.) = {chi2_mle_auto / (55-2)}")
+        # print(f"Auto reduced chi^2 (Using N-1 as d.o.f.) = {chi2_mle_auto / (55-1)}") 
+        # print(f"Cross chi^2 = {chi2_mle_cross}")
+        # print(f"Cross likelihood = {log_likelihood_mle_cross}")
+        # print(f"Cross reduced chi^2 (Using N-P as d.o.f.) = {chi2_mle_cross / (55-2)}")
+        # print(f"Cross reduced chi^2 (Using N-1 as d.o.f.) = {chi2_mle_cross / (55-1)}")
+    quit()
 
 
     for i in range(num_points):
@@ -307,10 +513,15 @@ if __name__ == '__main__':
         mle_err_lower.append(q[0])   # 50th - 16th percentile
         mle_err_upper.append(q[1])   # 84th - 50th percentile
 
+    median_amp = mle[0]
+    median_slope = mle[1]
     err_amp_lower = mle_err_lower[0]
     err_amp_upper = mle_err_upper[0]
     err_slope_lower = mle_err_lower[1]
     err_slope_upper = mle_err_upper[1]
+    print(f"[INFO] MLE AMP: {mle_amp}, MLE SLOPE: {mle_slope}")
+    print(f"[INFO] Median AMP: {median_amp}, Median SLOPE: {median_slope}")
+    quit()
 
     if plot:
         fig = corner.corner(
@@ -376,7 +587,11 @@ if __name__ == '__main__':
     mle_slope_name = f"{float(mle_slope):.3f}".replace('.', 'p')
     print(f"[INFO] MLE AMP: {mle_amp}, MLE SLOPE: {mle_slope}")
 
-    log_likelihood_mle = log_likelihood((mle_amp, mle_slope), f_obs, f_obs_err, box, isim, iz, lightcone=lightcone)
+    mle_amp = 10.909
+    mle_slope = 0.335
+    print(f"[INFO] MLEs overwritten to {mle_amp, mle_slope}")
+    # log_likelihood_mle = log_likelihood((mle_amp, mle_slope), f_obs, f_obs_err, box, isim, iz, lightcone=lightcone)
+    log_likelihood_mle = log_likelihood((mle_amp, mle_slope), f_obs, cov_cholesky, box, isim, iz, lightcone=lightcone)
     print(f"[INFO] Log-Likelihood at MLE (emulator comparison): {log_likelihood_mle}")
     print(f"[INFO] chi^2 at MLE (emulator comparison): {(log_likelihood_mle * -2)}")
 
@@ -391,13 +606,11 @@ if __name__ == '__main__':
 
     # print(f"[INFO] Wrote MLEs to {outfile}")
 
-    # mle_amp = 10.909
-    # mle_slope = 0.335
     x = np.array((mle_amp, mle_slope))
-    f_sim_auto = emulator(x, 'auto', box, isim, iz, load=True, lightcone=lightcone) 
-    f_sim_cross = emulator(x, 'cross', box, isim, iz, load=True, lightcone=lightcone) 
-    chi_sq_auto = np.sum(((f_obs['auto'] - f_sim_auto)**2)/(f_obs_err['auto']**2))
-    chi_sq_cross = np.sum(((f_obs['cross'] - f_sim_cross)**2)/(f_obs_err['cross']**2))
+    f_sim_auto, f_sim_var_auto, f_sim_std_auto  = emulator(x, 'auto', box, isim, iz, load=True, lightcone=lightcone) 
+    f_sim_cross, f_sim_var_cross, f_sim_std_cross = emulator(x, 'cross', box, isim, iz, load=True, lightcone=lightcone) 
+    chi_sq_auto = np.sum(((f_obs['auto'] - f_sim_auto)**2)/((f_obs_err['auto'] + f_sim_std_auto)**2))
+    chi_sq_cross = np.sum(((f_obs['cross'] - f_sim_cross)**2)/((f_obs_err['cross'] + f_sim_std_cross)**2))
     # chi_sq_auto = np.sum(((f_obs['auto'] - f_sim_auto)**2)/(f_obs['auto'] * 0.01))   #using 1% error bars for chi^2 calculation
     # chi_sq_cross = np.sum(((f_obs['cross'] - f_sim_cross)**2)/(f_obs['cross'] * 0.01))   #using 1% error bars for chi^2 calculation
     print(f"Auto chi^2 (Emulator) = {chi_sq_auto}")

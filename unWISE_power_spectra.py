@@ -62,6 +62,9 @@ mean_mstar = []
 # ps = patchyScreening(isim, iz, im, slope, ncpu, theta_d, fits_file=fits, signal=sig)
 # ps.get_halo_coordinates()
 
+mle_amp = np.loadtxt(f"./data_files/mle_parameters/{box}/{isim}/{iz}/lightcone{lightcone}/mle_values.txt", usecols=1, skiprows=6, max_rows=1, delimiter='=')
+mle_slope = np.loadtxt(f"./data_files/mle_parameters/{box}/{isim}/{iz}/lightcone{lightcone}/mle_values.txt", usecols=1, skiprows=7, max_rows=1, delimiter='=')
+
 def compute_catalog(slope, box=box, isim=isim, iz=iz, im=im, ncpu=ncpu, theta_d=theta_d, fits=fits, sig=sig, lightcone=lightcone, mle=mle):
     if slope == 0.0:
         slope = abs(slope)
@@ -73,7 +76,11 @@ def compute_catalog(slope, box=box, isim=isim, iz=iz, im=im, ncpu=ncpu, theta_d=
     return ps.merge, ps.source_vector, ps.nhalo, np.log10(np.mean(ps.merge['mstar'].to_numpy()))
 
 if single == False:
-    results = Parallel(n_jobs=ncpu, backend="loky")(delayed(compute_catalog)(slope) for slope in slopes)
+    if mle and mle_amp != im and mle_slope != slope:
+        mle_catalogue = False
+    else:
+        mle_catalogue = mle
+    results = Parallel(n_jobs=ncpu, backend="loky")(delayed(compute_catalog)(slope, mle=mle_catalogue) for slope in slopes)
     for i in range(len(results)):
         slopes_name.append(name_float(slopes[i], mle=mle))
         print(slopes[i])
@@ -82,7 +89,11 @@ if single == False:
         mean_mstar.append(results[i][3])
 
 elif single == True:
-    results = compute_catalog(slope)
+    if mle and mle_amp != im and mle_slope != slope:
+        mle_catalogue = False
+    else:
+        mle_catalogue = mle
+    results = compute_catalog(slope, mle=mle_catalogue)
     
     slopes_name.append(name_float(slope, mle=mle))
     source_vectors.append(results[1])

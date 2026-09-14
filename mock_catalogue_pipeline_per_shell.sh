@@ -573,7 +573,7 @@ jid8=$(sbatch --parsable \
             -c 1 \
             -p cosma8 \
             -A dp004 \
-            -t 1:00:00 \
+            -t 24:00:00 \
             -o "./batch_files/maximum_likelihood_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}/job.%j.dump" \
             -e "./batch_files/maximum_likelihood_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}/job.%j.err" \
 <<EOF

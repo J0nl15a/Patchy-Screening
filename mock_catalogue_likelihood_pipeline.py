@@ -7,7 +7,7 @@ import os, sys
 import multiprocessing
 import time
 os.environ["OMP_NUM_THREADS"] = "1"
-import importlib.util
+from datetime import datetime
 
 
 def log_likelihood(theta, f_obs, f_obs_err, box, isim, iz, lightcone=0, abundance_cut=0.5, 
@@ -46,14 +46,14 @@ def log_prior(theta, box, isim, iz, lightcone=0, abundance_cut=0.5,
 
     obs_nbar_full_sky = obs_nbar * 41253
    
-    if amp_min <= amp <= amp_max and slope_min <= slope <= slope_max:
+    if (amp_min + 0.00) <= amp <= (amp_max - 0.00) and (slope_min + 0.00) <= slope <= (slope_max - 0.00):
         predicted_nbar, _, nbar_var, nbar_std = emulator(theta, 'abundance', box, isim, iz, load=True, lightcone=lightcone, abundance_cut=0.0,
                                  amp_min=amp_min, amp_max=amp_max, amp_step=amp_step, slope_min=slope_min, slope_max=slope_max, slope_step=slope_step)
         predicted_nbar = float(np.asarray(predicted_nbar).squeeze())
 
-        if predicted_nbar >= (obs_nbar_full_sky * abundance_cut):
+        if (predicted_nbar) >= (obs_nbar_full_sky * abundance_cut):
             return 0.0
-        elif predicted_nbar < (obs_nbar_full_sky * abundance_cut):
+        elif (predicted_nbar) < (obs_nbar_full_sky * abundance_cut):
             return -np.inf
     else:
         return -np.inf
@@ -85,12 +85,11 @@ def multiprocess(f_obs, f_obs_err, box, isim, iz, steps, lightcone=0, abundance_
             pool=pool, moves=moves)
 
         check_steps = 1000
-        max_steps = 20000
         old_tau = np.full(ndim, np.inf)
 
         state = sampler.run_mcmc(pos, steps, progress=True)
 
-        while sampler.iteration < max_steps:
+        while True:
             try:
                 tau = sampler.get_autocorr_time(tol=0)
 
@@ -115,9 +114,6 @@ def multiprocess(f_obs, f_obs_err, box, isim, iz, steps, lightcone=0, abundance_
             # Always extend the chain
             state = sampler.run_mcmc(state, check_steps, progress=True)
 
-        else:
-            print(f"Stopped at {sampler.iteration} steps without satisfying the convergence test.")
-
         end = time.time()
         multi_time = end - start
         print("Multiprocessing took {0:.1f} seconds".format(multi_time))
@@ -126,7 +122,10 @@ def multiprocess(f_obs, f_obs_err, box, isim, iz, steps, lightcone=0, abundance_
 
 if __name__ == '__main__':
     from matplotlib.ticker import FormatStrFormatter
-    np.random.seed(8000)
+
+    seed = int(datetime.now().strftime("%Y%m%d%H%M%S%f")) % (2**32 - 1)
+    rng = np.random.default_rng(seed)
+    print(f"[INFO] Random seed = {seed}")
 
     box = sys.argv[1]
     isim = sys.argv[2]
@@ -161,43 +160,104 @@ if __name__ == '__main__':
     
     f_obs = {'auto': farren_data[:,1][ell_200_mask] * 1e5, 'cross': farren_data[:,2][ell_200_mask] * 1e5}
     f_obs_err = {'auto': np.sqrt(farren_data_var_auto) * 1e5, 'cross': np.sqrt(farren_data_var_cross) * 1e5}
+    # f_obs = {'auto': farren_data[:,1][ell_200_mask][:-3] * 1e5, 'cross': farren_data[:,2][ell_200_mask] * 1e5}
+    # f_obs_err = {'auto': np.sqrt(farren_data_var_auto[:-3]) * 1e5, 'cross': np.sqrt(farren_data_var_cross) * 1e5}
     print(f_obs['auto'], f_obs['cross'])
     print(f_obs_err['auto'], f_obs_err['cross'])
     
-    amp_positions = np.random.uniform(amp_min, amp_max+0.001, 1)[0]
-    slope_positions = np.random.uniform(slope_min, slope_max+0.001, 1)[0]
+    # amp_positions = rng.uniform(amp_min, amp_max)
+    # slope_positions = rng.uniform(slope_min, slope_max)
     
     mle_amps = []
     mle_slopes = []
     mle_likelihoods = []
 
 
-    allowed = False
-    while not allowed:
-        if log_prior((amp_positions, slope_positions), box, isim, iz, lightcone, abundance_cut, 
-                        amp_min, amp_max, amp_step, slope_min, slope_max, slope_step) == -np.inf:
-            amp_positions = np.random.uniform(amp_min, amp_max+0.001, 1)[0]
-            slope_positions = np.random.uniform(slope_min, slope_max+0.001, 1)[0]
-        else:
-            allowed = True
+    # allowed = False
+    # while not allowed:
+    #     if log_prior((amp_positions, slope_positions), box, isim, iz, lightcone, abundance_cut, 
+    #                     amp_min, amp_max, amp_step, slope_min, slope_max, slope_step) == -np.inf:
+    #         amp_positions = rng.uniform(amp_min, amp_max)
+    #         slope_positions = rng.uniform(slope_min, slope_max)
+    #     else:
+    #         allowed = True
 
-    nll = lambda *args: -log_probability(*args)
-    initial = amp_positions, slope_positions
-    print(f"[INFO] Initial guess: AMP = {initial[0]}, SLOPE = {initial[1]}")
+    # nll = lambda *args: -log_probability(*args)
+    def nll(theta, *args):
+        logp = log_probability(theta, *args)
 
-    initial_name = f"{float(initial[0]):.3f}".replace('.', 'p'), f"{float(initial[1]):.3f}".replace('.', 'p')
+        if not np.isfinite(logp):
+            return 1.0e100
+
+        return -logp
+    
+    # initial = amp_positions, slope_positions
+    # print(f"[INFO] Initial guess: AMP = {initial[0]}, SLOPE = {initial[1]}")
+
+    # initial_name = f"{float(initial[0]):.3f}".replace('.', 'p'), f"{float(initial[1]):.3f}".replace('.', 'p')
     gaussian_offset = 0.05
     gaussian_offset_name = f"{float(gaussian_offset):.3f}".replace('.', 'p')
     walkers = int(2 ** 5)
 
-    soln = minimize(nll, np.asarray(initial, dtype=float), args=(f_obs, f_obs_err, box, isim, iz, lightcone, 
-                                                                    abundance_cut, amp_min, amp_max, amp_step, 
-                                                                    slope_min, slope_max, slope_step), 
-                                                                    method="L-BFGS-B", bounds=[(amp_min, amp_max), (slope_min, slope_max)])
+    # soln = minimize(nll, np.asarray(initial, dtype=float), args=(f_obs, f_obs_err, box, isim, iz, lightcone, 
+    #                                                                 abundance_cut, amp_min, amp_max, amp_step, 
+    #                                                                 slope_min, slope_max, slope_step), 
+    #                                                                 method="L-BFGS-B", bounds=[(amp_min, amp_max), (slope_min, slope_max)])
+
+    n_optimizer_starts = 10
+    best_soln = None
+
+    for j in range(n_optimizer_starts):
+
+        # Find random point satisfying prior
+        while True:
+
+            initial = np.array([rng.uniform(amp_min, amp_max), rng.uniform(slope_min, slope_max),])
+
+            if np.isfinite(log_prior(initial, box, isim, iz, lightcone, abundance_cut, amp_min, amp_max, amp_step, slope_min, slope_max, slope_step)):
+                break
+
+        trial_soln = minimize(nll, initial, args=(f_obs, f_obs_err, box, isim, iz, lightcone, abundance_cut, amp_min, amp_max, amp_step, slope_min, slope_max, slope_step), 
+                              method="L-BFGS-B", bounds=[(amp_min, amp_max), (slope_min, slope_max)])
+
+        print(f"[INFO] Optimizer start {j}: x={trial_soln.x}, NLL={trial_soln.fun}")
+
+        if (np.isfinite(trial_soln.fun) and (best_soln is None or trial_soln.fun < best_soln.fun)):
+            best_soln = trial_soln
+
+
+    if best_soln is None:
+        raise RuntimeError("All optimizer starts failed")
+
+    soln = best_soln
     
     initial_scale = np.array([0.005 * (amp_max - amp_min), 0.005 * (slope_max - slope_min)])
-    pos = soln.x + np.random.randn(walkers, 2) * initial_scale
+    # pos = soln.x + rng.normal(size=(walkers, 2)) * initial_scale
+
+    pos = np.empty((walkers, 2), dtype=float)
+
+    for i in range(walkers):
+        for attempt in range(10000):
+
+            candidate = (soln.x + rng.normal(size=2) * initial_scale)
+
+            lp = log_probability(candidate, f_obs, f_obs_err, box, isim, iz, lightcone, abundance_cut, amp_min, amp_max, amp_step, slope_min, slope_max, slope_step,)
+
+            if np.isfinite(lp):
+                pos[i] = candidate
+                break
+
+        else:
+            raise RuntimeError(f"Could not initialise walker {i} inside the allowed posterior region."
+                               )
     print(soln.message)
+    print(soln)
+
+    if not np.all(np.isfinite(soln.x)):
+        raise RuntimeError(f"Optimizer returned invalid parameters: {soln.x}")
+
+    if not np.isfinite(soln.fun):
+        raise RuntimeError(f"Optimizer returned invalid objective: {soln.fun}")
     
     nwalkers, ndim = pos.shape
     steps = 5000
@@ -217,18 +277,75 @@ if __name__ == '__main__':
 
     burnin = int(2 * np.max(tau))
     thin = int(0.5 * np.min(tau))
+
     flat_samples = sampler.get_chain(discard=burnin, thin=thin, flat=True)
+    flat_log_prob = sampler.get_log_prob(discard=burnin, thin=thin, flat=True)
 
-    mle_amp = np.percentile(flat_samples[:, 0], [50])[0]
-    mle_slope = np.percentile(flat_samples[:, 1], [50])[0]
+    if len(flat_log_prob) != len(flat_samples):
+        raise ValueError("flat_samples and flat_log_prob have different lengths.")
 
-    # flat_loglike = np.array([log_likelihood(theta, f_obs, f_obs_err, box, isim, iz, lightcone=lightcone,
-    #                                         abundance_cut=abundance_cut, amp_min=amp_min, amp_max=amp_max, amp_step=amp_step,
-    #                                         slope_min=slope_min, slope_max=slope_max, slope_step=slope_step) 
-    #                                         for theta in flat_samples])
+    if not np.any(np.isfinite(flat_log_prob)):
+        raise RuntimeError("No finite log-probabilities in retained chain.")
 
-    # mle_index = np.argmax(flat_loglike)
-    # mle_amp, mle_slope = flat_samples[mle_index]
+    # ------------------------------------------------------------
+    # MLE = chain point with maximum likelihood / minimum chi^2
+    # ------------------------------------------------------------
+
+    mle_index = np.argmax(flat_log_prob)
+
+    mle_amp = flat_samples[mle_index, 0]
+    mle_slope = flat_samples[mle_index, 1]
+
+    log_likelihood_mle = flat_log_prob[mle_index]
+
+    chi2 = -2.0 * flat_log_prob
+    chi2_min = chi2[mle_index]
+
+    print(
+        f"[INFO] MLE from chain: "
+        f"AMP={mle_amp:.6f}, "
+        f"SLOPE={mle_slope:.6f}"
+    )
+    print(f"[INFO] Minimum chi^2 = {chi2_min:.6f}")
+
+    delta_chi2 = chi2 - chi2_min
+    delta_chi2_limit = 2.30
+
+    confidence_mask = (delta_chi2 <= delta_chi2_limit)
+    confidence_samples = flat_samples[confidence_mask]
+
+    if confidence_samples.shape[0] == 0:
+        raise RuntimeError("No MCMC samples lie inside the requested delta-chi^2 region.")
+
+    amp_conf_min = np.min(confidence_samples[:, 0])
+    amp_conf_max = np.max(confidence_samples[:, 0])
+    slope_conf_min = np.min(confidence_samples[:, 1])
+    slope_conf_max = np.max(confidence_samples[:, 1])
+
+    err_amp_lower = mle_amp - amp_conf_min
+    err_amp_upper = amp_conf_max - mle_amp
+    err_slope_lower = mle_slope - slope_conf_min
+    err_slope_upper = slope_conf_max - mle_slope
+
+    print(f"[INFO] Delta chi^2 <= {delta_chi2_limit}")
+    print(
+        f"[INFO] AMP range: "
+        f"{amp_conf_min:.6f} -- {amp_conf_max:.6f}"
+    )
+    print(
+        f"[INFO] SLOPE range: "
+        f"{slope_conf_min:.6f} -- {slope_conf_max:.6f}"
+    )
+    print(
+        f"[INFO] AMP = {mle_amp:.6f} "
+        f"-{err_amp_lower:.6f} "
+        f"+{err_amp_upper:.6f}"
+    )
+    print(
+        f"[INFO] SLOPE = {mle_slope:.6f} "
+        f"-{err_slope_lower:.6f} "
+        f"+{err_slope_upper:.6f}"
+    )
 
     print(np.mean(sampler.acceptance_fraction))
 
@@ -247,40 +364,57 @@ if __name__ == '__main__':
 
     axes[-1].set_xlabel("step number")
     # pb.savefig(f'./Plots/mcmc_chains_{test_name[0]}_{test_name[1]}_steps{steps}_walkers{nwalkers}_initialpos{initial_name[0]}_{initial_name[1]}_offset{gaussian_offset_name}.png', dpi=400)
-    pb.savefig(f'./Plots/mcmc_chains_optimal_value_{box}_{isim}_{iz}_mle.png', dpi=400)
+    if box == 'L2800N5040':
+        pb.savefig(f'./Plots/mcmc_chains_optimal_value_{box}_{iz}_lightcone{lightcone}_mle.png', dpi=400)
+    else:
+        pb.savefig(f'./Plots/mcmc_chains_optimal_value_{box}_{isim}_{iz}_mle.png', dpi=400)
     pb.clf()
 
     print(flat_samples.shape)
     
     import corner
 
-    mle = []
-    mle_err_lower = []
-    mle_err_upper = []
+    # mle = []
+    # mle_err_lower = []
+    # mle_err_upper = []
 
-    for i in range(ndim):
-        mcmc = np.percentile(flat_samples[:, i], [16, 50, 84])
-        q = np.diff(mcmc)
-        mle.append(mcmc[1])
-        mle_err_lower.append(q[0])   # 50th - 16th percentile
-        mle_err_upper.append(q[1])   # 84th - 50th percentile
+    # for i in range(ndim):
+    #     mcmc = np.percentile(flat_samples[:, i], [16, 50, 84])
+    #     q = np.diff(mcmc)
+    #     mle.append(mcmc[1])
+    #     mle_err_lower.append(q[0])   # 50th - 16th percentile
+    #     mle_err_upper.append(q[1])   # 84th - 50th percentile
 
-    median_amp = mle[0]
-    median_slope = mle[1]
-    err_amp_lower = mle_err_lower[0]
-    err_amp_upper = mle_err_upper[0]
-    err_slope_lower = mle_err_lower[1]
-    err_slope_upper = mle_err_upper[1]
-    print(f"[INFO] MLE AMP: {mle_amp}, MLE SLOPE: {mle_slope}")
-    print(f"[INFO] Median AMP: {median_amp}, Median SLOPE: {median_slope}")
+    # median_amp = mle[0]
+    # median_slope = mle[1]
+    # err_amp_lower = mle_err_lower[0]
+    # err_amp_upper = mle_err_upper[0]
+    # err_slope_lower = mle_err_lower[1]
+    # err_slope_upper = mle_err_upper[1]
+    # print(f"[INFO] MLE AMP: {mle_amp}, MLE SLOPE: {mle_slope}")
+    # print(f"[INFO] Median AMP: {median_amp}, Median SLOPE: {median_slope}")
 
-    log_likelihood_mle = log_likelihood((mle_amp, mle_slope), f_obs, f_obs_err, box, isim, iz, lightcone=lightcone,
+    log_likelihood_mle_check = log_likelihood((mle_amp, mle_slope), f_obs, f_obs_err, box, isim, iz, lightcone=lightcone,
                                         abundance_cut=abundance_cut, amp_min=amp_min, amp_max=amp_max, amp_step=amp_step,
                                         slope_min=slope_min, slope_max=slope_max, slope_step=slope_step)
     print(f"[INFO] Log-Likelihood at MLE: {log_likelihood_mle}")
+    print("[INFO] Stored/recalculated likelihood:",
+          log_likelihood_mle,
+          log_likelihood_mle_check,)
+
+    if not np.isclose(log_likelihood_mle, log_likelihood_mle_check, rtol=1e-10, atol=1e-10):
+        raise ValueError("Stored and recalculated MLE likelihoods disagree.")
 
     # Save MCMC chain
-    np.save(f"./data_files/mcmc_chains/flat_samples_{box}_{isim}_{iz}_lightcone{lightcone}_{mle_amp}_{mle_slope}.npy", flat_samples)
+    chain_dir = Path("./data_files/mcmc_chains")
+    chain_dir.mkdir(parents=True, exist_ok=True)
+    base = (f"{box}_{isim}_{iz}_lightcone{lightcone}_{mle_amp}_{mle_slope}")
+
+    np.save(chain_dir / f"chain_{base}.npy", sampler.get_chain())
+    np.save(chain_dir / f"log_prob_chain_{base}.npy", sampler.get_log_prob())
+    np.save(chain_dir / f"flat_samples_{base}.npy", flat_samples)
+    np.save(chain_dir / f"flat_log_prob_{base}.npy", flat_log_prob)
+    # np.save(f"./data_files/mcmc_chains/flat_samples_{box}_{isim}_{iz}_lightcone{lightcone}_{mle_amp}_{mle_slope}.npy", flat_samples)
 
     # write to text file in a known place
     path = f"./data_files/mle_parameters/{box}/{isim}/{iz}/lightcone{lightcone}/mle_values.txt"
@@ -299,7 +433,7 @@ if __name__ == '__main__':
 
     with open(outfile, "w") as f:
         f.write(f"LOG_LIKELIHOOD={log_likelihood_mle:.13f}\n")
-        f.write(f"CHI2={(log_likelihood_mle * -2):.13f}\n")
+        f.write(f"CHI2={chi2_min:.13f}\n")
         f.write(f"LOG_LIKELIHOOD_AUTO={(chi_sq_auto * -0.5):.13f}\n")
         f.write(f"CHI2_AUTO={chi_sq_auto:.13f}\n")
         f.write(f"LOG_LIKELIHOOD_CROSS={(chi_sq_cross * -0.5):.13f}\n")
@@ -310,6 +444,7 @@ if __name__ == '__main__':
         f.write(f"AMP_ERR_UPPER={err_amp_upper:.4f}\n")
         f.write(f"SLOPE_ERR_LOWER={err_slope_lower:.4f}\n")
         f.write(f"SLOPE_ERR_UPPER={err_slope_upper:.4f}\n")
+        f.write(f"RANDOM_SEED={seed}\n")
 
     print(f"[INFO] Wrote MLEs to {outfile}")
 
@@ -326,7 +461,10 @@ if __name__ == '__main__':
         ax.xaxis.set_major_formatter(FormatStrFormatter(fmt))
         ax.yaxis.set_major_formatter(FormatStrFormatter(fmt))
     # pb.savefig(f'./Plots/mcmc_corner_{test_name[0]}_{test_name[1]}_steps{steps}_walkers{nwalkers}_initialpos{initial_name[0]}_{initial_name[1]}_offset{gaussian_offset_name}.png', dpi=400)
-    pb.savefig(f'./Plots/mcmc_corner_optimal_value_{box}_{isim}_{iz}_mle.png', dpi=400)
+    if box == 'L2800N5040':
+        pb.savefig(f'./Plots/mcmc_corner_optimal_value_{box}_{iz}_lightcone{lightcone}_mle.png', dpi=400)
+    else:
+        pb.savefig(f'./Plots/mcmc_corner_optimal_value_{box}_{isim}_{iz}_mle.png', dpi=400)
     pb.clf()
 
 

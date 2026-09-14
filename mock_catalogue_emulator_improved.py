@@ -34,11 +34,19 @@ def emulator(x, spectra, box, isim, iz,
         y_train = np.load(f"./gpy_model/{box}/{isim}/{iz}/lightcone{lightcone}/training/Y_training_data_{spectra}.npy")
         print(y_train)
 
+    # if spectra != 'abundance' and spectra != 'cross':
+        # y_train = y_train[:, :-3]
+
 
     x = np.asarray(x, dtype=float).reshape(-1)
 
     if x.size != x_train.shape[1]:
         raise ValueError(f"Expected {x_train.shape[1]} input parameters, got {x.size}")
+
+    x_train_full = x_train.copy()
+    x_train_min = np.min(x_train_full, axis=0)
+    x_train_max = np.max(x_train_full, axis=0)
+    x_train_range = x_train_max - x_train_min
 
     if oos_test:
         held_out = np.where(np.all(np.isclose(x_train, x[None, :], rtol=0.0, atol=1.0e-8), axis=1))[0]
@@ -56,10 +64,6 @@ def emulator(x, spectra, box, isim, iz,
         # A genuine holdout model must be trained without the held-out point.
         load = False
         save = False
-
-    x_train_min = np.min(x_train, axis=0)
-    x_train_max = np.max(x_train, axis=0)
-    x_train_range = x_train_max - x_train_min
 
     if np.any(x_train_range <= 0):
         raise ValueError("At least one input parameter has zero training range")
@@ -89,9 +93,15 @@ def emulator(x, spectra, box, isim, iz,
     if not load:
         model = GPy.models.GPRegression(X=x_train_normalised, Y=y_model, kernel=kernel, normalizer=True, noise_var=1.0e-6)
 
-        model.Gaussian_noise.variance.fix(1.0e-6)
-
-        num_restarts = 3 if oos_test else 10
+        if spectra == "abundance":
+            num_restarts = 30
+            model.Gaussian_noise.variance.constrain_bounded(1.0e-8, 1.0e-3, warning=False)
+        elif oos_test:
+            num_restarts = 3
+            model.Gaussian_noise.variance.fix(1.0e-6)
+        else:
+            num_restarts = 10
+            model.Gaussian_noise.variance.fix(1.0e-6)
 
         model.optimize_restarts(num_restarts=num_restarts, optimizer="lbfgsb", max_iters=3000, verbose=False, parallel=False)
 
@@ -158,14 +168,20 @@ def emulator(x, spectra, box, isim, iz,
         variance_spectrum = (np.exp(ln10**2 * var_log10) - 1.0) * np.exp(2.0 * ln10 * mu_log10 + ln10**2 * var_log10)
         variance_spectrum = np.clip(variance_spectrum, 0.0, None)
 
+        if spectra == "abundance":
+            prediction = median_spectrum
+        else:
+            prediction = mean_spectrum
+
     else:
-        median_spectrum = mean_model
+        prediction = mean_model
         mean_spectrum = mean_model
+        median_spectrum = None
         variance_spectrum = variance_model
 
     std_spectrum = np.sqrt(variance_spectrum)
 
-    return mean_spectrum, median_spectrum, variance_spectrum, std_spectrum
+    return prediction, median_spectrum, variance_spectrum, std_spectrum
 
 
 if __name__ == '__main__':
@@ -177,8 +193,8 @@ if __name__ == '__main__':
     lightcone = int(sys.argv[5])
 
     spectra = str(sys.argv[4])
-    amp = 10.952
-    slope = 0.259
+    amp = 10.813
+    slope = 0.183
     residual = 0.0
 
     if iz == 'Blue':
@@ -189,7 +205,7 @@ if __name__ == '__main__':
     kusiak_observed_abundance = kusiak_nbar * 41253
 
     test = np.array((amp+residual, slope))
-    test_name = [f"{float(test[0]):.1f}".replace('.', 'p'), f"{float(test[1]):.1f}".replace('.', 'p')]
+    test_name = [f"{float(test[0]):.3f}".replace('.', 'p'), f"{float(test[1]):.3f}".replace('.', 'p')]
     test_name_base = [f"{float(amp):.1f}".replace('.', 'p'), f"{float(slope):.1f}".replace('.', 'p')]
     if amp+residual >= 11.3:
         pass
@@ -218,11 +234,13 @@ if __name__ == '__main__':
         #                         delimiter=' ', skiprows=1, usecols=(0,2) if spectra=='auto' else (0,1))
 
     pred_train, pred_train_median, pred_train_var, pred_train_std = emulator(test, spectra, box, isim, iz, save=True, retrain=True, lightcone=lightcone, 
-                    abundance_cut=0.5 if spectra != 'abundance' else 0.0, slope_max=2.0 if iz == 'Blue' else 1.0)
+                    abundance_cut=0.5 if spectra != 'abundance' else 0.0, log=True, slope_max=2.0 if iz == 'Blue' else 1.0)
     pred, pred_median, pred_var, pred_std = emulator(test, spectra, box, isim, iz, load=True, lightcone=lightcone, 
-                    abundance_cut=0.5 if spectra != 'abundance' else 0.0, log=True, slope_max=.0 if iz == 'Blue' else 1.0)
+                    abundance_cut=0.5 if spectra != 'abundance' else 0.0, log=True, slope_max=2.0 if iz == 'Blue' else 1.0)
     print(pred_train, abundance)
     print(pred, pred_var, pred_std)
+    print(pred - pred_std, pred + pred_std)
+    print(pred_std/pred)
     # quit()
 
     if spectra == 'abundance':
@@ -366,12 +384,14 @@ if __name__ == '__main__':
         pb.title(f'Emulator error test (x_test: Amplitude={test[0]}, Slope={test[1]})')
         pb.xlabel('$\ell$')
         pb.ylabel('Residual')
+        if spectra == 'cross':
+            pb.ylim(top=1.055, bottom=0.945)
         pb.xlim(100, 3000)
         pb.legend()
         pb.tight_layout()
         pb.savefig('./Plots/mock_catalog_emulator_error_test.png', dpi=400)
         pb.clf()
-        # quit()
+        quit()
 
         x_train = np.load(f"./gpy_model/{box}/{isim}/{iz}/lightcone{lightcone}/training/X_training_data_{spectra}.npy")
         # x_train = np.loadtxt('./data_files/mock_catalog_test_points.txt')

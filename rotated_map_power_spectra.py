@@ -152,7 +152,7 @@ for i in range(len(angles[0])):
     else:
         source_vector = np.concatenate((source_vector, hp.ang2vec(theta_rot, phi_rot, lonlat=True)), axis=0)
         source_vector_no_rotation = np.concatenate((source_vector_no_rotation, hp.ang2vec(theta, phi, lonlat=True)), axis=0)
-print(len(mock_catalogue['mvir']), source_vector.shape)
+print(len(mock_catalogue['m500crit']), source_vector.shape)
 print(dndz_total, mock_catalogue_total, mock_catalogue_z_total)
 
 print('Finished computing halo catalogs: {:.2f} seconds'.format(time.time() - job_start_time))
@@ -183,7 +183,7 @@ deproj_auto = nmt.deprojection_bias(f_galaxy, f_galaxy, clg)
 w_auto = nmt.NmtWorkspace.from_fields(f_galaxy, f_galaxy, b)
 cl_auto_namaster = w_auto.decouple_cell(pcl_auto - deproj_auto).squeeze()[ell_200_mask]
 
-auto_spectra_shot_noise = (4*np.pi)/len(mock_catalogue['mvir']) #Shot-noise is 4pi/(total number of sources in the map)
+auto_spectra_shot_noise = (4*np.pi)/len(mock_catalogue['m500crit']) #Shot-noise is 4pi/(total number of sources in the map)
 
 auto_spectra = ((cl_auto_namaster - auto_spectra_shot_noise) + obs_shot_noise)*1e5
 auto_spectra_unsmoothed_component = auto_spectra[np.where(ell_namaster <= 1000)]
@@ -216,7 +216,7 @@ deproj_auto_kk = nmt.deprojection_bias(f_kappa, f_kappa, clg_kk)
 w_auto_kk = nmt.NmtWorkspace.from_fields(f_kappa, f_kappa, b)
 cl_auto_namaster_kk = w_auto_kk.decouple_cell(pcl_auto_kk - deproj_auto_kk).squeeze()[ell_200_mask]
 
-auto_spectra_shot_noise = (4*np.pi)/len(mock_catalogue['mvir']) #Shot-noise is 4pi/(total number of sources in the map)
+auto_spectra_shot_noise = (4*np.pi)/len(mock_catalogue['m500crit']) #Shot-noise is 4pi/(total number of sources in the map)
 
 auto_spectra_kk = cl_auto_namaster_kk*1e5
 auto_spectra_unsmoothed_component_kk = auto_spectra_kk[np.where(ell_namaster <= 1000)]
@@ -284,7 +284,7 @@ pb.xscale("log")
 pb.yscale("log")
 pb.xlim(200, 4000)
 pb.ylim(bottom=1e-2)
-pb.title(f'Galaxy-galaxy power spectrum for mock catalogue with nhalos = {len(mock_catalogue["mvir"])}')
+pb.title(f'Galaxy-galaxy power spectrum for mock catalogue with nhalos = {len(mock_catalogue["m500crit"])}')
 pb.legend(fontsize=9, ncols=1, loc='upper right')
 pb.savefig(f'./Plots/gg_power_spectrum_{box}_{isim}_{iz}_lightcone{lightcone}_{im_name}_{slope_name}_rotated.png', dpi=300)
 pb.clf()
@@ -300,7 +300,7 @@ pb.xscale("log")
 pb.yscale("log")
 pb.xlim(200, 4000)
 # pb.ylim(bottom=1e-4)
-pb.title(f'Kappa-galaxy cross spectrum for mock catalogue with nhalos = {len(mock_catalogue["mvir"])}')
+pb.title(f'Kappa-galaxy cross spectrum for mock catalogue with nhalos = {len(mock_catalogue["m500crit"])}')
 pb.legend(fontsize=9, ncols=1, loc='upper right')
 pb.savefig(f'./Plots/kg_cross_spectrum_{box}_{isim}_{iz}_lightcone{lightcone}_{im_name}_{slope_name}_rotated.png', dpi=300)
 pb.clf()
@@ -315,7 +315,7 @@ pb.xscale("log")
 pb.yscale("log")
 pb.xlim(200, 4000)
 # pb.ylim(bottom=1e-2)
-pb.title(f'Kappa-kappa power spectrum for mock catalogue with nhalos = {len(mock_catalogue["mvir"])}')
+pb.title(f'Kappa-kappa power spectrum for mock catalogue with nhalos = {len(mock_catalogue["m500crit"])}')
 pb.legend(fontsize=9, ncols=1, loc='upper right')
 pb.savefig(f'./Plots/kk_power_spectrum_{box}_{isim}_{iz}_lightcone{lightcone}_{im_name}_{slope_name}_rotated.png', dpi=300)
 pb.clf()
@@ -329,5 +329,5 @@ cross_output_path.parent.mkdir(parents=True, exist_ok=True)
 
 auto_out = np.column_stack((ell_namaster, auto_spectra*1e5, ((auto_spectra-auto_spectra_shot_noise)+obs_shot_noise)*1e5))
 cross_out = np.column_stack((ell_namaster, cross_spectra*1e5))
-np.savetxt(auto_output_path, auto_out, fmt='%f %.13f %.13f', header=f"Galaxy-galaxy power spectra for mock catalog with nhalos = {len(mock_catalogue['mvir'])}", comments='')
-np.savetxt(cross_output_path, cross_out, fmt='%f %.13f', header=f"Kappa-galaxy cross spectra for mock catalog with nhalos = {len(mock_catalogue['mvir'])}", comments='')
+np.savetxt(auto_output_path, auto_out, fmt='%f %.13f %.13f', header=f"Galaxy-galaxy power spectra for mock catalog with nhalos = {len(mock_catalogue['m500crit'])}", comments='')
+np.savetxt(cross_output_path, cross_out, fmt='%f %.13f', header=f"Kappa-galaxy cross spectra for mock catalog with nhalos = {len(mock_catalogue['m500crit'])}", comments='')

@@ -153,11 +153,11 @@ def load_soap_hbt_snapshot(snap: int):
     with h5py.File(path, "r") as f:
         ids = f["InputHalos/HaloCatalogueIndex"][...]
         structure_type = f["InputHalos/IsCentral"][...]
-        mvir = f["SO/500_crit/TotalMass"][...] * 1e10
+        m500crit = f["SO/500_crit/TotalMass"][...] * 1e10
         mstar = f["ExclusiveSphere/50kpc/StellarMass"][...] * 1e10
         host_halo_index = f["SOAP/HostHaloIndex"][...]
 
-    return ids, structure_type, mvir, mstar, host_halo_index
+    return ids, structure_type, m500crit, mstar, host_halo_index
 
 
 def make_snapshot_lookup(ids: np.ndarray) -> dict[int, int]:
@@ -167,16 +167,16 @@ def make_snapshot_lookup(ids: np.ndarray) -> dict[int, int]:
     return {int(halo_id): i for i, halo_id in enumerate(ids)}
 
 
-def host_fixed_mvir_for_lightcone_ids(
+def host_fixed_m500crit_for_lightcone_ids(
     lc_ids: np.ndarray,
     soap_ids: np.ndarray,
     structure_type: np.ndarray,
-    mvir: np.ndarray,
+    m500crit: np.ndarray,
     mstar: np.ndarray,
     host_halo_index: np.ndarray,
 ):
     """
-    Return structure type, host-fixed mvir, and stellar mass for the lightcone objects.
+    Return structure type, host-fixed m500crit, and stellar mass for the lightcone objects.
     """
     id_to_row = make_snapshot_lookup(soap_ids)
 
@@ -188,11 +188,11 @@ def host_fixed_mvir_for_lightcone_ids(
     valid = rows >= 0
 
     lc_structure = np.full(len(lc_ids), -999, dtype=structure_type.dtype)
-    lc_mvir = np.full(len(lc_ids), np.nan, dtype=float)
+    lc_m500crit = np.full(len(lc_ids), np.nan, dtype=float)
     lc_mstar = np.full(len(lc_ids), np.nan, dtype=float)
 
     lc_structure[valid] = structure_type[rows[valid]]
-    lc_mvir[valid] = mvir[rows[valid]]
+    lc_m500crit[valid] = m500crit[rows[valid]]
     lc_mstar[valid] = mstar[rows[valid]]
 
     sat_mask = valid & (lc_structure == SATELLITE_FLAG)
@@ -203,10 +203,10 @@ def host_fixed_mvir_for_lightcone_ids(
 
         good_host_index = (
             (host_rows >= 0)
-            & (host_rows < len(mvir))
+            & (host_rows < len(m500crit))
         )
 
-        fixed_values = lc_mvir[sat_mask].copy()
+        fixed_values = lc_m500crit[sat_mask].copy()
 
         if np.any(good_host_index):
             candidate_host_rows = host_rows[good_host_index]
@@ -214,13 +214,13 @@ def host_fixed_mvir_for_lightcone_ids(
 
             fixed_values[good_host_index] = np.where(
                 host_is_central,
-                mvir[candidate_host_rows],
+                m500crit[candidate_host_rows],
                 fixed_values[good_host_index],
             )
 
-        lc_mvir[sat_mask] = fixed_values
+        lc_m500crit[sat_mask] = fixed_values
 
-    return lc_structure, lc_mvir, lc_mstar, valid
+    return lc_structure, lc_m500crit, lc_mstar, valid
 
 
 # -------------------------------------------------------------------
@@ -233,7 +233,7 @@ def main():
 
     shell_table = read_shell_table(REDSHIFT_SHELL_FILE)
 
-    all_mvir = []
+    all_m500crit = []
     all_mstar = []
     all_is_satellite = []
     redshift_rows = []
@@ -263,24 +263,24 @@ def main():
             in_snap = lc_snapnums == snap
 
             try:
-                soap_ids, structure_type, mvir, mstar, host_halo_index = load_soap_hbt_snapshot(snap)
+                soap_ids, structure_type, m500crit, mstar, host_halo_index = load_soap_hbt_snapshot(snap)
             except FileNotFoundError as err:
                 print(f"[WARN] Missing SOAP-HBT snapshot: {err}. Skipping snap={snap}.")
                 continue
 
-            lc_structure, lc_mvir, lc_mstar, valid = host_fixed_mvir_for_lightcone_ids(
+            lc_structure, lc_m500crit, lc_mstar, valid = host_fixed_m500crit_for_lightcone_ids(
                 lc_ids=lc_ids[in_snap],
                 soap_ids=soap_ids,
                 structure_type=structure_type,
-                mvir=mvir,
+                m500crit=m500crit,
                 mstar=mstar,
                 host_halo_index=host_halo_index,
             )
 
             good = (
                 valid
-                & np.isfinite(lc_mvir)
-                & (lc_mvir > 0)
+                & np.isfinite(lc_m500crit)
+                & (lc_m500crit > 0)
                 & np.isfinite(lc_mstar)
                 & (lc_mstar > 0)
                 & (
@@ -297,7 +297,7 @@ def main():
 
             is_sat = lc_structure[good] == SATELLITE_FLAG
 
-            all_mvir.append(lc_mvir[good])
+            all_m500crit.append(lc_m500crit[good])
             all_mstar.append(lc_mstar[good])
             all_is_satellite.append(is_sat)
 
@@ -330,24 +330,24 @@ def main():
             f"f_sat={frac_z[0]:.4f}"
         )
 
-    if len(all_mvir) == 0 or len(all_mstar) == 0:
+    if len(all_m500crit) == 0 or len(all_mstar) == 0:
         raise RuntimeError("No valid galaxies found. Check shell indices, paths, and z range.")
 
 
-    all_mvir = np.concatenate(all_mvir)
+    all_m500crit = np.concatenate(all_m500crit)
     all_mstar = np.concatenate(all_mstar)
     all_is_satellite = np.concatenate(all_is_satellite)
 
-    log_mvir = np.log10(all_mvir)
+    log_m500crit = np.log10(all_m500crit)
     log_mstar = np.log10(all_mstar)
 
     halo_mass_hist, halo_mass_bins = np.histogram(
-        log_mvir,
+        log_m500crit,
         bins=N_HALO_MASS_BINS,
     )
 
     halo_mass_hist_sat, _ = np.histogram(
-        log_mvir[all_is_satellite],
+        log_m500crit[all_is_satellite],
         bins=halo_mass_bins,
     )
 
@@ -408,7 +408,7 @@ def main():
         halo_mass_out,
         halo_mass_rows,
         header=(
-            "log10_mvir_bin_left log10_mvir_bin_right log10_mvir_bin_centre "
+            "log10_m500crit_bin_left log10_m500crit_bin_right log10_m500crit_bin_centre "
             "n_total n_satellite satellite_fraction satellite_fraction_binomial_error"
         ),
     )

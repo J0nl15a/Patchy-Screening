@@ -84,18 +84,18 @@ DS_MVIR = 'SO/500_crit/TotalMass'
 DS_HOSTID = 'SOAP/HostHaloIndex'
 # ---------------------
 
-if ps.merge[ps.merge['Structuretype'] == SATELLITE_FLAG].iloc[0]['mvir'] == 0:
-    print(ps.merge[ps.merge['Structuretype'] == SATELLITE_FLAG]['mvir'])
+if ps.merge[ps.merge['Structuretype'] == SATELLITE_FLAG].iloc[0]['m500crit'] == 0:
+    print(ps.merge[ps.merge['Structuretype'] == SATELLITE_FLAG]['m500crit'])
 
     # Load your (lightcone / selected) catalogue
     cat = ps.merge
 
     # Select satellites with valid HaloID
-    if "HostHaloID" in cat.columns:
+    if "HostHaloIndex" in cat.columns:
         sats = cat[
             (cat["Structuretype"] == SATELLITE_FLAG) &
-            (cat["HostHaloID"] >= 0)
-        ][["ID", "SnapNum", "HostHaloID"]]
+            (cat["HostHaloIndex"] >= 0)
+        ][["ID", "SnapNum", "HostHaloIndex"]]
     elif "HaloID" in cat.columns:
         sats = cat[
             (cat["Structuretype"] == SATELLITE_FLAG) &
@@ -109,7 +109,7 @@ if ps.merge[ps.merge['Structuretype'] == SATELLITE_FLAG].iloc[0]['mvir'] == 0:
     snapnums = sats["SnapNum"].unique().tolist()
     snapnums.sort()
 
-    updates = []  # will collect (ID, new_mvir) for all satellites across snaps
+    updates = []  # will collect (ID, new_m500crit) for all satellites across snaps
 
     for i, snap in enumerate(snapnums):
         sats_snap = sats[sats["SnapNum"] == snap]
@@ -119,10 +119,10 @@ if ps.merge[ps.merge['Structuretype'] == SATELLITE_FLAG].iloc[0]['mvir'] == 0:
         with h5py.File(h5_path, "r") as f:
             # Read full arrays (HaloID is an index into the FULL catalogue arrays)
             struct = f[DS_STRUCTURETYPE][...]  # shape (N,)
-            mvir = f[DS_MVIR][...] *1e10       # shape (N,)
+            m500crit = f[DS_MVIR][...] *1e10       # shape (N,)
 
-        if "HostHaloID" in sats_snap.columns:
-            halo_ids = sats_snap["HostHaloID"].to_numpy()
+        if "HostHaloIndex" in sats_snap.columns:
+            halo_ids = sats_snap["HostHaloIndex"].to_numpy()
         elif "HaloID" in sats_snap.columns:
             halo_ids = sats_snap["HaloID"].to_numpy()
         else:
@@ -139,30 +139,30 @@ if ps.merge[ps.merge['Structuretype'] == SATELLITE_FLAG].iloc[0]['mvir'] == 0:
         # print(halo_ids)
                 
         host_struct = struct[halo_ids]
-        host_mvir = mvir[halo_ids]
+        host_m500crit = m500crit[halo_ids]
 
         # Only accept hosts that are centrals; otherwise set null
-        host_mvir = np.where(host_struct == CENTRAL_FLAG, host_mvir, np.nan)
+        host_m500crit = np.where(host_struct == CENTRAL_FLAG, host_m500crit, np.nan)
 
         updates.append(
             pd.DataFrame({
                 "ID": sats_snap["ID"].to_numpy(),
-                "_host_mvir": host_mvir,
+                "_host_m500crit": host_m500crit,
             })
         )
 
         print(updates[i][0:5])
 
-    updates_df = pd.concat(updates) if updates else pd.DataFrame({"ID": [], "_host_mvir": []})
+    updates_df = pd.concat(updates) if updates else pd.DataFrame({"ID": [], "_host_m500crit": []})
 
-    # Join updates back onto the original catalogue and overwrite mvir for satellites only
+    # Join updates back onto the original catalogue and overwrite m500crit for satellites only
     cat_fixed = pd.merge(cat, updates_df, on="ID", how="left")
-    cat_fixed["mvir"] = np.where(
-        (cat_fixed["Structuretype"] == SATELLITE_FLAG) & cat_fixed["_host_mvir"].notna(),
-        cat_fixed["_host_mvir"],
-        cat_fixed["mvir"],
+    cat_fixed["m500crit"] = np.where(
+        (cat_fixed["Structuretype"] == SATELLITE_FLAG) & cat_fixed["_host_m500crit"].notna(),
+        cat_fixed["_host_m500crit"],
+        cat_fixed["m500crit"],
     )
-    cat_fixed = cat_fixed.drop(columns=["_host_mvir"])
+    cat_fixed = cat_fixed.drop(columns=["_host_m500crit"])
 
     print(cat_fixed[(cat_fixed["SnapNum"] == snap) & (cat_fixed["Structuretype"] == 0)].head())
 
@@ -174,8 +174,8 @@ if ps.merge[ps.merge['Structuretype'] == SATELLITE_FLAG].iloc[0]['mvir'] == 0:
     centrals_sample = cat_fixed[cat_fixed["Structuretype"] == CENTRAL_FLAG]
     satellites_sample = cat_fixed[cat_fixed["Structuretype"] == SATELLITE_FLAG]
 
-elif ps.merge[ps.merge["Structuretype"] == SATELLITE_FLAG]["mvir"].iloc[0] > 0:
-    print(ps.merge[ps.merge["Structuretype"] == SATELLITE_FLAG]["mvir"])
+elif ps.merge[ps.merge["Structuretype"] == SATELLITE_FLAG]["m500crit"].iloc[0] > 0:
+    print(ps.merge[ps.merge["Structuretype"] == SATELLITE_FLAG]["m500crit"])
 
     total_sample = ps.merge
     centrals_sample = ps.merge[ps.merge["Structuretype"] == CENTRAL_FLAG]
@@ -190,7 +190,7 @@ elif ps.merge[ps.merge["Structuretype"] == SATELLITE_FLAG]["mvir"].iloc[0] > 0:
         satellites_sample_other = ps_other.merge[ps_other.merge["Structuretype"] == SATELLITE_FLAG]
 
 # log_bins_stellar_mass = np.logspace(min(total_sample['mstar'].to_numpy()), max(total_sample['mstar'].to_numpy()), n_bins)
-# log_bins_halo_mass = np.logspace(min(total_sample['mvir'].to_numpy()), max(total_sample['mvir'].to_numpy()), n_bins)
+# log_bins_halo_mass = np.logspace(min(total_sample['m500crit'].to_numpy()), max(total_sample['m500crit'].to_numpy()), n_bins)
 
 stellar_mass_hist, stellar_bins = np.histogram(np.log10(total_sample['mstar'].to_numpy()), bins=n_bins)
 stellar_mass_hist_centrals, _ = np.histogram(np.log10(centrals_sample['mstar'].to_numpy()), bins=stellar_bins)
@@ -199,12 +199,12 @@ stellar_mass_hist_satellites, _ = np.histogram(np.log10(satellites_sample['mstar
 stellar_mass_hist_hires, stellar_bins_hires = np.histogram(np.log10(total_sample_hires['mstar'].to_numpy()), bins=n_bins)
 stellar_mass_hist_largebox, stellar_bins_largebox = np.histogram(np.log10(total_sample_largebox['mstar'].to_numpy()), bins=n_bins)
 
-halo_mass_hist, halo_bins = np.histogram(np.log10(total_sample['mvir'].to_numpy()), bins=n_bins)
-halo_mass_hist_centrals, _ = np.histogram(np.log10(centrals_sample['mvir'].to_numpy()), bins=halo_bins)
-halo_mass_hist_satellites, _ = np.histogram(np.log10(satellites_sample['mvir'].to_numpy()), bins=halo_bins)
+halo_mass_hist, halo_bins = np.histogram(np.log10(total_sample['m500crit'].to_numpy()), bins=n_bins)
+halo_mass_hist_centrals, _ = np.histogram(np.log10(centrals_sample['m500crit'].to_numpy()), bins=halo_bins)
+halo_mass_hist_satellites, _ = np.histogram(np.log10(satellites_sample['m500crit'].to_numpy()), bins=halo_bins)
 
-halo_mass_hist_hires, halo_bins_hires = np.histogram(np.log10(total_sample_hires['mvir'].to_numpy()), bins=n_bins)
-halo_mass_hist_largebox, halo_bins_largebox = np.histogram(np.log10(total_sample_largebox['mvir'].to_numpy()), bins=n_bins)
+halo_mass_hist_hires, halo_bins_hires = np.histogram(np.log10(total_sample_hires['m500crit'].to_numpy()), bins=n_bins)
+halo_mass_hist_largebox, halo_bins_largebox = np.histogram(np.log10(total_sample_largebox['m500crit'].to_numpy()), bins=n_bins)
 
 redshift_hist = []
 redshift_hist_centrals = []
@@ -235,7 +235,7 @@ print(redshift_hist)
 # redshift_hist_satellites, _ = np.histogram(satellites_sample['z'].to_numpy(), bins=redshift_bins)
 
 # stellar_mass_hist_reduced, stellar_bins_reduced = np.histogram(total_sample['mstar'].to_numpy(), bins=n_bins, range=(stellar_bins.min(), stellar_bins.max()))
-# halo_mass_hist_reduced, halo_bins_reduced = np.histogram(total_sample['mvir'].to_numpy(), bins=n_bins, range=(halo_bins.min(), halo_bins.max()))
+# halo_mass_hist_reduced, halo_bins_reduced = np.histogram(total_sample['m500crit'].to_numpy(), bins=n_bins, range=(halo_bins.min(), halo_bins.max()))
 
 
 satellite_fraction_stellar_mass = (stellar_mass_hist_satellites/stellar_mass_hist) #stellar_mass_hist_satellites/stellar_mass_hist_reduced #stellar_mass_hist_satellites/stellar_mass_hist_reduced
@@ -316,11 +316,11 @@ if plot_all == "True":
     pb.savefig(f"./Plots/stellar_mass_distribution_mock_catalog_multi_res_{iz}.{plot_suffix}", dpi=400)
     pb.clf()
 
-    # pb.hist(np.log10(total_sample['mvir'].to_numpy()), bins=n_bins, log=True, histtype='step', label='All galaxies', color='black')
+    # pb.hist(np.log10(total_sample['m500crit'].to_numpy()), bins=n_bins, log=True, histtype='step', label='All galaxies', color='black')
     # pb.errorbar((halo_bins[1:]-halo_bins[:-1])/2, halo_mass_hist, yerr=np.sqrt(halo_mass_hist), ecolor='black', linewidth=0, alpha=1, elinewidth=2)
-    # pb.hist(np.log10(centrals_sample['mvir'].to_numpy()), bins=n_bins, log=True, histtype='step', label='Centrals', color='red')
+    # pb.hist(np.log10(centrals_sample['m500crit'].to_numpy()), bins=n_bins, log=True, histtype='step', label='Centrals', color='red')
     # pb.errorbar((halo_bins[1:]-halo_bins[:-1])/2, halo_mass_hist_centrals, yerr=np.sqrt(halo_mass_hist_centrals), ecolor='red', linewidth=0, alpha=1, elinewidth=2)
-    # pb.hist(np.log10(satellites_sample['mvir'].to_numpy()), bins=n_bins, log=True, histtype='step', label='Satellites', color='blue')
+    # pb.hist(np.log10(satellites_sample['m500crit'].to_numpy()), bins=n_bins, log=True, histtype='step', label='Satellites', color='blue')
     # pb.errorbar((halo_bins[1:]-halo_bins[:-1])/2, halo_mass_hist_satellites, yerr=np.sqrt(halo_mass_hist_satellites), ecolor='blue', linewidth=0, alpha=1, elinewidth=2)
     halo_bin_centres = 0.5 * (halo_bins[1:] + halo_bins[:-1])
     pb.stairs(halo_mass_hist, halo_bins, color='black', label='All galaxies')
@@ -394,9 +394,9 @@ if plot_all == "True":
     pb.savefig(f"./Plots/satellite_fraction_mock_catalog_{box}_{isim}_{iz}_{m_cut_name}_{s_cut_name}_redshift.{plot_suffix}", dpi=400)
     pb.clf()
 
-    # halo_mass_hist_redshift_bins, _ = np.histogram(total_sample['mvir'].to_numpy() * total_sample['z'].to_numpy(), bins=redshift_bins)
-    # halo_mass_hist_centrals_redshift_bins, _ = np.histogram(centrals_sample['mvir'].to_numpy() * centrals_sample['z'].to_numpy(), bins=redshift_bins)
-    # halo_mass_hist_satellites_redshift_bins, _ = np.histogram(satellites_sample['mvir'].to_numpy() * satellites_sample['z'].to_numpy(), bins=redshift_bins)
+    # halo_mass_hist_redshift_bins, _ = np.histogram(total_sample['m500crit'].to_numpy() * total_sample['z'].to_numpy(), bins=redshift_bins)
+    # halo_mass_hist_centrals_redshift_bins, _ = np.histogram(centrals_sample['m500crit'].to_numpy() * centrals_sample['z'].to_numpy(), bins=redshift_bins)
+    # halo_mass_hist_satellites_redshift_bins, _ = np.histogram(satellites_sample['m500crit'].to_numpy() * satellites_sample['z'].to_numpy(), bins=redshift_bins)
 
     # pb.plot(redshift_bins[:-1], halo_mass_hist_redshift_bins, label='All galaxies')
     # pb.plot(redshift_bins[:-1], halo_mass_hist_centrals_redshift_bins, label='Centrals')

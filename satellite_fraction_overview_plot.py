@@ -284,7 +284,7 @@ def make_plot(args) -> Path:
     # axs[1, 1].fill_between(reference_redshift[:,2], reference_redshift[:,5] - reference_redshift[:,6], reference_redshift[:,5] + reference_redshift[:,6], color="0.8", alpha=0.3, linewidth=0)
 
 
-    mass_column = "mvir" if args.mass_axis == "halo" else "mstar"
+    mass_column = "m500crit" if args.mass_axis == "halo" else "mstar"
     mass_label = "Halo mass" if args.mass_axis == "halo" else "Stellar mass"
 
     for col, iz in enumerate(SAMPLES):

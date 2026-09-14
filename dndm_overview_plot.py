@@ -271,7 +271,7 @@ def configure_axes(axs) -> None:
         ax.set_xlim(11.0, 16.2)
         ax.set_ylim(1e3, 1e8)
     for ax in stellar_axes:
-        ax.set_xlim(10.25, 12.5)
+        ax.set_xlim(10.5, 12.5)
         ax.set_ylim(1e3, 1e8)
 
 
@@ -287,10 +287,10 @@ def make_plot(args) -> Path:
     for col, iz in enumerate(SAMPLES):
         if args.mode == "population":
             cat = load_catalogue(data_root, args.box, args.isim, iz, args.lightcone, args.ncpu)
-            plot_population_panel(axs[0, col], cat, "mvir", args.n_bins)
+            plot_population_panel(axs[0, col], cat, "m500crit", args.n_bins)
             plot_population_panel(axs[1, col], cat, "mstar", args.n_bins)
         elif args.mode == "simulations":
-            plot_simulations_panel(axs[0, col], data_root, args.box, iz, args.lightcone, args.ncpu, "mvir", args.population, args.n_bins, include_resolutions=args.include_resolutions)
+            plot_simulations_panel(axs[0, col], data_root, args.box, iz, args.lightcone, args.ncpu, "m500crit", args.population, args.n_bins, include_resolutions=args.include_resolutions)
             plot_simulations_panel(axs[1, col], data_root, args.box, iz, args.lightcone, args.ncpu, "mstar", args.population, args.n_bins, include_resolutions=args.include_resolutions)
         else:
             raise ValueError(f"Unknown mode: {args.mode}")

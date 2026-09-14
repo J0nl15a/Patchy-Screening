@@ -432,7 +432,7 @@ echo "=============================="
 
 python3 unWISE_power_spectra.py \
     "$SLURM_CPUS_PER_TASK" "$BOX" "$ISIM" "$IZ" "$mle_amp" "$mle_slope" \
-    unlensed True False False True True False False "$LIGHTCONE" False
+    unlensed True False False True True False False "$LIGHTCONE" True
 
 echo "Job 15: Compute power spectra for box $BOX, sim $ISIM, lightcone $LIGHTCONE, $IZ sample for MLE values only."
 

@@ -182,16 +182,10 @@ def load_spectrum(box, sim, iz, lc, amp, slope, spectra_key, ell, shot_noise=Fal
 
     if spectra_key == "auto":
         usecol = 1 if shot_noise else 2
-        path = (
-            f"./data_files/power_spectra/galaxy_galaxy/{box}/{sim}/{iz}/lightcone{lc}/"
-            f"galaxy_galaxy_power_spectrum_{amp_name}_{slope_name}.txt"
-        )
+        path = (f"./data_files/power_spectra/galaxy_galaxy/{box}/{sim}/{iz}/lightcone{lc}/galaxy_galaxy_power_spectrum_{amp_name}_{slope_name}.txt")
     elif spectra_key == "cross":
         usecol = 1
-        path = (
-            f"./data_files/power_spectra/kappa_galaxy/{box}/{sim}/{iz}/lightcone{lc}/"
-            f"kappa_galaxy_power_spectrum_{amp_name}_{slope_name}.txt"
-        )
+        path = (f"./data_files/power_spectra/kappa_galaxy/{box}/{sim}/{iz}/lightcone{lc}/kappa_galaxy_power_spectrum_{amp_name}_{slope_name}.txt")
     else:
         raise ValueError("spectra_key must be 'auto' or 'cross'")
 
@@ -269,10 +263,8 @@ def make_entries(args, iz, ell, spectra_key):
         if entry["color"] is None:
             entry["color"] = cmap(i / max(1, len(entries) - 1))
 
-        entry["spectrum"] = load_spectrum(
-            entry["box"], entry["sim"], iz, entry["lc"], entry["amp"], entry["slope"],
-            spectra_key, ell, shot_noise=args.shot_noise, smooth=not args.no_smooth,
-        )
+        entry["spectrum"] = load_spectrum(entry["box"], entry["sim"], iz, entry["lc"], entry["amp"], entry["slope"], 
+                                          spectra_key, ell, shot_noise=args.shot_noise, smooth=not args.no_smooth)
 
     return entries
 
@@ -330,21 +322,27 @@ def add_observations(ax, ax_ratio, data, fid, spectra_key, show=True):
 def plot_panel(ax, ax_ratio, data, entries, spectra_key, iz, args):
     model_handles = []
     ell = data["ell"]
-    ref_idx = choose_reference(entries, args.ref_index)
-    fid = np.asarray(entries[ref_idx]["spectrum"], dtype=float)
+
+    if args.mode == "samples":
+        fid = load_spectrum(box=args.box, sim=args.sim, iz=iz, lc=args.lc, amp=args.ref_amp, slope=args.ref_slope, spectra_key=spectra_key, ell=ell, 
+                            shot_noise=args.shot_noise, smooth=not args.no_smooth)
+        fid = np.asarray(fid, dtype=float)
+        ref_idx = None
+    else:
+        ref_idx = choose_reference(entries, args.ref_index)
+        fid = np.asarray(entries[ref_idx]["spectrum"], dtype=float)
 
     if ax_ratio is not None:
         ax_ratio.axhline(1.0, color="k", linestyle="--", alpha=0.6)
 
     for i, entry in enumerate(entries):
         y = np.asarray(entry["spectrum"], dtype=float)
-        line, = ax.plot(ell, y, color=entry["color"], lw=1.3 if i != ref_idx else 1.8,
-                alpha=0.9, label=entry["label"])
+        line, = ax.plot(ell, y, color=entry["color"], lw=1.3, alpha=0.9, label=entry["label"])
         model_handles.append(line)
         if ax_ratio is not None:
             ax_ratio.plot(ell, y / fid, color=entry["color"], alpha=0.9)
 
-    if args.fiducial_std and entries[ref_idx]["box"] == "L1000N1800" and entries[ref_idx]["sim"] == "HYDRO_FIDUCIAL":
+    if args.mode == "spectra" and args.fiducial_std and entries[ref_idx]["box"] == "L1000N1800" and entries[ref_idx]["sim"] == "HYDRO_FIDUCIAL":
         std = load_fiducial_std(iz, spectra_key)
         if std.shape == fid.shape:
             ax.fill_between(ell, fid - std, fid + std, color=entries[ref_idx]["color"], alpha=0.25, linewidth=0)
@@ -371,22 +369,8 @@ def plot_panel(ax, ax_ratio, data, entries, spectra_key, iz, args):
 
 
 def make_figure(panel_specs, args):
-    if args.mode == "samples":
-        fig, axes = pb.subplots(
-            1, 2,
-            figsize=(9.0, 3.6),
-            sharex=True,
-            sharey=True,
-            gridspec_kw={"wspace": 0.08},
-        )
-        axes = np.asarray([axes, [None, None]])
-    else:
-        fig, axes = pb.subplots(
-            2, 2,
-            figsize=(9.0, 4.8),
-            sharex="col",
-            gridspec_kw={"height_ratios": [3.0, 1.0], "hspace": 0.06, "wspace": 0.20},
-        )
+    
+    fig, axes = pb.subplots(2, 2, figsize=(9.0, 4.8), sharex="col", gridspec_kw={"height_ratios": [3.0, 1.0], "hspace": 0.06, "wspace": 0.20 if args.mode == "spectra" else 0.08})
 
     for col, spec in enumerate(panel_specs):
         iz = spec["iz"]
@@ -406,15 +390,7 @@ def make_figure(panel_specs, args):
         ax = axes[0, col]
         ax_ratio = axes[1, col]
 
-        _, model_handles, act_line, planck_line = plot_panel(
-            ax,
-            ax_ratio,
-            data,
-            entries,
-            spectra_key,
-            iz,
-            args,
-        )
+        _, model_handles, act_line, planck_line = plot_panel(ax, ax_ratio, data, entries, spectra_key, iz, args)
 
         ylabel = r"$C_\ell^{\rm gg} \times 10^5$" if spectra_key == "auto" else r"$C_\ell^{\kappa \rm g} \times 10^5$"
 
@@ -426,32 +402,23 @@ def make_figure(panel_specs, args):
         elif args.mode == "spectra":
             ax.set_ylabel(ylabel)
 
-        ax.set_xlabel(r"Multipole moment $\ell$")
         legend_title = spec.get("legend_title", None)
 
         if args.mode == "spectra":
             legend_title = f"{iz} sample, $A={args.amp:.1f}$, $s={args.slope:.1f}$"
 
-        model_legend = ax.legend(
-            handles=model_handles,
-            ncol=2 if args.mode == "samples" else 1,
-            loc="upper right",
-            title=legend_title,
-            frameon=False,
-        )
+        model_legend = ax.legend( handles=model_handles, ncol=2 if args.mode == "samples" else 1, loc="upper right", title=legend_title, frameon=False)
 
-        obs_legend = ax.legend(
-            handles=[act_line, planck_line],
-            loc="lower left",
-            fontsize=7,
-            frameon=False,
-        )
+        obs_legend = ax.legend(handles=[act_line, planck_line], loc="lower left", fontsize=8, frameon=False)
 
         ax.add_artist(model_legend)
 
-        if args.mode == "spectra":
-            ax_ratio.set_ylabel("Ratio" if col == 0 else None)
-            ax_ratio.set_xlabel(r"Multipole moment $\ell$")
+        if col == 0:
+            ax_ratio.set_ylabel(r"$C_\ell/C_\ell^{\rm ref}$")
+        else:
+            ax_ratio.tick_params(axis="y", labelleft=False)
+
+        ax_ratio.set_xlabel(r"Multipole moment $\ell$")
 
     Path("./Plots").mkdir(exist_ok=True)
     out = Path(args.output) if args.output else Path("./Plots") / default_output_name(args)
@@ -489,6 +456,8 @@ def main():
     parser.add_argument("--slopes", default=None, help="Comma list or start:stop:step. Ignored with --use-mle.")
     parser.add_argument("--amp", type=float, default=10.8)
     parser.add_argument("--slope", type=float, default=0.5)
+    parser.add_argument("--ref-amp", type=float, default=10.8, help="Amplitude used for the reference spectrum in the ratio panels.")
+    parser.add_argument("--ref-slope", type=float, default=0.5, help="Slope used for the reference spectrum in the ratio panels.")
     parser.add_argument("--use-mle", action="store_true", help="Use one MLE amp/slope per sim.")
 
     parser.add_argument("--labels", default=None, help="Optional comma list matching final plotted entries.")

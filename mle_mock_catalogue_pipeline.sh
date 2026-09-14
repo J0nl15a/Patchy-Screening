@@ -129,10 +129,10 @@ else
                 --dependency=afterok:${jid0} \
                 --kill-on-invalid-dep=yes \
                 --job-name=mock_catalog_maximum_likelihood_estimation \
-                -c 16 \
+                -c 1 \
                 -p cosma8 \
                 -A dp004 \
-                -t 01:00:00 \
+                -t 03:00:00 \
                 -o "./batch_files/maximum_likelihood_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}/job.%j.dump" \
                 -e "./batch_files/maximum_likelihood_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}/job.%j.err" \
 <<EOF

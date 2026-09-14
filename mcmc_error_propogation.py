@@ -209,7 +209,6 @@ def run_emulator_posterior_predictions(
 
     output_file = Path(output_file)
     output_file.parent.mkdir(parents=True, exist_ok=True)
-    quit()
 
     np.savez_compressed(
         output_file,

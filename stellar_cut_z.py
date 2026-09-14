@@ -3,23 +3,21 @@ import numpy as np
 from pathlib import Path
 from FLAMINGO_halo_redshifts import multiprocess_z_bins
 
-def stellar_cut_z(ncpu, boxname, simname, z_sample, mean_z_mass_cut, slope, lightcone=0):
+def name_float(x, mle=False):
+    if mle:
+        return f"{float(x):.3f}".replace(".", "p")
+    else:
+        return f"{float(x):.1f}".replace(".", "p")
+
+def stellar_cut_z(ncpu, boxname, simname, z_sample, mean_z_mass_cut, slope, lightcone=0, mle=False):
 
     z_sample = str(z_sample)
 
     im = float(mean_z_mass_cut)
-    if round(im, 1) == im:
-        im_name = f"{im:.1f}".replace('.', 'p')
-    else:
-        im_name = f"{im:.3f}".replace('.', 'p')
+    im_name = name_float(im, mle=mle)
     
     slope = float(slope)
-    if round(slope, 1) == slope:
-        slope_name = f"{float(slope):.1f}".replace('.', 'p')
-    else:
-        slope_name = f"{float(slope):.3f}".replace('.', 'p')
-    if slope < 0.0:
-        slope_name = f"{slope_name}".replace('-', 'minus')
+    slope_name = name_float(slope, mle=mle)
 
     lightcone = int(lightcone)
     
@@ -63,4 +61,5 @@ if __name__ == "__main__":
         for j in slope_values:
             stellar_cut_z(i, j, z_sample)'''
 
-    stellar_cut_z(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6], lightcone=sys.argv[7])
+    stellar_cut_z(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6], 
+                  lightcone=sys.argv[7], mle=sys.argv[8])

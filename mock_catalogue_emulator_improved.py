@@ -1,6 +1,6 @@
 import numpy as np, pylab as pb
 import GPy
-from emulator_data_loader import data_loader
+from emulator_data_loader_improved import data_loader
 from pathlib import Path
 
 # import importlib.util
@@ -13,9 +13,9 @@ from pathlib import Path
 # spec = importlib.util.spec_from_file_location(module_name, script_path)
 # module = importlib.util.module_from_spec(spec)
 # sys.modules[module_name] = module
-# spec.loader.exec_module(module)
+# spec.loader.exec_module(module)  
 
-def emulator(x, spectra, box, isim, iz, 
+def emulator(x, spectra, box, isim, iz,
              save=False, load=False, log=True, oos_test=False, retrain=False, lightcone=0, abundance_cut=0.5,
              amp_min=10.3, amp_max=11.3, amp_step=0.1, slope_min=0.0, slope_max=1.0, slope_step=0.1):
     
@@ -33,26 +33,42 @@ def emulator(x, spectra, box, isim, iz,
         x_train = np.load(f"./gpy_model/{box}/{isim}/{iz}/lightcone{lightcone}/training/X_training_data_{spectra}.npy")
         y_train = np.load(f"./gpy_model/{box}/{isim}/{iz}/lightcone{lightcone}/training/Y_training_data_{spectra}.npy")
         print(y_train)
-        # if spectra == 'auto' or spectra == 'abundance':
-        #     dir_type = 'galaxy_galaxy'
-        # elif spectra == 'cross':
-        #     dir_type = 'kappa_galaxy'
-        # initial_spectra = np.loadtxt(f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/power_spectra/{dir_type}/{box}/{isim}/{iz}/lightcone{lightcone}/{dir_type}_power_spectrum_10p8_0p5.txt', 
-        #                             delimiter=' ', skiprows=1, usecols=0)
-        #                             # delimiter=' ', skiprows=1, usecols=2 if spectra=='auto' else 1)
 
-    x_train_min = (np.min(x_train[:,0]), np.min(x_train[:,1]))
-    x_train_max = (np.max(x_train[:,0]), np.max(x_train[:,1]))
-    
-    x_train_normalised = np.column_stack(((x_train[:,0]-x_train_min[0])/(x_train_max[0]-x_train_min[0]), (x_train[:,1]-x_train_min[1])/(x_train_max[1]-x_train_min[1])))
-    
+    # if spectra != 'abundance' and spectra != 'cross':
+        # y_train = y_train[:, :-3]
+
+
+    x = np.asarray(x, dtype=float).reshape(-1)
+
+    if x.size != x_train.shape[1]:
+        raise ValueError(f"Expected {x_train.shape[1]} input parameters, got {x.size}")
+
+    x_train_full = x_train.copy()
+    x_train_min = np.min(x_train_full, axis=0)
+    x_train_max = np.max(x_train_full, axis=0)
+    x_train_range = x_train_max - x_train_min
 
     if oos_test:
-        for i, (a, s) in enumerate(x_train):
-            if a == x[0] and s == x[1]:
-                print('DELETING!')
-                x_train_normalised = np.delete(x_train_normalised, (i), axis=0)
-                y_train = np.delete(y_train, (i), axis=0)
+        held_out = np.where(np.all(np.isclose(x_train, x[None, :], rtol=0.0, atol=1.0e-8), axis=1))[0]
+
+        if held_out.size != 1:
+            raise ValueError(f"Expected exactly one training point matching {x}, found {held_out.size}")
+
+        held_out_index = held_out[0]
+
+        print(f"Holding out training point {x_train[held_out_index]}")
+
+        x_train = np.delete(x_train, held_out_index, axis=0)
+        y_train = np.delete(y_train, held_out_index, axis=0)
+
+        # A genuine holdout model must be trained without the held-out point.
+        load = False
+        save = False
+
+    if np.any(x_train_range <= 0):
+        raise ValueError("At least one input parameter has zero training range")
+
+    x_train_normalised = ((x_train - x_train_min[None, :]) / x_train_range[None, :])
 
     if not np.all(np.isfinite(y_train)):
         raise ValueError("y_train contains non-finite values before log10")
@@ -62,72 +78,111 @@ def emulator(x, spectra, box, isim, iz,
         raise ValueError(f"y_train has non-positive entries; first few: {bad}")
 
     if log:
-        y_train_normalised = np.log10(y_train.copy())
+        y_model = np.log10(y_train)
     else:
-        y_train_normalised = y_train.copy()
-    mean_y_train = np.mean(y_train_normalised, axis=0)
-    y_train_normalised -= mean_y_train
-    std_y_train = np.std(y_train_normalised, axis=0)
-    y_train_normalised /= std_y_train
+        y_model = y_train.copy()
 
-    # for i in range(y_train_normalised.shape[0]):
-    #     pb.plot(initial_spectra, y_train_normalised[i,:], label=f'x_train: {x_train[i,0]}, {x_train[i,1]}')
-    # pb.xlabel('Multipole l')
-    # pb.ylabel('Normalised Power Spectrum')
-    # pb.title('Auto Spectrum Training Data')
-    # pb.legend()
-    # pb.savefig('./Plots/emulator_auto_training_data_inside.png', dpi=300)
-    # pb.clf()
-
-    kernel = GPy.kern.RBF(x_train_normalised.shape[1], ARD=True)
+    if spectra == "abundance":
+        kernel = GPy.kern.Matern32(x_train_normalised.shape[1], ARD=True)
+    else:
+        kernel = GPy.kern.RBF(x_train_normalised.shape[1], ARD=True)
 
     path = f'./gpy_model/{box}/{isim}/{iz}/lightcone{lightcone}/'
-    normalisation_path = Path(path+f'normalisation_parameters_{spectra}.npz')
-    model_path = Path(path+f'gpy_model_{spectra}.npy')
+    model_path = Path(path+f'gpy_model_{spectra}.npz')
 
     if not load:
+        model = GPy.models.GPRegression(X=x_train_normalised, Y=y_model, kernel=kernel, normalizer=True, noise_var=1.0e-6)
 
-        model = GPy.models.GPRegression(X=x_train_normalised, Y=y_train_normalised, kernel=kernel) 
-        model.optimize()
-    
+        if spectra == "abundance":
+            num_restarts = 30
+            model.Gaussian_noise.variance.constrain_bounded(1.0e-8, 1.0e-3, warning=False)
+        elif oos_test:
+            num_restarts = 3
+            model.Gaussian_noise.variance.fix(1.0e-6)
+        else:
+            num_restarts = 10
+            model.Gaussian_noise.variance.fix(1.0e-6)
+
+        model.optimize_restarts(num_restarts=num_restarts, optimizer="lbfgsb", max_iters=3000, verbose=False, parallel=False)
+
         if save:
-            # normalisation_params = np.array((mean_y_train, std_y_train)).reshape(-1, 2)
-            normalisation_path.parent.mkdir(parents=True, exist_ok=True)
             model_path.parent.mkdir(parents=True, exist_ok=True)
 
-            np.savez(normalisation_path, mean=mean_y_train, std=std_y_train)
-            np.save(model_path, model.param_array)
+            np.savez_compressed(model_path, parameters=model.param_array, x_min=x_train_min, x_max=x_train_max, log_output=np.asarray(log, dtype=bool))
 
-    elif load: 
-        model = GPy.models.GPRegression(X=x_train_normalised, Y=y_train_normalised, kernel=kernel, initialize=False)
-        model.update_model(False) # do not call the underlying expensive algebra on load
-        model.initialize_parameter() # Initialize the parameters (connect the parameters up)
-        
-        model[:] = np.load(model_path) # Load the parameters
-        model.update_model(True) # Call the algebra only once
+    elif load:
+        saved = np.load(model_path)
+
+        saved_x_min = np.asarray(saved["x_min"], dtype=float)
+        saved_x_max = np.asarray(saved["x_max"], dtype=float)
+
+        saved_log = bool(saved["log_output"])
+
+        if saved_log != log:
+            raise ValueError(f"Saved emulator uses log={saved_log}, but prediction requested log={log}")
+
+        if not np.allclose(saved_x_min, x_train_min):
+            raise ValueError("Saved and current training input minima differ")
+
+        if not np.allclose(saved_x_max, x_train_max):
+            raise ValueError("Saved and current training input maxima differ")
+
+        model = GPy.models.GPRegression(X=x_train_normalised, Y=y_model, kernel=kernel, normalizer=True, noise_var=1.0e-6, initialize=False)
+
+        model.update_model(False)
+        model.initialize_parameter()
+        model[:] = saved["parameters"]
+        model.update_model(True)
     
-    x_test = np.array(((x[0] - x_train_min[0])/(x_train_max[0] - x_train_min[0]), (x[1] - x_train_min[1])/(x_train_max[1] - x_train_min[1]))).reshape(1,-1)
-    model_output = model._raw_predict(x_test)
+    x_test = ((x[None, :] - x_train_min[None, :]) / (x_train_max - x_train_min)[None, :])
 
-    if load:
-        normalisation_params = np.load(normalisation_path)
+    # Prediction in the units supplied to the model:
+    # log10(C_ell) when log=True, otherwise C_ell.
+    mean_model, variance_model = model.predict_noiseless(x_test, full_cov=False)
 
-        mean = np.asarray(normalisation_params['mean']).reshape(-1)
-        std  = np.asarray(normalisation_params['std']).reshape(-1)
+    mean_model = np.asarray(mean_model, dtype=float)[0]
+    variance_model = np.asarray(variance_model, dtype=float)
 
-        if log:
-            y_test = 10**((model_output[0][0] * std) + mean)
+    # GPy may return one latent normalized variance and broadcast it through
+    # the output normalizer. Make the final shape explicitly match the spectrum.
+    if variance_model.ndim == 2:
+        variance_model = variance_model[0]
+
+    variance_model = np.broadcast_to(variance_model, mean_model.shape).copy()
+    variance_model = np.clip(variance_model, 0.0, None)
+
+    if log:
+        # mean_model and variance_model describe log10(C_ell).
+        mu_log10 = mean_model
+        var_log10 = variance_model
+
+        ln10 = np.log(10.0)
+
+        # Median in linear C_ell space.
+        median_spectrum = 10.0**mu_log10
+
+        # Mean of the implied lognormal distribution in linear C_ell space.
+        mean_spectrum = np.exp(ln10 * mu_log10 + 0.5 * ln10**2 * var_log10)
+
+        # Per-ell-bin emulator variance in linear C_ell space.
+        variance_spectrum = (np.exp(ln10**2 * var_log10) - 1.0) * np.exp(2.0 * ln10 * mu_log10 + ln10**2 * var_log10)
+        variance_spectrum = np.clip(variance_spectrum, 0.0, None)
+
+        if spectra == "abundance":
+            prediction = median_spectrum
         else:
-            y_test = (model_output[0][0] * std) + mean
-    elif not load:
-        if log:
-            y_test = 10**((model_output[0][0] * std_y_train) + mean_y_train)
-        else:
-            y_test = ((model_output[0][0] * std_y_train) + mean_y_train) #* initial_spectra
-    posterior_variance = model_output[1]
-    #print(normalisation_params)
+            prediction = mean_spectrum
 
-    return y_test
+    else:
+        prediction = mean_model
+        mean_spectrum = mean_model
+        median_spectrum = None
+        variance_spectrum = variance_model
+
+    std_spectrum = np.sqrt(variance_spectrum)
+
+    return prediction, median_spectrum, variance_spectrum, std_spectrum
+
 
 if __name__ == '__main__':
     import sys
@@ -138,8 +193,8 @@ if __name__ == '__main__':
     lightcone = int(sys.argv[5])
 
     spectra = str(sys.argv[4])
-    amp = 10.909
-    slope = 0.335
+    amp = 10.813
+    slope = 0.183
     residual = 0.0
 
     if iz == 'Blue':
@@ -150,7 +205,7 @@ if __name__ == '__main__':
     kusiak_observed_abundance = kusiak_nbar * 41253
 
     test = np.array((amp+residual, slope))
-    test_name = [f"{float(test[0]):.1f}".replace('.', 'p'), f"{float(test[1]):.1f}".replace('.', 'p')]
+    test_name = [f"{float(test[0]):.3f}".replace('.', 'p'), f"{float(test[1]):.3f}".replace('.', 'p')]
     test_name_base = [f"{float(amp):.1f}".replace('.', 'p'), f"{float(slope):.1f}".replace('.', 'p')]
     if amp+residual >= 11.3:
         pass
@@ -178,12 +233,15 @@ if __name__ == '__main__':
         #                         # delimiter=' ', skiprows=1, usecols=(0,1) if spectra=='auto' else (0,1))
         #                         delimiter=' ', skiprows=1, usecols=(0,2) if spectra=='auto' else (0,1))
 
-    pred_train = emulator(test, spectra, box, isim, iz, save=True, retrain=True, lightcone=lightcone, 
-                    abundance_cut=0.5 if spectra != 'abundance' else 0.0, slope_max=2.0 if iz == 'Blue' else 1.0)
-    pred = emulator(test, spectra, box, isim, iz, load=True, lightcone=lightcone, 
+    pred_train, pred_train_median, pred_train_var, pred_train_std = emulator(test, spectra, box, isim, iz, save=True, retrain=True, lightcone=lightcone, 
+                    abundance_cut=0.5 if spectra != 'abundance' else 0.0, log=True, slope_max=2.0 if iz == 'Blue' else 1.0)
+    pred, pred_median, pred_var, pred_std = emulator(test, spectra, box, isim, iz, load=True, lightcone=lightcone, 
                     abundance_cut=0.5 if spectra != 'abundance' else 0.0, log=True, slope_max=2.0 if iz == 'Blue' else 1.0)
     print(pred_train, abundance)
-    # print(pred)
+    print(pred, pred_var, pred_std)
+    print(pred - pred_std, pred + pred_std)
+    print(pred_std/pred)
+    # quit()
 
     if spectra == 'abundance':
 
@@ -204,9 +262,12 @@ if __name__ == '__main__':
 
             name_i = [f"{float(x_train[i,0]):.1f}".replace('.', 'p'), f"{float(x_train[i,1]):.1f}".replace('.', 'p')]
             print(x_train[i,:])
-            pred_i = emulator(x_train[i,:], spectra, box, isim, iz, oos_test=True, load=True, lightcone=lightcone, 
-                              abundance_cut=0.5, log=True, slope_max=2.0 if iz == 'Blue' else 1.0)
+            pred_i, pred_i_median, pred_i_var, pred_i_std = emulator(x_train[i,:], spectra, box, isim, iz, oos_test=True, load=True, lightcone=lightcone, 
+                              abundance_cut=0.0, log=True, slope_max=2.0 if iz == 'Blue' else 1.0)
             print(pred_i)
+
+            fractional_emulator_error = pred_i_std / pred_i
+            print(fractional_emulator_error)
 
             with open(f"./data_files/dndz_samples/{box}/{isim}/{iz}/lightcone{lightcone}/dndz_galaxies_sampled_{name_i[0]}_{name_i[1]}.txt", "r") as f:
                 first_line = f.readline().strip()
@@ -280,13 +341,19 @@ if __name__ == '__main__':
         ell_200_mask = np.where(farren_data[:,0] > 200)
 
         pb.loglog(farren_data[:,0][ell_200_mask], farren_data[:,1][ell_200_mask]*1e5 if spectra=='auto' else farren_data[:,2][ell_200_mask]*1e5, color='k', marker='.', markersize=5, label='ACT x unWISE (Farren et al. 2023)')
-        # pb.loglog(true[:,0], true[:,1], label=f'Mock catalog {amp+residual, slope}', color='b')
+        try:
+            pb.loglog(true[:,0], true[:,1], label=f'Mock catalog {amp+residual, slope}', color='b')
+        except:
+            pass
+        
         if amp+residual >= 11.3:
             pass
         else:
             pass
             # pb.loglog(true_plus_1[:,0], true_plus_1[:,1], label=f'Mock catalog {amp+0.1, slope}', color='g')
         pb.loglog(farren_data[:,0][ell_200_mask], pred, label='Emulator', color='r')
+        # pb.loglog(farren_data[:,0][ell_200_mask], pred_median, label='Emulator (Median)', color='r', linestyle='dashed')
+        pb.fill_between(farren_data[:, 0][ell_200_mask], pred - pred_std, pred + pred_std, alpha=0.25, label=r"Emulator $1\sigma$")
         pb.title(f'Mock catalog emulator test (x_test: Amplitude={test[0]:.3f}, Slope={test[1]})')
         pb.xlabel('$\ell$')
         pb.ylabel('$C_{\ell}^{gg}$x10^5' if spectra=='auto' else '$C_{\ell}^{\kappa g}x10^5$')
@@ -300,36 +367,68 @@ if __name__ == '__main__':
         pb.hlines(y=1.010, xmin=-1, xmax=np.max(true[:,0])*1.1, color='k', linestyles='dashed', alpha=0.5, label=None)
         pb.hlines(y=0.950, xmin=-1, xmax=np.max(true[:,0])*1.1, color='k', linestyles='dotted', alpha=0.5, label='5% error')
         pb.hlines(y=1.050, xmin=-1, xmax=np.max(true[:,0])*1.1, color='k', linestyles='dotted', alpha=0.5, label=None)
-        # pb.plot(true[:,0], pred/true[:,1], label='Error w.r.t. simulated clustering')
+        try:
+            pb.plot(true[:,0], pred/true[:,1], label='Error w.r.t. simulated clustering')
+            # pb.plot(true[:,0], pred_median/true[:,1], label='Error w.r.t. simulated clustering (Median)', linestyle='dashed')
+        except:
+            pass
         pb.plot(true[:,0], pred/(farren_data[:,1][ell_200_mask]*1e5) if spectra=='auto' else pred/(farren_data[:,2][ell_200_mask]*1e5), label='Error w.r.t. observed clustering')
+        # pb.plot(true[:,0], pred_median/(farren_data[:,1][ell_200_mask]*1e5) if spectra=='auto' else pred_median/(farren_data[:,2][ell_200_mask]*1e5), label='Error w.r.t. observed clustering (Median)', linestyle='dashed')
+        try:
+            pb.fill_between(true[:, 0], (pred - pred_std)/true[:,1], (pred + pred_std)/true[:,1], alpha=0.25, label=r"Emulator $1\sigma$ w.r.t. simulated clustering")
+            # pb.fill_between(true[:, 0], (pred_median - pred_std)/true[:,1], (pred_median + pred_std)/true[:,1], alpha=0.25, label=r"Emulator $1\sigma$ w.r.t. simulated clustering (Median)")
+        except:
+            pass
+        pb.fill_between(farren_data[:, 0][ell_200_mask], (pred - pred_std)/(farren_data[:,1][ell_200_mask]*1e5) if spectra=='auto' else (pred - pred_std)/(farren_data[:,2][ell_200_mask]*1e5), 
+                        (pred + pred_std)/(farren_data[:,1][ell_200_mask]*1e5) if spectra=='auto' else (pred + pred_std)/(farren_data[:,2][ell_200_mask]*1e5), alpha=0.25, label=r"Emulator $1\sigma$")
         pb.title(f'Emulator error test (x_test: Amplitude={test[0]}, Slope={test[1]})')
         pb.xlabel('$\ell$')
         pb.ylabel('Residual')
+        if spectra == 'cross':
+            pb.ylim(top=1.055, bottom=0.945)
         pb.xlim(100, 3000)
         pb.legend()
         pb.tight_layout()
         pb.savefig('./Plots/mock_catalog_emulator_error_test.png', dpi=400)
         pb.clf()
-        # quit()
+        quit()
 
         x_train = np.load(f"./gpy_model/{box}/{isim}/{iz}/lightcone{lightcone}/training/X_training_data_{spectra}.npy")
         # x_train = np.loadtxt('./data_files/mock_catalog_test_points.txt')
         pred_errors = []
+        pred_errors_median = []
         for i in range(x_train.shape[0]): 
             name_i = [f"{float(x_train[i,0]):.1f}".replace('.', 'p'), f"{float(x_train[i,1]):.1f}".replace('.', 'p')]
-            pred_i = emulator(x_train[i,:], spectra, box, isim, iz, oos_test=True, load=True, lightcone=lightcone, abundance_cut=0.5)
+            pred_i, pred_i_median, pred_i_var, pred_i_std = emulator(x_train[i,:], spectra, box, isim, iz, oos_test=True, load=True, lightcone=lightcone, log=True,
+                                                      abundance_cut=0.5, slope_max=2.0 if iz == 'Blue' else 1.0)
+
+            fractional_emulator_error = pred_i_std / pred_i
+            print(fractional_emulator_error)
+            fractional_emulator_error_median = pred_i_std / pred_i_median
+            print(fractional_emulator_error_median)
+
             true_i = np.loadtxt(f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/power_spectra/{dir_type}/{box}/{isim}/{iz}/lightcone{lightcone}/{dir_type}_power_spectrum_{name_i[0]}_{name_i[1]}.txt',
                             # delimiter=' ', skiprows=1, usecols=(0,1) if spectra=='auto' else (0,1))
                             delimiter=' ', skiprows=1, usecols=(0,2) if spectra=='auto' else (0,1))
             error_i = (pred_i)/true_i[:,1]
             error_i = np.array(error_i)
+            error_i_median = (pred_i_median)/true_i[:,1]
+            error_i_median = np.array(error_i_median)
             print(error_i)
             pred_errors.append(error_i)
+            pred_errors_median.append(error_i_median)
+
         print(pred_errors)
         pred_errors = np.array(pred_errors)
         mean_pred_errors = np.mean(pred_errors, axis=0)
         print(mean_pred_errors.shape)
         std_pred_errors = np.std(pred_errors, axis=0)
+
+        print(pred_errors_median)
+        pred_errors_median = np.array(pred_errors_median)
+        mean_pred_errors_median = np.mean(pred_errors_median, axis=0)
+        print(mean_pred_errors_median.shape)
+        std_pred_errors_median = np.std(pred_errors_median, axis=0)
 
         pb.hlines(y=1.000, xmin=-1, xmax=np.max(true[:,0])*1.1, color='k', linestyles='solid', alpha=0.5, label=None)
         pb.hlines(y=0.990, xmin=-1, xmax=np.max(true[:,0])*1.1, color='k', linestyles='dashed', alpha=0.5, label='1% error')
@@ -337,7 +436,9 @@ if __name__ == '__main__':
         pb.hlines(y=0.950, xmin=-1, xmax=np.max(true[:,0])*1.1, color='k', linestyles='dotted', alpha=0.5, label='5% error')
         pb.hlines(y=1.050, xmin=-1, xmax=np.max(true[:,0])*1.1, color='k', linestyles='dotted', alpha=0.5, label=None)
         pb.plot(true[:,0], mean_pred_errors, label='Mean error w.r.t. simulated clustering')
+        # pb.plot(true[:,0], mean_pred_errors_median, label='Mean error w.r.t. simulated clustering (Median)', linestyle='dashed')
         pb.fill_between(true[:,0], mean_pred_errors - std_pred_errors, mean_pred_errors + std_pred_errors, color='gray', alpha=0.5, label='1$\sigma$ scatter')
+        # pb.fill_between(true[:,0], mean_pred_errors_median - std_pred_errors_median, mean_pred_errors_median + std_pred_errors_median, color='red', alpha=0.25, label='1$\sigma$ scatter (Median)')
         # pb.title(f'Mean emulator error test over training set ({spectra}, {box}, {isim}, {iz})', wrap=True)
         pb.xlabel('Multipole moment $\ell$')
         pb.ylabel('Residual error')

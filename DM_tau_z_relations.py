@@ -3,22 +3,15 @@ from pathlib import Path
 import sys
 
 
-def plot_shell_DM_tau_relations_from_diagnostics(
-    box,
-    sim,
-    lightcone=0,
-    scale_factor=True
-):
+def plot_shell_DM_tau_relations_from_diagnostics(box, sim, lightcone=0, scale_factor=True):
 
-    base_path = Path(
-        f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/DM_maps/{box}/{sim}/lightcone{lightcone}/'
-    )
+    base_path = Path(f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/DM_maps/{box}/{sim}/lightcone{lightcone}/')
 
     suffix = "_scale_factor" if scale_factor else ""
 
     shell_path = base_path / "shells"
 
-    if box == 'L1000N1800':
+    if box == 'L1000N1800' or box == 'L1000N3600':
         max_redshift = '3'
     elif box == 'L2800N5040' and sim == 'HYDRO_FIDUCIAL':
         max_redshift = '5'
@@ -26,11 +19,8 @@ def plot_shell_DM_tau_relations_from_diagnostics(
         print("Lightcone redshift file not available for this box/simulation combination.")
         sys.exit()
 
-    lightcone_shell_redshifts = np.loadtxt(
-        f'/cosma8/data/dp004/flamingo/Runs/{box}/{sim}/shell_redshifts_z{max_redshift}.txt',
-        skiprows=0,
-        delimiter=','
-    )
+    lightcone_shell_redshifts = np.loadtxt(f'/cosma8/data/dp004/flamingo/Runs/{box}/{sim}/shell_redshifts_z{max_redshift}.txt' if box != 'L2800N5040' 
+                                           else f'/cosma8/data/dp004/flamingo/Runs/{box}/{sim}/shell_redshifts.txt', skiprows=0, delimiter=',')
 
     redshifts = []
     DM_means = []
@@ -60,12 +50,13 @@ def plot_shell_DM_tau_relations_from_diagnostics(
             continue
 
         DM += hp.read_map(DM_file, verbose=False)
+        print(f"Read DM map: {DM_file}")
+
         tau += hp.read_map(tau_file, verbose=False)
+        print(f"Read tau map: {tau_file}")
 
         redshifts.append(z_mid)
-
         DM_means.append(np.mean(DM))
-
         tau_means.append(np.mean(tau))
 
     redshifts = np.array(redshifts)
@@ -108,24 +99,24 @@ def plot_shell_DM_tau_relations_from_diagnostics(
     plt.figure()
     plt.plot(DM_z_TNG[:, 0], DM_z_TNG[:, 1], label='TNG DM(z)', color='green')
     plt.plot(redshift, np.cumsum(mean_DM), label='FLAMINGO shell means', color='blue')
-    plt.plot(redshifts, DM_means, label='FLAMINGO shells', color='orange')
+    # plt.plot(redshifts, DM_means, label='FLAMINGO shells', color='orange')
     plt.xlabel("Redshift")
     plt.ylabel("Mean DM")
     plt.tight_layout()
     plt.legend()
-    plt.savefig(plot_path / f"DM_mean_vs_redshift{suffix}.png", dpi=300)
+    plt.savefig(plot_path / f"DM_mean_vs_redshift{suffix}_{box}_{sim}_lightcone{lightcone}.png", dpi=300)
     plt.close()
 
 
     plt.figure()
     plt.plot(z_PL, tau_PL, label='Planck 2018', color='red')
     plt.plot(redshift, np.cumsum(mean_tau), label='FLAMINGO shell means', color='blue')
-    plt.plot(redshifts, tau_means, label='FLAMINGO shells', color='orange')
+    # plt.plot(redshifts, tau_means, label='FLAMINGO shells', color='orange')
     plt.xlabel("Redshift")
     plt.ylabel("Mean tau")
     plt.tight_layout()
     plt.legend()
-    plt.savefig(plot_path / f"tau_mean_vs_redshift{suffix}.png", dpi=300)
+    plt.savefig(plot_path / f"tau_mean_vs_redshift{suffix}_{box}_{sim}_lightcone{lightcone}.png", dpi=300)
     plt.close()
 
     return shell_index, redshift, mean_DM, mean_tau
@@ -133,9 +124,4 @@ def plot_shell_DM_tau_relations_from_diagnostics(
 
 if __name__ == "__main__":
 
-    results = plot_shell_DM_tau_relations_from_diagnostics(
-        'L1000N1800',
-        'HYDRO_FIDUCIAL',
-        lightcone=0,
-        scale_factor=False
-    )
+    results = plot_shell_DM_tau_relations_from_diagnostics('L2800N5040', 'HYDRO_FIDUCIAL', lightcone=0, scale_factor=False)

@@ -211,7 +211,7 @@ decomposition_bins = {
         "log10": True,
     },
     "halo_mass": {
-        "column": "mvir",
+        "column": "m500crit",
         "bins": [(10.5, 11.5), (11.5, 12.5), (12.5, 13.5), (13.5, 14.5), (14.5, 15.5)],
         "log10": True,
     },

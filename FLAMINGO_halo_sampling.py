@@ -80,8 +80,8 @@ def halo_sampling(boxname, simname, z_sample, mass_cut, n_cut, ncpu, lightcone=0
     dfs = [df for df in results if df is not None]
     sampled_halo_data = pd.concat(dfs)
 
-    mvir = sampled_halo_data['mvir'].to_numpy()
-    nhalo = mvir.size
+    m500crit = sampled_halo_data['m500crit'].to_numpy()
+    nhalo = m500crit.size
     print(nhalo)
 
     print(f"Total job time: {time.time() - job_start_time:.2f} seconds")

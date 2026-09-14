@@ -129,10 +129,10 @@ else
                 --dependency=afterok:${jid0} \
                 --kill-on-invalid-dep=yes \
                 --job-name=mock_catalog_maximum_likelihood_estimation \
-                -c 16 \
+                -c 1 \
                 -p cosma8 \
                 -A dp004 \
-                -t 01:00:00 \
+                -t 03:00:00 \
                 -o "./batch_files/maximum_likelihood_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}/job.%j.dump" \
                 -e "./batch_files/maximum_likelihood_logs/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}/job.%j.err" \
 <<EOF
@@ -156,8 +156,8 @@ echo "=== Step 8 (Job ID \$SLURM_JOB_ID) starting"
 echo "    Received arguments: ncpu='\$SLURM_CPUS_PER_TASK', Box='${BOX}', Sim='${ISIM}', Lightcone='${LIGHTCONE}', Sample='${IZ}'"
 echo "=============================="
 
-python3 mock_catalog_likelihood_parallel.py \
-    "\$SLURM_CPUS_PER_TASK" "${BOX}" "${ISIM}" "${IZ}" "${LIGHTCONE}" "${ABUNDANCE_CUT}" \
+python3 mock_catalogue_likelihood_pipeline.py \
+    "${BOX}" "${ISIM}" "${IZ}" "${LIGHTCONE}" "${ABUNDANCE_CUT}" \
     "${AMP_MIN}" "${AMP_MAX}" "${AMP_STEP}" \
     "${SLOPE_MIN}" "${SLOPE_MAX}" "${SLOPE_STEP}"
 
@@ -219,7 +219,7 @@ echo "=============================="
 if [ -f "./data_files/z_dependant_stellar_cuts/${BOX}/${IZ}/z_stellar_cut_data_${mle_amp//./p}_${mle_slope//./p}.txt" ]; then
     echo "Found stellar cut data for MLE values — skipping FLAMINGO_halo_lightcones_shell.py"
 else
-    python3 stellar_cut_z.py "$SLURM_CPUS_PER_TASK" "$BOX" "$ISIM" "$IZ" "$mle_amp" "$mle_slope" "$LIGHTCONE"
+    python3 stellar_cut_z.py "$SLURM_CPUS_PER_TASK" "$BOX" "$ISIM" "$IZ" "$mle_amp" "$mle_slope" "$LIGHTCONE" True
 fi
 
 echo "Job 9: Compute z-dependant stellar cut values for box $BOX, $IZ sample for MLE values only."
@@ -353,7 +353,7 @@ echo "=============================="
 if [ -f "./data_files/dndz_samples/${BOX}/${ISIM}/${IZ}/lightcone${LIGHTCONE}/dndz_galaxies_sampled_${mle_amp//./p}_${mle_slope//./p}.txt" ]; then
     echo "Found matched catalogs — skipping unWISE_data_matching.py"
 else
-    python3 unWISE_data_matching.py "$BOX" "$ISIM" "$IZ" "$mle_amp" "$mle_slope" ntotal "$LIGHTCONE"
+    python3 unWISE_data_matching_improved.py "$BOX" "$ISIM" "$IZ" "$mle_amp" "$mle_slope" ntotal True "$LIGHTCONE"
 fi
 
 echo "Job 12: Match FLAMINGO halo catalogs to unWISE dN/dz for box $BOX, sim $ISIM, lightcone $LIGHTCONE, $IZ sample for MLE values only."
@@ -503,7 +503,7 @@ if [ -f "./data_files/power_spectra/galaxy_galaxy/${BOX}/${ISIM}/${IZ}/lightcone
 else
     python3 unWISE_power_spectra.py \
       "$SLURM_CPUS_PER_TASK" "$BOX" "$ISIM" "$IZ" "$mle_amp" "$mle_slope" \
-      unlensed True False False True True False False "$LIGHTCONE"
+      unlensed True False False True True False False "$LIGHTCONE" True
 fi
 
 echo "Job 15: Compute power spectra for box $BOX, sim $ISIM, lightcone $LIGHTCONE, $IZ sample for MLE values only."

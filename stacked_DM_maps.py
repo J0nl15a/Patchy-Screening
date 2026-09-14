@@ -7,19 +7,15 @@ sample_redshift_shell = {'Blue':11, 'Green':21, 'Red':29}
 
 def read_one_shell(i, box, sim, lightcone, map_dir, scale_factor):
 
-    map_lightcone = (
-        f'/cosma8/data/dp004/flamingo/Runs/{box}/{sim}/{map_dir}/'
-        f'lightcone{lightcone}_shells/shell_{i}/'
-        f'lightcone{lightcone}.shell_{i}.0.hdf5'
-    )
+    if box == 'L1000N1800' or box == 'L1000N3600':
+        machine = 'cosma8'
+    elif box == 'L2800N5040':
+        machine = 'cosma6'
+
+    map_lightcone = (f'/{machine}/data/dp004/flamingo/Runs/{box}/{sim}/{map_dir}/lightcone{lightcone}_shells/shell_{i}/lightcone{lightcone}.shell_{i}.0.hdf5')
 
     with h5py.File(map_lightcone, "r") as g:
-        DM = (
-            g["DM"][...] *
-            g["DM"].attrs[
-                "Conversion factor to CGS (not including cosmological corrections)"
-            ]
-        )
+        DM = (g["DM"][...] * g["DM"].attrs["Conversion factor to CGS (not including cosmological corrections)"])
         redshift = g["DM"].attrs["Central redshift assumed for correction"]
 
     if scale_factor:
@@ -33,13 +29,15 @@ def stack_DM_maps_z3(ncpu, box, sim, lightcone=0, scale_factor=False, save_shell
 
     if box == 'L1000N1800' or box == 'L1000N3600':
         max_redshift = '3'
-        map_dir = 'neutrino_corrected_maps'
+        # map_dir = 'neutrino_corrected_maps'
     elif box == 'L2800N5040':
         max_redshift = '5'
-        map_dir = 'neutrino_corrected_maps_downsampled_4096'
+        # map_dir = 'neutrino_corrected_maps_downsampled_4096'
     else:
         print("Lightcone map not available for this box/simulation combination.")
         sys.exit()
+
+    map_dir = 'neutrino_corrected_maps'
     
     lightcone_shell_redshifts = np.loadtxt(f'/cosma8/data/dp004/flamingo/Runs/{box}/{sim}/shell_redshifts_z{max_redshift}.txt' if box != 'L2800N5040' else f'/cosma8/data/dp004/flamingo/Runs/{box}/{sim}/shell_redshifts.txt', 
                                            skiprows=0, delimiter=',')
@@ -93,7 +91,7 @@ def stack_DM_maps_z3(ncpu, box, sim, lightcone=0, scale_factor=False, save_shell
     # tau_total = sigma_T * DM_total
     
     hp.write_map(f"{output_path}/stacked_DM_map_z3p0{suffix}.fits", DM_total, overwrite=True)
-    hp.write_map(f"{output_path}/stacked_tau_map_z3p0_scale_factor.fits", tau_total, overwrite=True)
+    hp.write_map(f"{output_path}/stacked_tau_map_z3p0{suffix}.fits", tau_total, overwrite=True)
 
     np.savetxt(
         output_path / f"shell_diagnostics{suffix}.txt",

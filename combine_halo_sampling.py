@@ -1,4 +1,4 @@
-import sys
+import sys, re
 from pathlib import Path
 import numpy as np, pandas as pd
 
@@ -8,7 +8,8 @@ def fmt_name(x, mle=False):
     else:
         return f"{x:.1f}".replace(".", "p")
 
-def combine_shells(box, sim, z_sample, lightcone, mle=False, custom_amp=False, custom_slope=False):
+
+def combine_shells(box, sim, z_sample, lightcone, mle=False, custom_amp=None, custom_slope=None):
     shell_base = Path(
         f"./data_files/mock_halo_catalogs/{box}/{sim}/{z_sample}/lightcone{lightcone}"
     )
@@ -22,14 +23,15 @@ def combine_shells(box, sim, z_sample, lightcone, mle=False, custom_amp=False, c
         slope = np.loadtxt(f"./data_files/mle_parameters/{box}/{sim}/{z_sample}/lightcone{lightcone}/mle_values.txt", usecols=1, skiprows=7, max_rows=1, delimiter='=')
         amp_name = fmt_name(amp, mle)
         slope_name = fmt_name(slope, mle)
-    elif not mle and custom_amp != False and custom_slope != False:
+    elif not mle and custom_amp is not None and custom_slope is not None:
         cut_dirs = [shell_base / "mle"]
         amp = custom_amp
         slope = custom_slope
         amp_name = fmt_name(amp, True)
         slope_name = fmt_name(slope, True)
     else:
-        cut_dirs = sorted([p for p in shell_base.iterdir() if p.is_dir()])
+        cut_pattern = re.compile(r"^1[01]p\d+_\d+p\d+$")
+        cut_dirs = sorted([p for p in shell_base.iterdir() if p.is_dir() and cut_pattern.match(p.name)])
 
     outdir = Path(
         f"./data_files/mock_halo_catalogs/{box}/{sim}/{z_sample}/lightcone{lightcone}"
@@ -48,7 +50,7 @@ def combine_shells(box, sim, z_sample, lightcone, mle=False, custom_amp=False, c
         combined = pd.concat(dfs, ignore_index=True)
         # combined = pd.concat(dfs, axis=0, ignore_index=True) #how="vertical")
 
-        if mle or (custom_amp != False and custom_slope != False):
+        if mle or (custom_amp is not None and custom_slope is not None):
             pass
         else:
             amp_name, slope_name = cut_dir.name.split("_", 1)
@@ -64,7 +66,7 @@ if __name__ == "__main__":
     z_sample = sys.argv[3]
     lightcone = int(sys.argv[4])
     mle = sys.argv[5].lower() in ("true", "1", "yes", "y")
-    custom_amp = float(sys.argv[6]) if len(sys.argv) > 6 else False
-    custom_slope = float(sys.argv[7]) if len(sys.argv) > 7 else False
+    custom_amp = float(sys.argv[6]) if len(sys.argv) > 6 else None
+    custom_slope = float(sys.argv[7]) if len(sys.argv) > 7 else None
 
     combine_shells(box, sim, z_sample, lightcone, mle, custom_amp, custom_slope)

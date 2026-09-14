@@ -61,18 +61,9 @@ class patchyScreening:
         self.theta_d = theta_d
         self.nside = nside
 
-        # if self.boxname == 'L2800N5040' and self.nside > 4096:
-        #     self.nside = 4096
-        #     print("Setting nside to 4096 for L2800N5040.")
-
         self.pix_res = hp.pixelfunc.nside2resol(nside, arcmin=True)
         self.npix_cutout = int(20.0/self.pix_res)
         self.rtheta = self.make_cutout_radius_grid()
-        # self.rtheta = np.zeros((self.npix_cutout, self.npix_cutout))
-
-        # for ix in range(self.npix_cutout):
-        #     for iy in range(self.npix_cutout):
-        #         self.rtheta[ix, iy] = self.pix_res*np.sqrt((ix - int(self.npix_cutout/2.0))**2 + (iy - int(self.npix_cutout/2.0))**2)
         
         self.cmb_method = cmb_method
         self.fits_file = str(fits_file)
@@ -91,7 +82,7 @@ class patchyScreening:
         self.mock_CMB_primary = None
 
         self.mle = mle
-        if self.mle == True:
+        if self.mle:
             mle_cut_file = f"/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/mle_parameters/{self.boxname}/{self.simname}/{self.z_sample_name}/lightcone{self.lightcone}/mle_values.txt"
             self.im = np.loadtxt(mle_cut_file, usecols=1, skiprows=6, max_rows=1, delimiter='=')
             self.slope = np.loadtxt(mle_cut_file, usecols=1, skiprows=7, max_rows=1, delimiter='=')
@@ -101,11 +92,12 @@ class patchyScreening:
             if float(im) == 0.0:
                 self.im = 0.0
             else:
-                self.im = 10**np.array(float(im))
-            
+                # self.im = 10**np.array(float(im))
+                self.im = np.array(float(im))
             self.slope = np.array(float(n_cut))
-            self.im_name = name_float(float(im), mle=self.mle)
-            self.slope_name = name_float(float(n_cut), mle=self.mle)
+                
+        self.im_name = name_float(float(self.im), mle=self.mle)
+        self.slope_name = name_float(float(self.slope), mle=self.mle)
 
 
     def make_cutout_radius_grid(self):
@@ -235,7 +227,6 @@ class patchyScreening:
                 map_dir = 'neutrino_corrected_maps'
                 machine = 'cosma8'
             elif self.boxname == 'L2800N5040' and self.simname == 'HYDRO_FIDUCIAL':
-                # map_dir = 'neutrino_corrected_maps_downsampled_4096'
                 map_dir = 'neutrino_corrected_maps'
                 machine = 'cosma6'
             else:
@@ -250,8 +241,8 @@ class patchyScreening:
             # tau *= (1+redshift)
             # g.close()
 
-            tau = hp.read_map(f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/DM_maps/{self.boxname}/{self.simname}/lightcone{self.lightcone}/shells/tau_map_shell_{self.z_sample}_scale_factor.fits', dtype=np.float64, verbose=False)
-            map_central_redshifts = np.loadtxt(f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/DM_maps/{self.boxname}/{self.simname}/lightcone{self.lightcone}/shell_diagnostics_scale_factor.txt', skiprows=1, delimiter=' ', usecols=(0, 1))
+            tau = hp.read_map(f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/DM_maps/{self.boxname}/{self.simname}/lightcone{self.lightcone}/shells/tau_map_shell_{self.z_sample}.fits', dtype=np.float64, verbose=False)
+            map_central_redshifts = np.loadtxt(f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/DM_maps/{self.boxname}/{self.simname}/lightcone{self.lightcone}/shell_diagnostics.txt', skiprows=1, delimiter=' ', usecols=(0, 1))
             redshift = map_central_redshifts[self.z_sample, 1]
 
             print(f'Map z of {self.z_sample_name} sample = {redshift} (shell: {self.z_sample})')
@@ -278,10 +269,10 @@ class patchyScreening:
             # redshift_high = g_high['DM'].attrs['Central redshift assumed for correction']
             # tau_high *= (1+redshift_high)
 
-            tau_low = hp.read_map(f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/DM_maps/{self.boxname}/{self.simname}/lightcone{self.lightcone}/shells/tau_map_shell_{self.z_sample-1}_scale_factor.fits', dtype=np.float64, verbose=False)
+            tau_low = hp.read_map(f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/DM_maps/{self.boxname}/{self.simname}/lightcone{self.lightcone}/shells/tau_map_shell_{self.z_sample-1}.fits', dtype=np.float64, verbose=False)
             redshift_low = map_central_redshifts[self.z_sample-1, 1]
 
-            tau_high = hp.read_map(f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/DM_maps/{self.boxname}/{self.simname}/lightcone{self.lightcone}/shells/tau_map_shell_{self.z_sample+1}_scale_factor.fits', dtype=np.float64, verbose=False)
+            tau_high = hp.read_map(f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/DM_maps/{self.boxname}/{self.simname}/lightcone{self.lightcone}/shells/tau_map_shell_{self.z_sample+1}.fits', dtype=np.float64, verbose=False)
             redshift_high = map_central_redshifts[self.z_sample+1, 1]
 
             tau = tau_low + tau + tau_high
@@ -292,10 +283,10 @@ class patchyScreening:
 
         elif self.lightcone_method[0] == 'FULL':
             try:
-                tau = hp.read_map(f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/DM_maps/{self.boxname}/{self.simname}/lightcone{self.lightcone}/stacked_tau_map_z3p0_scale_factor.fits', dtype=np.float64, verbose=False)
+                tau = hp.read_map(f'/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/DM_maps/{self.boxname}/{self.simname}/lightcone{self.lightcone}/stacked_tau_map_z3p0.fits', dtype=np.float64, verbose=False)
             except FileNotFoundError:
                 from stacked_DM_maps import stack_DM_maps_z3
-                tau = stack_DM_maps_z3(self.ncpu, self.boxname, self.simname, lightcone=self.lightcone, scale_factor=True, save_shells=False)
+                tau = stack_DM_maps_z3(self.ncpu, self.boxname, self.simname, lightcone=self.lightcone, scale_factor=False, save_shells=False)
             # tau_2 = hp.pixelfunc.ud_grade(tau,self.nside)
             # alm = hp.map2alm(tau_2)
             # #tau_2 = hp.alm2map(alm, nside=self.nside, lmax=5024)
@@ -354,6 +345,7 @@ class patchyScreening:
                 'zminpot':     f['Lightcone/HaloCentre'][...][:,2],
             }).sort_values('ID')
             f.close()
+
         elif lightcone_type == 'VR':
             halo_lightcone = f'/cosma8/data/dp004/jch/FLAMINGO/lightcone_halos/{self.simname}/lightcone_halos/lightcone0/lightcone_halos_{self.z_sample:04d}.hdf5'
             f = h5py.File(halo_lightcone, 'r')
@@ -377,7 +369,7 @@ class patchyScreening:
             # df_HBT = pl.DataFrame({
             #     'ID':          f['InputHalos/HaloCatalogueIndex'][...],
             #     'Structuretype': f['InputHalos/IsCentral'][...],
-            #     'mvir':       f['SO/500_crit/TotalMass'][...] * 1e10,
+            #     'm500':       f['SO/500_crit/TotalMass'][...] * 1e10,
             #     'mstar':       f['ExclusiveSphere/50kpc/StellarMass'][...] * 1e10,
             #     'HaloID':      f['SOAP/HostHaloIndex'][...],
             # })
@@ -389,36 +381,42 @@ class patchyScreening:
             with h5py.File(HBT_file, 'r') as f:
                 ids    = f['InputHalos/HaloCatalogueIndex'][...]
                 struct = f['InputHalos/IsCentral'][...]                  # 1=central, 0=satellite (your convention)
-                mvir   = f['SO/500_crit/TotalMass'][...] * 1e10
+                m500crit   = f['SO/500_crit/TotalMass'][...] * 1e10
+                m200crit   = f['SO/200_crit/TotalMass'][...] * 1e10
                 mstar  = f['ExclusiveSphere/50kpc/StellarMass'][...] * 1e10
                 hid    = f['SOAP/HostHaloIndex'][...]                    # index into the FULL arrays above
             f.close()
 
-            # ---- apply host-mvir fix for satellites (from dndz_dndm_curve.py logic) ----
+            # ---- apply host-m500 fix for satellites (from dndz_dndm_curve.py logic) ----
             SATELLITE_FLAG = 0
             CENTRAL_FLAG   = 1
 
             sat_mask = (struct == SATELLITE_FLAG) & (hid >= 0)
 
-            mvir_fixed = mvir
+            m500_fixed = m500crit
+            m200_fixed = m200crit
             if np.any(sat_mask):
                 host_ids    = hid[sat_mask].astype(np.int64)
                 host_struct = struct[host_ids]
-                host_mvir   = mvir[host_ids]
+                host_m500   = m500crit[host_ids]
+                host_m200   = m200crit[host_ids]
 
-                # only accept hosts that are centrals; otherwise leave original mvir
+                # only accept hosts that are centrals; otherwise leave original m500
                 good_host = (host_struct == CENTRAL_FLAG)
 
-                mvir_fixed = mvir.copy()
-                mvir_fixed[sat_mask] = np.where(good_host, host_mvir, mvir[sat_mask])
+                m500_fixed = m500crit.copy()
+                m500_fixed[sat_mask] = np.where(good_host, host_m500, m500crit[sat_mask])
+                m200_fixed = m200crit.copy()
+                m200_fixed[sat_mask] = np.where(good_host, host_m200, m200crit[sat_mask])
 
-            # build dataframe (satellites now carry host mvir in the mvir column)
+            # build dataframe (satellites now carry host m500 in the m500 column)
             df_HBT = pd.DataFrame({
                 'ID':            ids,
                 'Structuretype': struct,
-                'mvir':          mvir_fixed,
+                'm500crit':      m500_fixed,
+                'm200crit':      m200_fixed,
                 'mstar':         mstar,
-                'HostHaloID':        hid,
+                'HostHaloIndex': hid,
             })
 
 
@@ -447,7 +445,7 @@ class patchyScreening:
             if halo_lc_data is None or df_halo is None:
                 halo_lc_data, df_halo = self.load_halo_data()
                 
-            df_mass = df_halo[df_halo['mstar'] > self.im]
+            df_mass = df_halo[df_halo['mstar'] > (10**self.im)]
             self.merge = pd.merge(
                 df_mass,
                 halo_lc_data,
@@ -455,7 +453,7 @@ class patchyScreening:
                 how='inner'
             ).sort_values('ID').reset_index(drop=True)
             if self.merge.empty:
-                print(f"No halos for stellar cut = {np.log10(self.im)}")
+                print(f"No halos for stellar cut = {self.im}")
                 self.nhalo = 0
                 return
         elif self.lightcone_method[1] == 'dndz':
@@ -470,14 +468,63 @@ class patchyScreening:
         self.x = self.merge['xminpot'].to_numpy()
         self.y = self.merge['yminpot'].to_numpy()
         self.z = self.merge['zminpot'].to_numpy()
-        mvir = self.merge['mvir'].to_numpy()
+
+        try:
+            m500crit = self.merge['m500crit'].to_numpy()
+        except KeyError:
+            m500crit = self.merge['mvir'].to_numpy()
+
         mstar = self.merge['mstar'].to_numpy()
-        self.nhalo = mvir.size
+        self.nhalo = m500crit.size
         print(self.nhalo)
-        print(np.log10(self.im), np.log10(np.min(mstar)), np.log10(np.mean(mstar)), np.log10(np.mean(mvir)), self.nhalo)
+
+        try:
+            m200crit = self.merge['m200crit'].to_numpy()
+        except KeyError:
+            m200crit = np.nan
+
+        print(f"Cut = {self.im}, Min M* = {np.log10(np.min(mstar)):.5f}, Mean M* = {np.log10(np.mean(mstar)):.5f}, "
+              f"Mean M200c = {np.mean(m200crit):.5f}, {np.log10(np.mean(m200crit)):.5f}, Mean M500c = {np.log10(np.mean(m500crit)):.5f}, Nhalo = {self.nhalo}")
+        
         print(f'Identifying stackable objects: {time.time() - self.job_start_time}s')
 
+        self.stack_size = self.nhalo
+
         return
+    
+
+    def cluster_removal(self):
+        try:
+            print(self.merge['ID'][0])
+        except AttributeError:
+            self.filter_stellar_mass()
+            if self.nhalo == 0:
+                print("No halos to compute coordinates")
+                sys.exit()
+
+        try:
+            self.merge = self.merge[self.merge['m500crit'] <= (10**np.array(14.3))] # Filter out halos with m500 > 10^14.3, cut from Siegel et al. 2026
+        except KeyError:
+            self.merge = self.merge[self.merge['mvir'] <= (10**np.array(14.3))] # Filter out halos with m500 > 10^14.3, cut from Siegel et al. 2026
+
+        self.x = self.merge['xminpot'].to_numpy()
+        self.y = self.merge['yminpot'].to_numpy()
+        self.z = self.merge['zminpot'].to_numpy()
+        try:
+            m500crit = self.merge['m500crit'].to_numpy()
+        except KeyError:
+            m500crit = self.merge['mvir'].to_numpy()
+        mstar = self.merge['mstar'].to_numpy()
+        self.stack_size = m500crit.size
+        print(self.stack_size)
+        print(f"Cut = {self.im}, Min M* = {np.log10(np.min(mstar))}, Mean M* = {np.log10(np.mean(mstar))}, Mean M500c = {np.log10(np.mean(m500crit))}, Stack size = {self.stack_size}")
+        print(f'Removing high mass clusters: {time.time() - self.job_start_time}s')
+
+        if self.stack_size == 0:
+            raise ValueError("No halos found; cannot run halo branch.")
+
+        return
+    
 
     def compute_alm_maps(self, plot=False):
                     
@@ -563,7 +610,7 @@ class patchyScreening:
 
         # self.reconstructed_tau_map = hp.ud_grade(self.reconstructed_tau_map, 8192)
 
-        self.reconstructed_tau_map = hp.smoothing(self.reconstructed_tau_map, fwhm=1.3*np.pi/60.0/180.0)
+        self.reconstructed_tau_map = hp.smoothing(self.reconstructed_tau_map, fwhm=1.6*np.pi/60.0/180.0)
 
         if plot:
             hp.mollview(self.reconstructed_tau_map, title=f"Reconstructed tau map, ell >= {ell_min}", cmap="jet")
@@ -615,14 +662,14 @@ class patchyScreening:
                 self.theta = halo["theta"]
                 self.phi = halo["phi"]
                 self.source_vector = halo["source_vector"]
-                self.nhalo = int(halo["nhalo"])
+                self.stack_size = int(halo["stack_size"])
 
             except FileNotFoundError:
                 self.get_halo_coordinates()
 
             pixels = hp.vec2pix(self.nside, self.source_vector[:, 0], self.source_vector[:, 1], self.source_vector[:, 2])
 
-        print(len(pixels), len(self.source_vector), self.nhalo)
+        print(len(pixels), len(self.source_vector), self.stack_size)
 
         try:
             t_large_at_halos = self.large_scale_map[pixels]
@@ -649,9 +696,9 @@ class patchyScreening:
         self.theta = self.theta[keep_idx]
         self.phi = self.phi[keep_idx]
         self.source_vector = self.source_vector[keep_idx]
-        self.nhalo = len(keep_idx)
+        self.stack_size = len(keep_idx)
 
-        print(f"Balanced large-scale signs: {n_keep} positive + {n_keep} negative = {self.nhalo} halos")
+        print(f"Balanced large-scale signs: {n_keep} positive + {n_keep} negative = {self.stack_size} halos")
         
         return
 
@@ -724,11 +771,11 @@ class patchyScreening:
 
     def run_tau_profiles(self):
         # Parallelisation of computing tau profiles for each halo
-        batch_size=max(1, self.nhalo // (self.ncpu*2))
+        batch_size=max(1, self.stack_size // (self.ncpu*2))
 
         print(f'Starting profile loop: {time.time() - self.job_start_time}s')
         
-        results = Parallel(n_jobs=self.ncpu, backend="loky", batch_size=batch_size)(delayed(self.tau_prof)(i) for i in range(self.nhalo))
+        results = Parallel(n_jobs=self.ncpu, backend="loky", batch_size=batch_size)(delayed(self.tau_prof)(i) for i in range(self.stack_size))
         self.data_1D = np.asarray(results)
         print(f'Ending profile loop: {time.time() - self.job_start_time}s')
         return
@@ -750,12 +797,12 @@ class patchyScreening:
         if rank == 0:
             print(f"MPI setup complete: {time.time() - self.job_start_time:.2f}s")
 
-        all_indices = np.arange(self.nhalo)
+        all_indices = np.arange(self.stack_size)
         my_indices = all_indices[rank::size]
 
         print(
             f"Rank {rank}/{size} processing {len(my_indices)} halos "
-            f"from total {self.nhalo}"
+            f"from total {self.stack_size}"
         )
 
         t_local_start = time.time()
@@ -796,7 +843,7 @@ class patchyScreening:
         comm.Barrier()
 
         if rank == 0:
-            self.data_1D = np.empty((self.nhalo, len(self.theta_d)))
+            self.data_1D = np.empty((self.stack_size, len(self.theta_d)))
 
             for r in range(size):
                 chunk_file = os.path.join(tmpdir, f"rank_{r:04d}.npz")
@@ -821,12 +868,12 @@ class patchyScreening:
             t0 = time.time()
             print(f"Starting MPI tau image stack with {size} ranks")
 
-        all_indices = np.arange(self.nhalo)
+        all_indices = np.arange(self.stack_size)
         my_indices = all_indices[rank::size]
 
         print(
             f"Rank {rank}/{size} processing {len(my_indices)} halos "
-            f"from total {self.nhalo}",
+            f"from total {self.stack_size}",
             flush=True,
         )
 
@@ -859,10 +906,10 @@ class patchyScreening:
             local_sum += img
 
             if rank == 0 and (n_done % progress_every == 0 or n_done == len(my_indices)):
-                approx_global_done = min(n_done * size, self.nhalo)
+                approx_global_done = min(n_done * size, self.stack_size)
                 print(
-                    f"Approx progress: {approx_global_done}/{self.nhalo} "
-                    f"({100 * approx_global_done / self.nhalo:.1f}%)",
+                    f"Approx progress: {approx_global_done}/{self.stack_size} "
+                    f"({100 * approx_global_done / self.stack_size:.1f}%)",
                     flush=True,
                 )
 
@@ -907,7 +954,7 @@ class patchyScreening:
         # if rank == 0:
         #     print(
         #         f"Balanced catalogue loaded on all ranks: "
-        #         f"nhalo = {self.nhalo}"
+        #         f"stack_size = {self.stack_size}"
         #     )
 
         # self.run_tau_profiles_mpi()
@@ -926,7 +973,7 @@ class patchyScreening:
 
         comm = MPI.COMM_WORLD
         if comm.Get_rank() == 0:
-            self.stack_and_save_image(plot=plot)
+            self.stack_and_save_image()
 
             if self.cleanup_tmp:
                 self.cleanup_tmp_dir()
@@ -941,18 +988,18 @@ class patchyScreening:
         
         # Stacking of tau profiles and save as pickle files
         tau_1D_stack = np.zeros(len(self.theta_d))
-        for i in range(self.nhalo):
+        for i in range(self.stack_size):
             tau_1D = self.data_1D[i,:]
             tau_1D_stack += tau_1D
-        # tau_1D_stack *= -1.0/(self.mean_mod_T_large_scale * self.nhalo)
-        tau_1D_stack /= self.nhalo
+        # tau_1D_stack *= -1.0/(self.mean_mod_T_large_scale * self.stack_size)
+        tau_1D_stack /= self.stack_size
         
         rows, cols = (len(self.theta_d), 4)
         data = [0]*cols
         data[0] = self.theta_d
         data[1] = tau_1D_stack
         data[2] = (self.theta_d*np.pi/(180.0*60.0))*self.Dcom
-        data[3] = self.nhalo
+        data[3] = self.stack_size
 
         fits_suffix = "" if self.cmb_method=='CAMB' else f"_{self.fits_file}"
         signal_suffix = "" if self.signal==True else "_no_ps"
@@ -970,7 +1017,7 @@ class patchyScreening:
         return
 
 
-    def stack_and_save_image(self, plot=False):
+    def stack_and_save_image(self):
         comm = MPI.COMM_WORLD
         if comm.Get_rank() != 0:
             return
@@ -984,41 +1031,29 @@ class patchyScreening:
             )
             tau_1D_stack[j] = np.mean(self.tau_2D_stack[idx_in])
 
-        if plot:
-            os.makedirs("./Plots", exist_ok=True)
 
-            vmax = np.max(np.abs(self.tau_2D_stack))
+        os.makedirs("./Plots", exist_ok=True)
+        vmax = np.max(np.abs(self.tau_2D_stack))
+        extent = [
+            -0.5 * self.npix_cutout * self.pix_res,
+            0.5 * self.npix_cutout * self.pix_res,
+            -0.5 * self.npix_cutout * self.pix_res,
+            0.5 * self.npix_cutout * self.pix_res,
+        ]
 
-            extent = [
-                -0.5 * self.npix_cutout * self.pix_res,
-                0.5 * self.npix_cutout * self.pix_res,
-                -0.5 * self.npix_cutout * self.pix_res,
-                0.5 * self.npix_cutout * self.pix_res,
-            ]
+        plt.imshow(self.tau_2D_stack.T, origin="lower", extent=extent, cmap="RdBu", vmax=vmax, vmin=-vmax)
+        plt.xlabel("x [arcmin]")
+        plt.ylabel("y [arcmin]")
+        plt.colorbar(label=r"$\tau$")
+        plt.savefig(f"./Plots/tau_2D_stack_{self.boxname}_{self.simname}_{self.z_sample_name}.png", dpi=400, bbox_inches="tight")
+        plt.clf()
 
-            plt.imshow(
-                self.tau_2D_stack.T,
-                origin="lower",
-                extent=extent,
-                cmap="RdBu",
-                vmax=vmax,
-                vmin=-vmax
-            )
-            plt.xlabel("x [arcmin]")
-            plt.ylabel("y [arcmin]")
-            plt.colorbar(label=r"$\tau$")
-            plt.savefig(
-                f"./Plots/tau_2D_stack_{self.boxname}_{self.simname}_{self.z_sample_name}.png",
-                dpi=400,
-                bbox_inches="tight",
-            )
-            plt.clf()
 
         data = [0] * 5
         data[0] = self.theta_d
         data[1] = tau_1D_stack
         data[2] = (self.theta_d * np.pi / (180.0 * 60.0)) * self.Dcom
-        data[3] = self.nhalo
+        data[3] = self.stack_size
         data[4] = self.tau_2D_stack
 
         fits_suffix = "" if self.cmb_method == "CAMB" else f"_{self.fits_file}"
@@ -1078,6 +1113,7 @@ class patchyScreening:
             self.filter_stellar_mass(halo_lc_data, df_halo)
         elif self.lightcone_method[1] == 'dndz':
             self.filter_stellar_mass()     # reads self.lightcone_method, writes self.filtered_halos
+        self.cluster_removal()
         self.get_halo_coordinates()    # reads filtered_halos, writes self.halo_coords
         self.balance_large_scale_signs(seed=1000)
 
@@ -1088,9 +1124,7 @@ class patchyScreening:
         elif self.lightcone_method[1] == "dndz":
             self.filter_stellar_mass()
 
-        if self.nhalo == 0:
-            raise ValueError("No halos found; cannot run halo branch.")
-
+        self.cluster_removal()
         self.get_halo_coordinates()
 
         np.savez_compressed(
@@ -1098,7 +1132,7 @@ class patchyScreening:
             theta=self.theta,
             phi=self.phi,
             source_vector=self.source_vector,
-            nhalo=self.nhalo,
+            stack_size=self.stack_size,
             Dcom=self.Dcom,
         )
 
@@ -1138,23 +1172,24 @@ class patchyScreening:
         theta_balanced = self.theta[keep_idx]
         phi_balanced = self.phi[keep_idx]
         source_vector_balanced = self.source_vector[keep_idx]
-        nhalo_balanced = len(keep_idx)
+        stack_size_balanced = len(keep_idx)
 
         np.savez_compressed(
             self.balanced_halo_tmp_file(),
             theta=theta_balanced,
             phi=phi_balanced,
             source_vector=source_vector_balanced,
-            nhalo=nhalo_balanced,
+            stack_size=stack_size_balanced,
             Dcom=self.Dcom,
             keep_idx=keep_idx,
         )
 
         print(
             f"Saved balanced halo catalogue: "
-            f"{n_keep} positive + {n_keep} negative = {nhalo_balanced} halos"
+            f"{n_keep} positive + {n_keep} negative = {stack_size_balanced} halos"
         )
         print(f"Saved to {self.balanced_halo_tmp_file()}")
+        
 
     def load_branch_outputs(self):
         cmb = np.load(self.cmb_tmp_file())
@@ -1168,7 +1203,7 @@ class patchyScreening:
         self.theta = halo["theta"]
         self.phi = halo["phi"]
         self.source_vector = halo["source_vector"]
-        self.nhalo = int(halo["nhalo"])
+        self.stack_size = int(halo["stack_size"])
         self.Dcom = float(halo["Dcom"])
 
         print(f"Loaded CMB branch data from {self.cmb_tmp_file()}")
@@ -1180,7 +1215,7 @@ class patchyScreening:
         self.theta = halo["theta"]
         self.phi = halo["phi"]
         self.source_vector = halo["source_vector"]
-        self.nhalo = int(halo["nhalo"])
+        self.stack_size = int(halo["stack_size"])
         self.Dcom = float(halo["Dcom"])
 
         print(f"Loaded balanced halo catalogue from {self.balanced_halo_tmp_file()}")
@@ -1242,6 +1277,7 @@ class patchyScreening:
                 self.filter_stellar_mass()
 
             self.compute_alm_maps(plot)
+            self.cluster_removal()
             self.get_halo_coordinates()
             self.run_tau_profiles()
             self.stack_and_save()
@@ -1253,13 +1289,14 @@ class patchyScreening:
 
         # Compute source vectors of each halo
         try:
-            rows, cols = (self.nhalo, 3)
+            rows, cols = (self.stack_size, 3)
         except AttributeError:
             self.filter_stellar_mass()
-            if self.nhalo == 0:
+            self.cluster_removal()
+            if self.stack_size == 0:
                 print("No halos to compute coordinates")
                 sys.exit()
-            rows, cols = (self.nhalo, 3)
+            rows, cols = (self.stack_size, 3)
         vec = [[0]*cols]*rows
         vec=1.0*np.asarray(vec)
         vec[:,0]=self.x
@@ -1378,7 +1415,7 @@ if __name__ == '__main__':
     slope = sys.argv[6]
     lightcone = sys.argv[7] 
     fits = sys.argv[8]
-    sig = sys.argv[9]
+    sig = sys.argv[9].lower() in ("true", "1", "yes", "y")
     mode = sys.argv[10] if len(sys.argv) > 10 else "full"
     run_id = sys.argv[11] if len(sys.argv) > 11 else None
     cleanup_tmp = sys.argv[12].lower() in ("true", "1", "yes", "y") if len(sys.argv) > 12 else False

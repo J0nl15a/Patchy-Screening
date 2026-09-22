@@ -28,12 +28,12 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-import numpy as np
-import matplotlib.pyplot as plt
+import numpy as np, pylab as pb
+from matplotlib.lines import Line2D
 
 from imp_patchy_screening import patchyScreening
 
-plt.rc('text', usetex=True)
+pb.rc('text', usetex=True)
 
 
 # Match your catalogue convention
@@ -115,7 +115,7 @@ POPULATION_STYLES = {
 
 
 def set_plot_style(fontsize: int = 8) -> None:
-    plt.rcParams.update({
+    pb.rcParams.update({
         "font.family": "serif",
         "font.size": fontsize,
         "axes.labelsize": fontsize,
@@ -160,6 +160,18 @@ def finite_log10(values: np.ndarray) -> np.ndarray:
     return np.log10(values[mask])
 
 
+def mean_log_mass(cat, mass_column: str) -> float:
+    values = np.asarray(cat[mass_column].to_numpy(), dtype=float)
+
+    mask = np.isfinite(values) & (values > 0)
+    values = values[mask]
+
+    if len(values) == 0:
+        return np.nan
+
+    return np.log10(np.mean(values))
+
+
 def histogram_log_mass(cat, mass_column: str, bins: int | np.ndarray):
     logm = finite_log10(cat[mass_column].to_numpy())
     return np.histogram(logm, bins=bins)
@@ -184,31 +196,21 @@ def plot_population_panel(ax, cat, mass_column: str, n_bins: int) -> None:
     counts_total, bins = histogram_log_mass(total, mass_column, n_bins)
 
     histograms = {"total": counts_total}
+    populations = {"total": total}
+
     for population in ("central", "satellite"):
         sub = select_population(cat, population)
+        populations[population] = sub
         histograms[population], _ = histogram_log_mass(sub, mass_column, bins)
 
     for population in ("total", "central", "satellite"):
         style = POPULATION_STYLES[population]
         plot_hist_with_errors(ax, histograms[population], bins, style["colour"], style["label"])
+        mean_mass = mean_log_mass(populations[population], mass_column)
 
+        if np.isfinite(mean_mass):
+            ax.axvline(mean_mass, color=style["colour"], linestyle="--", linewidth=1.2, label="_nolegend_", alpha=0.75)
 
-# def plot_simulations_panel(ax, data_root: Path, box: str, iz: str, lc: int, ncpu: int, mass_column: str, population: str, n_bins: int) -> None:
-
-
-#     # Use shared bins set by the fiducial simulation, then draw every simulation on those bins.
-#     fid_cat = load_catalogue(data_root, box, "HYDRO_FIDUCIAL", iz, lc, ncpu)
-#     _, bins = histogram_log_mass(select_population(fid_cat, population), mass_column, n_bins)
-
-#     for sim, label, colour in zip(SIMS, SIM_NAMES, SIM_COLOURS):
-#         try:
-#             cat = fid_cat if sim == "HYDRO_FIDUCIAL" else load_catalogue(data_root, box, sim, iz, lc, ncpu)
-#         except FileNotFoundError as err:
-#             print(f"[WARN] {err}. Skipping {sim}/{iz}.")
-#             continue
-
-#         counts, _ = histogram_log_mass(select_population(cat, population), mass_column, bins)
-#         plot_hist_with_errors(ax, counts, bins, colour, label)
 
 def plot_simulations_panel(ax, data_root: Path, box: str, iz: str, lc: int, ncpu: int, mass_column: str, population: str, n_bins: int, include_resolutions: bool = False) -> None:
 
@@ -246,9 +248,13 @@ def plot_simulations_panel(ax, data_root: Path, box: str, iz: str, lc: int, ncpu
             print(f"[WARN] {err}. Skipping {entry['label']}/{iz}.")
             continue
 
-        counts, _ = histogram_log_mass(select_population(cat, population), mass_column, bins)
-
+        sub = select_population(cat, population)
+        counts, _ = histogram_log_mass(sub, mass_column, bins)
         plot_hist_with_errors(ax, counts, bins, entry["colour"], entry["label"])
+        mean_mass = mean_log_mass(sub, mass_column)
+
+        if np.isfinite(mean_mass):
+            ax.axvline(mean_mass, color=entry["colour"], linestyle="--", linewidth=1.2, label="_nolegend_", alpha=0.75)
 
 
 def configure_axes(axs) -> None:
@@ -261,10 +267,10 @@ def configure_axes(axs) -> None:
 
     halo_axes[0].set_ylabel("Counts")
     stellar_axes[0].set_ylabel("Counts")
-    halo_axes[0].set_xlabel(r"Halo Mass [$\log_{10}(M / M_\odot)$]")
-    halo_axes[1].set_xlabel(r"Halo Mass [$\log_{10}(M / M_\odot)$]")
-    stellar_axes[0].set_xlabel(r"Stellar Mass [$\log_{10}(M / M_\odot)$]")
-    stellar_axes[1].set_xlabel(r"Stellar Mass [$\log_{10}(M / M_\odot)$]")
+    halo_axes[0].set_xlabel(r"$\log_{10}(M_{200c}\,[M_\odot])$")
+    halo_axes[1].set_xlabel(r"$\log_{10}(M_{200c}\,[M_\odot])$")
+    stellar_axes[0].set_xlabel(r"$\log_{10}(M_*\,[M_\odot])$")
+    stellar_axes[1].set_xlabel(r"$\log_{10}(M_*\,[M_\odot])$")
 
     # Same limits as your single-panel plots.
     for ax in halo_axes:
@@ -282,26 +288,30 @@ def make_plot(args) -> Path:
 
     set_plot_style(7)
 
-    fig, axs = plt.subplots(2, 2, figsize=(7.2, 5.8), sharey=True)
+    fig, axs = pb.subplots(2, 2, figsize=(7.2, 5.8), sharey=True)
 
     for col, iz in enumerate(SAMPLES):
         if args.mode == "population":
             cat = load_catalogue(data_root, args.box, args.isim, iz, args.lightcone, args.ncpu)
-            plot_population_panel(axs[0, col], cat, "m500crit", args.n_bins)
+            plot_population_panel(axs[0, col], cat, "m200crit", args.n_bins)
             plot_population_panel(axs[1, col], cat, "mstar", args.n_bins)
         elif args.mode == "simulations":
-            plot_simulations_panel(axs[0, col], data_root, args.box, iz, args.lightcone, args.ncpu, "m500crit", args.population, args.n_bins, include_resolutions=args.include_resolutions)
+            plot_simulations_panel(axs[0, col], data_root, args.box, iz, args.lightcone, args.ncpu, "m200crit", args.population, args.n_bins, include_resolutions=args.include_resolutions)
             plot_simulations_panel(axs[1, col], data_root, args.box, iz, args.lightcone, args.ncpu, "mstar", args.population, args.n_bins, include_resolutions=args.include_resolutions)
         else:
             raise ValueError(f"Unknown mode: {args.mode}")
 
     configure_axes(axs)
 
-    # Legends: sample-labelled, no frame. Put only one legend per panel because the user requested sample labels.
-    axs[0, 0].legend(title="Blue sample", loc="upper right", frameon=False)
-    axs[0, 1].legend(title="Green sample", loc="upper right", frameon=False)
-    axs[1, 0].legend(title="Blue sample", loc="upper right", frameon=False)
-    axs[1, 1].legend(title="Green sample", loc="upper right", frameon=False)
+    mean_handle = Line2D([0], [0], color="grey", linestyle="--", linewidth=1.2, label=f"Mean mass")
+
+    for ax, title in [(axs[0, 0], "Blue sample"), (axs[0, 1], "Green sample"), (axs[1, 0], "Blue sample"), (axs[1, 1], "Green sample")]:
+        handles, labels = ax.get_legend_handles_labels()
+
+        handles.append(mean_handle)
+        labels.append("Mean mass")
+
+        ax.legend(handles=handles, labels=labels, title=title, loc="upper right", frameon=False)
 
     # Keep no titles/subplot titles.
     for ax in axs.flat:
@@ -311,7 +321,7 @@ def make_plot(args) -> Path:
     mode_tag = args.mode if args.mode == "population" else f"simulations_{args.population}"
     outpath = outdir / f"dndm_overview_{mode_tag}.{suffix}"
     fig.savefig(outpath, dpi=args.dpi, bbox_inches="tight")
-    plt.close(fig)
+    pb.close(fig)
     return outpath
 
 

@@ -354,6 +354,152 @@ class TauPlotter:
         pb.close(fig)
 
 
+    def generic_subplot(self, blue_files, green_files, labels, line_styles, alpha, outname, blue_observed=None, green_observed=None, fiducial_index=0, noise_data=None, 
+                        main_ylim=None, ratio_ylim=None):
+
+        fig, axes = pb.subplots(2, 2, figsize=(11, 7), sharex="col", sharey="row", gridspec_kw={"height_ratios": [3.0, 1.0], "hspace": 0.05, "wspace": 0.05}, dpi=400)
+
+        # ------------------------------------------------------------
+        # Helper for plotting one sample/column
+        # ------------------------------------------------------------
+
+        def plot_column(ax, ax_ratio, file_list, colour, sample, observed_data):
+
+            profiles = []
+
+            # Load all mock profiles first.
+            for fp in file_list:
+                with open(fp, "rb") as f:
+                    data = pickle.load(f)
+
+                profiles.append({"theta": np.asarray(data[0]), "tau": np.asarray(data[1]), "distance": np.asarray(data[2])})
+
+            # --------------------------------------------------------
+            # Reference = unlensed profile
+            # --------------------------------------------------------
+
+            fid_theta = profiles[fiducial_index]["theta"]
+            fid_tau = profiles[fiducial_index]["tau"]
+
+            # --------------------------------------------------------
+            # Mock profiles
+            # --------------------------------------------------------
+
+            for profile, lab, style, a in zip(profiles, labels, line_styles, alpha):
+
+                theta = profile["theta"]
+                tau = profile["tau"]
+
+                # Main panel.
+                ax.plot(theta, tau * 1e4, style, color=colour, alpha=a, label=lab, markersize=4)
+
+                # Interpolate fiducial in case theta arrays differ.
+                fid_at_theta = np.interp(theta, fid_theta, fid_tau)
+
+                # Difference panel.
+                ax_ratio.plot(theta, (tau - fid_at_theta) * 1e4, style, color=colour, alpha=a, markersize=4)
+
+                if noise_data is not None and lab in noise_data:
+                    ax.plot(theta, noise_data[lab] * 1e4, "--", color=colour, label=f"{lab} noise")
+
+            # --------------------------------------------------------
+            # Observations
+            # --------------------------------------------------------
+
+            if observed_data is not None:
+
+                obs = np.loadtxt(observed_data)
+
+                obs_theta = obs[:, 0]
+                obs_tau = obs[:, 1]
+                obs_upper = obs[:, 2]
+                obs_lower = obs[:, 3]
+
+                # Observed files already contain tau x 1e4.
+                obs_yerr = np.vstack((obs_tau - obs_lower, obs_upper - obs_tau))
+
+                ax.errorbar(obs_theta, obs_tau, yerr=obs_yerr, fmt="o", markersize=4, color="k", ecolor="k", capsize=2, linewidth=1.0, label="Coulton et al. 2025", zorder=10)
+
+                # Fiducial mock is still stored in unscaled tau,
+                # so multiply by 1e4 before subtracting it from obs.
+                fid_at_obs = np.interp(obs_theta, fid_theta, fid_tau * 1e4)
+
+                ax_ratio.errorbar(obs_theta, obs_tau - fid_at_obs, yerr=obs_yerr, fmt="o", markersize=4, color="k", ecolor="k", capsize=2, linewidth=1.0, zorder=10)
+
+            # --------------------------------------------------------
+            # Formatting for this column
+            # --------------------------------------------------------
+
+            ax.axhline(0.0, color="k", linewidth=0.8)
+            ax_ratio.axhline(0.0, color="k", linestyle="--", linewidth=0.8, alpha=0.7)
+
+            ax.set_xlim(0, 11)
+
+            ax.legend(fontsize=10, loc="best", title=f"{sample} sample", title_fontsize=11, frameon=False)
+
+            return fid_theta, profiles[fiducial_index]["distance"]
+
+        # ------------------------------------------------------------
+        # Blue: left column
+        # ------------------------------------------------------------
+
+        blue_theta, blue_distance = plot_column(ax=axes[0, 0], ax_ratio=axes[1, 0], file_list=blue_files, colour="tab:blue", sample="Blue", observed_data=blue_observed)
+
+        # ------------------------------------------------------------
+        # Green: right column
+        # ------------------------------------------------------------
+
+        green_theta, green_distance = plot_column(ax=axes[0, 1], ax_ratio=axes[1, 1], file_list=green_files, colour="tab:green", sample="Green", observed_data=green_observed)
+
+        # ------------------------------------------------------------
+        # Optional y-axis limits
+        # ------------------------------------------------------------
+
+        if main_ylim is not None:
+            axes[0, 0].set_ylim(main_ylim)
+
+        if ratio_ylim is not None:
+            axes[1, 0].set_ylim(ratio_ylim)
+
+        # ------------------------------------------------------------
+        # Top axes: physical distance
+        # ------------------------------------------------------------
+
+        ax_blue_distance = axes[0, 0].twiny()
+        ax_green_distance = axes[0, 1].twiny()
+
+        theta_limits = axes[0, 0].get_xlim()
+
+        blue_distance_limits = np.interp(theta_limits, blue_theta, blue_distance)
+        green_distance_limits = np.interp(theta_limits, green_theta, green_distance)
+
+        ax_blue_distance.set_xlim(blue_distance_limits)
+        ax_green_distance.set_xlim(green_distance_limits)
+
+        ax_blue_distance.set_xlabel(r"$r\ [{\rm Mpc}/h]$")
+        ax_green_distance.set_xlabel(r"$r\ [{\rm Mpc}/h]$")
+
+        # ------------------------------------------------------------
+        # Shared labels
+        # ------------------------------------------------------------
+
+        axes[0, 0].set_ylabel(r"$\tau \times 10^4$")
+        axes[1, 0].set_ylabel(r"$(\tau-\tau_{\rm fid})\times10^4$")
+        axes[1, 0].set_xlabel("Annulus centre (arcmin)")
+        axes[1, 1].set_xlabel("Annulus centre (arcmin)")
+
+        # No y labels/tick labels on right column.
+        axes[0, 1].tick_params(axis="y", labelleft=False)
+        axes[1, 1].tick_params(axis="y", labelleft=False)
+
+        # ------------------------------------------------------------
+        # Save
+        # ------------------------------------------------------------
+
+        pb.savefig(os.path.join("./Plots", outname), dpi=400, bbox_inches="tight")
+        pb.close(fig)
+
+
 if __name__ == '__main__':
 
     tp = TauPlotter(base_dir="./L1000N1800")
@@ -367,29 +513,58 @@ if __name__ == '__main__':
     #                 outname='HYDRO_LOW_SIGMA8_optimum_catalog_Blue_10p725_0p894_nside8192_unlensed.png')
     # quit()
 
-    tp.generic_plot(file_list=['./data_files/tau_profiles/L1000N1800/HYDRO_FIDUCIAL/Green/lightcone0/tau_mle_catalogue_nside8192_FITS_unlensed.pickle',
+    tp.generic_plot(file_list=['./data_files/tau_profiles/L1000N1800/HYDRO_FIDUCIAL/Blue/lightcone0/tau_mle_catalogue_nside8192_FITS_unlensed.pickle',
+                               './data_files/tau_profiles/L1000N1800/HYDRO_FIDUCIAL/Blue/lightcone0/tau_mle_catalogue_nside8192_FITS_unlensed_large_T_L_norm.pickle',
                             #    './data_files/tau_profiles/L1000N1800/HYDRO_FIDUCIAL/Green/lightcone0/tau_mle_catalogue_nside8192_FITS_unlensed_no_ps.pickle',
                             #    './data_files/tau_profiles/L1000N1800/HYDRO_LOW_SIGMA8/Green/lightcone0/tau_mle_catalogue_nside8192_FITS_unlensed.pickle',
                             #    './data_files/tau_profiles/L1000N1800/HYDRO_LOW_SIGMA8/Green/lightcone0/tau_mle_catalogue_nside8192_FITS_unlensed_no_ps.pickle',
                             #    './data_files/tau_profiles/L1000N1800/HYDRO_FIDUCIAL/Green/lightcone0/tau_from_image_mle_catalogue_nside8192_FITS_unlensed.pickle',
                             #    './data_files/tau_profiles/L1000N1800/HYDRO_FIDUCIAL/Green/lightcone0/tau_mle_catalogue_nside8192_FITS_unlensed_no_ps.pickle',
-                               './data_files/tau_profiles/L1000N1800/HYDRO_FIDUCIAL/Green/lightcone0/tau_mle_catalogue_nside8192_FITS_lensed_z2.pickle',
+                               './data_files/tau_profiles/L1000N1800/HYDRO_FIDUCIAL/Blue/lightcone0/tau_mle_catalogue_nside8192_FITS_lensed_z2.pickle',
+                               './data_files/tau_profiles/L1000N1800/HYDRO_FIDUCIAL/Blue/lightcone0/tau_mle_catalogue_nside8192_FITS_lensed_z2_large_T_L_norm.pickle',
                             #    './data_files/tau_profiles/L1000N1800/HYDRO_FIDUCIAL/Green/lightcone0/tau_mle_catalogue_nside8192_FITS_lensed_z2_no_ps.pickle',
-                               './data_files/tau_profiles/L1000N1800/HYDRO_FIDUCIAL/Green/lightcone0/tau_mle_catalogue_nside8192_FITS_lensed_z3.pickle',
+                               './data_files/tau_profiles/L1000N1800/HYDRO_FIDUCIAL/Blue/lightcone0/tau_mle_catalogue_nside8192_FITS_lensed_z3.pickle',
+                               './data_files/tau_profiles/L1000N1800/HYDRO_FIDUCIAL/Blue/lightcone0/tau_mle_catalogue_nside8192_FITS_lensed_z3_large_T_L_norm.pickle',
                             #    './data_files/tau_profiles/L1000N1800/HYDRO_FIDUCIAL/Green/lightcone0/tau_mle_catalogue_nside8192_FITS_lensed_z3_no_ps.pickle'
                             ],
-                    labels=["CMB unlensed", "CMB lensed to z=2", "CMB lensed to z=3"], #"CMB unlensed (no PS)", "CMB lensed to z=2", "CMB lensed to z=2 (no PS)", "CMB lensed to z=3", "CMB lensed to z=3 (no PS)"],
-                    line_styles=["-", ":", "--"], #"*", "-.", "+"],
-                    colours=["tab:green" for _ in range(3)], #+ ["darkblue" for _ in range(6)],
-                    alpha=[1. for _ in range(3)],
+                    labels=["CMB unlensed", "CMB unlensed (Galaxy stack normalisation)", "CMB lensed to z=2", "CMB lensed to z=2 (Galaxy stack normalisation)", "CMB lensed to z=3", "CMB lensed to z=3 (Galaxy stack normalisation)"], #"CMB unlensed (no PS)", "CMB lensed to z=2", "CMB lensed to z=2 (no PS)", "CMB lensed to z=3", "CMB lensed to z=3 (no PS)"],
+                    line_styles=["-", ":", "--", "*", "-.", "+"],
+                    colours=["tab:blue" for _ in range(6)], #+ ["darkblue" for _ in range(6)],
+                    alpha=[1. for _ in range(6)],
                     plot_title=None,
-                    label_title="Green sample",
-                    outname='tau_1D_profile_method_comp_full_HYDRO_FIDUCIAL_Green_mle_catalogue_nside8192_FITS.png',
-                    observed_data="./data_files/tau_profiles/digitized_obs_data_green.txt",
+                    label_title="Blue sample",
+                    outname='tau_1D_profile_method_comp_full_HYDRO_FIDUCIAL_Blue_mle_catalogue_nside8192_FITS_large_T_L_norm.png',
+                    observed_data="./data_files/tau_profiles/digitized_obs_data_blue.txt",
                     fiducial_index=0,
                     main_ylim=(-0.5, 1.5),
                     ratio_ylim=(-0.5, 0.5),
                     )
+
+    tp.generic_subplot(blue_files=['./data_files/tau_profiles/L1000N1800/HYDRO_FIDUCIAL/Blue/lightcone0/tau_mle_catalogue_nside8192_FITS_unlensed.pickle',
+                                #    './data_files/tau_profiles/L1000N1800/HYDRO_FIDUCIAL/Blue/lightcone0/tau_mle_catalogue_nside8192_FITS_lensed_z2.pickle',
+                                   './data_files/tau_profiles/L1000N1800/HYDRO_FIDUCIAL/Blue/lightcone0/tau_mle_catalogue_nside8192_FITS_unlensed_no_ps.pickle',
+                                   './data_files/tau_profiles/L1000N1800/HYDRO_FIDUCIAL/Blue/lightcone0/tau_mle_catalogue_nside8192_FITS_lensed_z3.pickle',
+                                #    './data_files/tau_profiles/L1000N1800/HYDRO_FIDUCIAL/Blue/lightcone0/tau_mle_catalogue_nside8192_FITS_lensed_z2_no_ps.pickle',
+                                   './data_files/tau_profiles/L1000N1800/HYDRO_FIDUCIAL/Blue/lightcone0/tau_mle_catalogue_nside8192_FITS_lensed_z3_no_ps.pickle'
+                                   ], 
+                       green_files=['./data_files/tau_profiles/L1000N1800/HYDRO_FIDUCIAL/Green/lightcone0/tau_mle_catalogue_nside8192_FITS_unlensed.pickle',
+                                    # './data_files/tau_profiles/L1000N1800/HYDRO_FIDUCIAL/Green/lightcone0/tau_mle_catalogue_nside8192_FITS_lensed_z2.pickle',
+                                    './data_files/tau_profiles/L1000N1800/HYDRO_FIDUCIAL/Green/lightcone0/tau_mle_catalogue_nside8192_FITS_unlensed_no_ps.pickle',
+                                    './data_files/tau_profiles/L1000N1800/HYDRO_FIDUCIAL/Green/lightcone0/tau_mle_catalogue_nside8192_FITS_lensed_z3.pickle',
+                                    # './data_files/tau_profiles/L1000N1800/HYDRO_FIDUCIAL/Green/lightcone0/tau_mle_catalogue_nside8192_FITS_lensed_z2_no_ps.pickle',
+                                    './data_files/tau_profiles/L1000N1800/HYDRO_FIDUCIAL/Green/lightcone0/tau_mle_catalogue_nside8192_FITS_lensed_z3_no_ps.pickle'
+                                    ],
+                       labels=["CMB unlensed", r"CMB unlensed (no PS)", r"CMB lensed to $z=3$", r"CMB lensed to $z=3$ (no PS)"],
+                       line_styles=["-", "-.", "--", ":"],
+                       alpha=[1.0, 1.0, 1.0, 1.0],
+                       blue_observed=("./data_files/tau_profiles/digitized_obs_data_blue.txt"),
+                       green_observed=("./data_files/tau_profiles/digitized_obs_data_green.txt"),
+                       fiducial_index=0,
+                       outname=("tau_1D_profile_method_comp_HYDRO_FIDUCIAL_Blue_Green_mle_catalogue_nside8192_FITS.pdf"),
+                       main_ylim=(-0.5, 1.5),
+                       ratio_ylim=(-0.5, 0.5),
+                       )
+    
     quit()
     
     tp.generic_plot(file_list=['./data_files/tau_profiles/L1000N1800//HYDRO_FIDUCIAL_tau_Mstar_bin10p808_0p259_nside8192_FITS_unlensed_ell_limited.pickle', 

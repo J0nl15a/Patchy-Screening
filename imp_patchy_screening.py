@@ -357,8 +357,8 @@ class patchyScreening:
             halo_lc_data['zminpot'] = f['Subhalo/LightconeZcminpot'][...]
             f.close()
 
-        print(f"Halo lightcone z = [{halo_lc_data['z'].min()},{halo_lc_data['z'].max()}]")
-        Dcom = self.cosmology.comoving_distance(halo_lc_data['z'].mean())*0.681  # comoving distance to galaxy in Mpc/h
+        print(f"Halo lightcone z = [{halo_lc_data['z'].min()}, {halo_lc_data['z'].max()}]")
+        Dcom = self.cosmology.comoving_distance(halo_lc_data['z'].mean()) * 0.681  # comoving distance to galaxy in Mpc/h FOR FIDUCIAL COSMOLOGY
         self.Dcom = Dcom.value
         snap = int(halo_lc_data['SnapNum'].iloc[0])
         print(f'D_com = {self.Dcom}, Snap number = {snap}')
@@ -462,7 +462,7 @@ class patchyScreening:
                 f"/cosma8/data/dp004/dc-conl1/FLAMINGO/patchy_screening/data_files/mock_halo_catalogs/{self.boxname}/{self.simname}/{self.z_sample_name}/lightcone{self.lightcone}/sampled_halo_data_{self.im_name}_{self.slope_name}.parquet"
             )
             mean_z = {'Blue':0.6, 'Green':1.1, 'Red':1.5} 
-            Dcom = self.cosmology.comoving_distance(mean_z[self.z_sample_name])*0.681  # comoving distance to galaxy in Mpc/h
+            Dcom = self.cosmology.comoving_distance(mean_z[self.z_sample_name]) * 0.681  # comoving distance to galaxy in Mpc/h FOR FIDUCIAL COSMOLOGY
             self.Dcom = Dcom.value
 
         self.x = self.merge['xminpot'].to_numpy()
@@ -575,9 +575,6 @@ class patchyScreening:
             plt.savefig(f'./Plots/T_ps_map_small_scale_{self.boxname}_{self.simname}_{self.z_sample_name}_{self.im_name}_{self.slope_name}.png', dpi=400)
             plt.clf()
 
-        self.mean_mod_T_large_scale = np.mean(np.abs(self.large_scale_map.copy()))
-        print(self.mean_mod_T_large_scale)
-
         if self.rotate == True:
             print(f'Computing, rotating and filtering alms: {time.time() - self.job_start_time}s')
         elif self.rotate == False:
@@ -593,11 +590,21 @@ class patchyScreening:
 
         ell_min = 1600
 
+        # Sign estiomator
         try:
-            tau_est = -(np.sign(self.large_scale_map.copy()) * self.small_scale_map.copy()) / self.mean_mod_T_large_scale.copy()
+            tau_est = -(np.sign(self.large_scale_map.copy()) * self.small_scale_map.copy())
         except AttributeError:
             self.compute_alm_maps(plot)
-            tau_est = -(np.sign(self.large_scale_map.copy()) * self.small_scale_map.copy()) / self.mean_mod_T_large_scale.copy()
+            tau_est = -(np.sign(self.large_scale_map.copy()) * self.small_scale_map.copy())
+
+        # Temperature inversion estimator
+        # try:
+        #     norm = np.mean(self.large_scale_map.copy()**2)
+        # except AttributeError:
+        #     self.compute_alm_maps(plot)
+        #     norm = np.mean(self.large_scale_map.copy()**2)
+
+        # tau_est = -(self.large_scale_map.copy() * self.small_scale_map.copy()) / norm
 
         lmax = 3 * self.nside - 1
         tau_alm = hp.map2alm(tau_est, lmax=lmax)
@@ -607,8 +614,6 @@ class patchyScreening:
         tau_alm = hp.almxfl(tau_alm.copy(), tau_values)
 
         self.reconstructed_tau_map = hp.alm2map(tau_alm, nside=self.nside, lmax=lmax)
-
-        # self.reconstructed_tau_map = hp.ud_grade(self.reconstructed_tau_map, 8192)
 
         self.reconstructed_tau_map = hp.smoothing(self.reconstructed_tau_map, fwhm=1.6*np.pi/60.0/180.0)
 
@@ -622,6 +627,18 @@ class patchyScreening:
 
         return
 
+
+    def normalise_tau_map_from_halos(self):
+
+        pixels = hp.vec2pix(self.nside, self.source_vector[:, 0], self.source_vector[:, 1], self.source_vector[:, 2])
+        T_large_at_halos = self.large_scale_map[pixels]
+
+        self.mean_mod_T_large_scale = np.mean(np.abs(T_large_at_halos))
+        self.reconstructed_tau_map /= self.mean_mod_T_large_scale
+
+        print(f"<|T_large|> from {self.stack_size} balanced halos = {self.mean_mod_T_large_scale}")
+
+
     def f_lowpass(self, l):
         # Low frequency bandpass filter
         if l < 600:
@@ -631,6 +648,7 @@ class patchyScreening:
         else:
             return np.cos(((l - 600) * np.pi) / 100)
 
+
     def f_highpass(self, l):
         # High frequency bandpass filter
         if l < 850:
@@ -639,6 +657,7 @@ class patchyScreening:
             return 1
         else:
             return np.sin(((l - 850) * np.pi) / 100)
+
         
     def lensing_filter(self, l):
         # Lensing filter for the tau map
@@ -646,6 +665,7 @@ class patchyScreening:
             return 0
         elif l >= 1600:
             return 1
+
 
     def balance_large_scale_signs(self, plot=False, seed=1000):
         """
@@ -936,28 +956,27 @@ class patchyScreening:
         
 
     def run_tau_mpi_from_saved(self):
-        self.load_branch_outputs()
-        self.run_tau_profiles_mpi()
-
         comm = MPI.COMM_WORLD
         rank = comm.Get_rank()
 
-        # if rank == 0:
-        #     self.balance_large_scale_signs_and_save(seed=1000)
+        self.load_branch_outputs()
 
-        # comm.Barrier()
+        if rank == 0:
+            self.balance_large_scale_signs_and_save(seed=1000)
 
-        # self.load_balanced_halo_outputs()
+        comm.Barrier()
 
-        # comm.Barrier()
+        self.load_balanced_halo_outputs()
 
-        # if rank == 0:
-        #     print(
-        #         f"Balanced catalogue loaded on all ranks: "
-        #         f"stack_size = {self.stack_size}"
-        #     )
+        self.normalise_tau_map_from_halos()
 
-        # self.run_tau_profiles_mpi()
+        if rank == 0:
+            print(f"Balanced catalogue: stack_size = {self.stack_size}")
+            print(f"<|T_large|> = {self.mean_mod_T_large_scale}")
+
+        comm.Barrier()
+
+        self.run_tau_profiles_mpi()
 
         if rank == 0:
             self.stack_and_save()
@@ -967,12 +986,26 @@ class patchyScreening:
 
         comm.Barrier()
 
+
     def run_tau_mpi_from_saved_image(self, plot=False):
+        comm = MPI.COMM_WORLD
+        rank = comm.Get_rank()
+
         self.load_branch_outputs()
+
+        if rank == 0:
+            self.balance_large_scale_signs_and_save(seed=1000)
+
+        comm.Barrier()
+
+        self.load_balanced_halo_outputs()
+        self.normalise_tau_map_from_halos()
+
+        comm.Barrier()
+
         self.run_tau_image_stack_mpi()
 
-        comm = MPI.COMM_WORLD
-        if comm.Get_rank() == 0:
+        if rank == 0:
             self.stack_and_save_image()
 
             if self.cleanup_tmp:
@@ -983,7 +1016,9 @@ class patchyScreening:
 
     def stack_and_save(self):
         comm = MPI.COMM_WORLD
-        if comm.Get_rank() != 0:
+        rank = comm.Get_rank()
+
+        if rank != 0:
             return
         
         # Stacking of tau profiles and save as pickle files
@@ -991,14 +1026,13 @@ class patchyScreening:
         for i in range(self.stack_size):
             tau_1D = self.data_1D[i,:]
             tau_1D_stack += tau_1D
-        # tau_1D_stack *= -1.0/(self.mean_mod_T_large_scale * self.stack_size)
         tau_1D_stack /= self.stack_size
         
         rows, cols = (len(self.theta_d), 4)
         data = [0]*cols
         data[0] = self.theta_d
         data[1] = tau_1D_stack
-        data[2] = (self.theta_d*np.pi/(180.0*60.0))*self.Dcom
+        data[2] = (self.theta_d*np.pi/(180.0*60.0)) * self.Dcom
         data[3] = self.stack_size
 
         fits_suffix = "" if self.cmb_method=='CAMB' else f"_{self.fits_file}"
@@ -1019,7 +1053,9 @@ class patchyScreening:
 
     def stack_and_save_image(self):
         comm = MPI.COMM_WORLD
-        if comm.Get_rank() != 0:
+        rank = comm.Get_rank()
+        
+        if rank != 0:
             return
 
         tau_1D_stack = np.zeros(len(self.theta_d))
@@ -1101,7 +1137,6 @@ class patchyScreening:
             self.cmb_tmp_file(),
             large_scale_map=self.large_scale_map,
             small_scale_map=self.small_scale_map,
-            mean_mod_T_large_scale=self.mean_mod_T_large_scale,
             reconstructed_tau_map=self.reconstructed_tau_map,
         )
 
@@ -1197,7 +1232,6 @@ class patchyScreening:
 
         self.large_scale_map = cmb["large_scale_map"]
         self.small_scale_map = cmb["small_scale_map"]
-        self.mean_mod_T_large_scale = float(cmb["mean_mod_T_large_scale"])
         self.reconstructed_tau_map = cmb["reconstructed_tau_map"]
 
         self.theta = halo["theta"]
